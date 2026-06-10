@@ -24,192 +24,15 @@ import CartDrawer from "@/components/CartDrawer";
 import RepairModal from "@/components/RepairModal";
 import CheckoutModal from "@/components/CheckoutModal";
 import WishlistDrawer from "@/components/WishlistDrawer";
+import PromoCarousel from "@/components/PromoCarousel";
 import Link from "next/link";
 import { useApp, Product, CartItem } from "@/context/AppContext";
 
-// 15+ Premium CSS Mockups & Custom Image Component
-function ProductMockup({ image, name, sizeClass = "w-24 aspect-[9/18]" }: { image: string; name: string; sizeClass?: string }) {
-  if (image === "iphone") {
-    return (
-      <div className={`${sizeClass} bg-slate-800 rounded-3xl p-1 shadow-lg border-2 border-slate-600 flex flex-col relative group-hover:scale-105 transition-transform duration-300`}>
-        <div className="absolute top-2 right-2 w-7 h-7 bg-slate-700/80 rounded-lg p-0.5 grid grid-cols-2 gap-0.5">
-          <div className="w-2.5 h-2.5 rounded-full bg-slate-950 border border-slate-500"></div>
-          <div className="w-2.5 h-2.5 rounded-full bg-slate-950 border border-slate-500"></div>
-          <div className="col-span-2 mx-auto w-2 h-2 rounded-full bg-slate-950 border border-slate-500"></div>
-        </div>
-        <div className="flex-1 bg-slate-900 rounded-[22px] flex items-center justify-center relative overflow-hidden border border-slate-950/20">
-          <div className="absolute top-1 w-6 h-1.5 bg-black rounded-full"></div>
-          <span className="text-[7px] text-[#38BDF8] font-bold">15 Pro</span>
-        </div>
-      </div>
-    );
-  }
-  if (image === "samsung") {
-    return (
-      <div className={`${sizeClass} bg-slate-900 rounded-xl p-1 shadow-lg border-2 border-slate-700 flex flex-col relative group-hover:scale-105 transition-transform duration-300`}>
-        <div className="absolute top-2 right-2 flex flex-col gap-1">
-          <div className="w-2 h-2 rounded-full bg-slate-950 border border-slate-500"></div>
-          <div className="w-2 h-2 rounded-full bg-slate-950 border border-slate-500"></div>
-          <div className="w-2 h-2 rounded-full bg-slate-950 border border-slate-500"></div>
-        </div>
-        <div className="flex-1 bg-slate-950 rounded-lg flex items-center justify-center relative overflow-hidden border border-slate-900">
-          <div className="absolute top-0.5 w-1 h-1 rounded-full bg-black"></div>
-          <span className="text-[7px] text-amber-500 font-bold">Galaxy S24</span>
-        </div>
-      </div>
-    );
-  }
-  if (image === "cases") {
-    return (
-      <div className="flex gap-2 group-hover:scale-105 transition-transform duration-300">
-        <div className="w-14 aspect-[9/17] bg-[#38BDF8]/90 rounded-xl border border-sky-300 shadow-md p-1 relative">
-          <div className="w-4 h-4 bg-sky-900/40 rounded absolute top-2 right-2"></div>
-        </div>
-        <div className="w-14 aspect-[9/17] bg-amber-700/80 rounded-xl border border-amber-600 shadow-md p-1 relative -mt-2">
-          <div className="w-4 h-4 bg-amber-950/40 rounded absolute top-2 right-2"></div>
-        </div>
-      </div>
-    );
-  }
-  if (image && image.startsWith("charger-")) {
-    const watt = image.split("-")[1] || "20w";
-    let color = "bg-white text-slate-800 border-slate-200";
-    let size = "w-14 h-14";
-    let detail = "";
-    if (watt === "10w") {
-      size = "w-11 h-11";
-      color = "bg-slate-100 text-slate-600 border-slate-250";
-    } else if (watt === "15w") {
-      size = "w-12 h-12";
-      color = "bg-white text-slate-700 border-slate-200";
-    } else if (watt === "20w") {
-      size = "w-14 h-14";
-      color = "bg-white text-slate-800 border-slate-200";
-      detail = "PD CHARGE";
-    } else if (watt === "45w") {
-      size = "w-15 h-15";
-      color = "bg-slate-800 text-slate-100 border-slate-700";
-      detail = "SUPER FAST";
-    } else if (watt === "65w") {
-      size = "w-16 h-16";
-      color = "bg-slate-900 text-emerald-400 border-slate-800";
-      detail = "GaN FAST";
-    } else if (watt === "120w") {
-      size = "w-18 h-18";
-      color = "bg-black text-orange-500 border-orange-900/40";
-      detail = "ULTRA CHARGE";
-    }
-    return (
-      <div className={`${size} ${color} border rounded-2xl shadow-md flex flex-col items-center justify-center p-2 relative group-hover:scale-105 transition-transform duration-300`}>
-        <div className="flex gap-2.5 -mt-3.5 mb-1.5">
-          <div className="w-1 h-3 bg-slate-350 rounded-t"></div>
-          <div className="w-1 h-3 bg-slate-350 rounded-t"></div>
-        </div>
-        <span className="text-[10px] font-extrabold tracking-tight">{watt.toUpperCase()}</span>
-        {detail && <span className="text-[6px] font-bold text-slate-400 mt-0.5">{detail}</span>}
-        <div className={`w-2.5 h-1 rounded-full mt-1 ${watt === '120w' ? 'bg-orange-500' : 'bg-emerald-500'}`}></div>
-      </div>
-    );
-  }
-  if (image === "headphones") {
-    return (
-      <div className="w-20 h-20 relative flex items-center justify-center group-hover:scale-105 transition-transform duration-300">
-        <div className="absolute top-2 w-16 h-12 border-t-4 border-l-4 border-r-4 border-slate-500 rounded-t-full"></div>
-        <div className="absolute left-1 bottom-4 w-5 h-8 bg-slate-700 rounded-full border border-slate-600 shadow"></div>
-        <div className="absolute right-1 bottom-4 w-5 h-8 bg-slate-700 rounded-full border border-slate-600 shadow"></div>
-        <div className="absolute top-1.5 w-10 h-2 bg-slate-600 rounded-full"></div>
-      </div>
-    );
-  }
-  if (image === "earbuds") {
-    return (
-      <div className="w-20 h-16 bg-white border border-slate-200 rounded-2xl p-2.5 shadow-md relative flex flex-col justify-between items-center group-hover:scale-105 transition-transform duration-300">
-        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-        <div className="flex gap-3 mt-1">
-          <div className="w-4 h-4 bg-slate-100 border border-slate-200 rounded-full flex items-center justify-center">
-            <div className="w-2 h-2 bg-slate-600 rounded-full"></div>
-          </div>
-          <div className="w-4 h-4 bg-slate-100 border border-slate-200 rounded-full flex items-center justify-center">
-            <div className="w-2 h-2 bg-slate-600 rounded-full"></div>
-          </div>
-        </div>
-        <span className="text-[6px] text-slate-400 font-bold uppercase tracking-wider">Wireless</span>
-      </div>
-    );
-  }
-  if (image === "cable") {
-    return (
-      <div className="w-20 h-20 relative flex items-center justify-center group-hover:scale-105 transition-transform duration-300">
-        <div className="w-14 h-14 border-4 border-dashed border-slate-400 rounded-full rotate-45 flex items-center justify-center">
-          <div className="w-10 h-10 border-4 border-slate-350 rounded-full"></div>
-        </div>
-        <div className="absolute bottom-2 left-1.5 w-3 h-6 bg-slate-800 rounded border border-slate-600 flex flex-col items-center">
-          <div className="w-1.5 h-2 bg-slate-300 rounded-t"></div>
-        </div>
-        <div className="absolute top-2 right-1.5 w-6 h-3 bg-slate-800 rounded border border-slate-600 flex items-center justify-end">
-          <div className="w-2 h-1.5 bg-slate-300 rounded-r"></div>
-        </div>
-      </div>
-    );
-  }
-  if (image === "smartwatch") {
-    return (
-      <div className="w-18 h-18 relative flex flex-col items-center justify-center group-hover:scale-105 transition-transform duration-300">
-        <div className="absolute top-0 w-8 h-4 bg-slate-800 rounded-t-lg"></div>
-        <div className="absolute bottom-0 w-8 h-4 bg-slate-800 rounded-b-lg"></div>
-        <div className="w-12 h-13 bg-slate-900 border-2 border-slate-700 rounded-xl shadow-lg relative z-10 p-1.5 flex flex-col justify-between">
-          <div className="flex justify-between items-center text-[5px] text-slate-400 font-bold font-mono">
-            <span>9:41</span>
-            <span className="text-emerald-500">75%</span>
-          </div>
-          <div className="w-full flex justify-center items-center py-1">
-            <div className="w-4 h-4 bg-rose-500/10 rounded-full flex items-center justify-center text-rose-500 font-bold text-[7px] animate-pulse">♥</div>
-          </div>
-          <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
-            <div className="w-3/4 h-full bg-cyan-400"></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-  if (image === "powerbank") {
-    return (
-      <div className="w-16 h-20 bg-slate-800 border border-slate-700 rounded-2xl p-2 shadow-lg flex flex-col justify-between group-hover:scale-105 transition-transform duration-300">
-        <div className="flex justify-around items-center bg-slate-950/40 rounded-lg p-0.5">
-          <div className="w-2 h-1 bg-amber-500 rounded-full"></div>
-          <div className="w-3.5 h-1 bg-slate-650 rounded-full"></div>
-          <div className="w-3.5 h-1 bg-slate-650 rounded-full"></div>
-        </div>
-        <div className="my-auto bg-slate-950 p-1.5 rounded-lg border border-slate-700 flex flex-col items-center">
-          <span className="text-[9px] text-[#38BDF8] font-mono font-bold">99%</span>
-          <span className="text-[5px] text-emerald-500 font-bold uppercase tracking-widest mt-0.5">PD 3.0</span>
-        </div>
-        <div className="text-[6px] text-center text-slate-400 font-bold font-mono">20,000 mAh</div>
-      </div>
-    );
-  }
-  if (image === "screen-protector") {
-    return (
-      <div className="w-20 h-22 relative flex items-center justify-center group-hover:scale-105 transition-transform duration-300">
-        <div className="absolute w-16 h-20 border-2 border-dashed border-emerald-400/70 rounded-2xl bg-emerald-500/5"></div>
-        <div className="w-12 h-18 bg-white/20 border-2 border-white/60 rounded-xl shadow-lg relative z-10 flex flex-col justify-between p-1 backdrop-blur-xs">
-          <div className="w-5 h-1 bg-white/50 mx-auto rounded-full"></div>
-          <span className="text-[6px] text-center text-white font-bold select-none">GLASS 9H</span>
-          <div className="w-1.5 h-1.5 border-b-2 border-r-2 border-white/50 self-end mr-0.5 mb-0.5"></div>
-        </div>
-      </div>
-    );
-  }
-
-  // Fallback for custom image url
-  return (
-    <img 
-      src={image} 
-      alt={name} 
-      className="max-w-full max-h-full object-contain rounded-xl transition-transform duration-300 group-hover:scale-105"
-    />
-  );
-}
+import ProductMockup from "@/components/ProductMockup";
+import MarqueeTicker from "@/components/MarqueeTicker";
+import FlashSaleBanner from "@/components/FlashSaleBanner";
+import BundlesSection from "@/components/BundlesSection";
+import PromoPopUp from "@/components/PromoPopUp";
 
 interface ProductDetailModalProps {
   product: Product;
@@ -533,6 +356,8 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-white text-[#1a1a1a] flex flex-col font-sans">
       
+      <MarqueeTicker />
+
       {/* 1. Header (Navigation) */}
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-card-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
@@ -670,88 +495,11 @@ export default function Home() {
           <Search className="w-4.5 h-4.5 text-slate-400 absolute left-auto right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
         </div>
 
-        {/* 2. Hero Section (Bento Style) */}
-        <section className="bg-gradient-to-br from-slate-50 via-slate-50 to-blue-50/20 border border-card-border rounded-3xl p-6 sm:p-10 lg:p-12 overflow-hidden relative">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
-            
-            {/* Right Side: Hero Content */}
-            <div className="lg:col-span-7 space-y-6 text-right order-1 lg:order-2">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-accent/10 text-accent font-bold text-xs rounded-full">
-                <Shield className="w-3.5 h-3.5" />
-                موزع معتمد لقطع الغيار والصيانة السريعة
-              </span>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-[#1a1a1a] leading-tight">
-                أحدث الملحقات <br className="hidden sm:inline" />
-                <span className="text-accent">والصيانة السريعة</span> هاتفياً
-              </h1>
-              <p className="text-sm sm:text-base text-slate-500 leading-relaxed max-w-2xl">
-                في متجر مركز الروان المعتمد، نوفر لك أرقى إكسسوارات الهواتف الذكية وحافظاتها الأكثر متانة، بالإضافة لخدمة صيانة الأجهزة الفورية على أيدي فنيين معتمدين وبأقصر وقت ممكن.
-              </p>
-              
-              <div className="flex flex-wrap gap-4 justify-start pt-2">
-                <a
-                  href="#products"
-                  className="bg-[#1a1a1a] hover:bg-slate-800 text-white font-bold text-sm px-7 py-3.5 rounded-xl transition-all duration-200 shadow-md hover:scale-[1.01]"
-                >
-                  تسوق الآن
-                </a>
-                <button
-                  onClick={() => setIsRepairOpen(true)}
-                  className="bg-accent hover:bg-accent-hover text-white font-bold text-sm px-7 py-3.5 rounded-xl transition-all duration-200 shadow-md hover:scale-[1.01] cursor-pointer"
-                >
-                  احجز صيانة فورية
-                </button>
-              </div>
-            </div>
+        {/* 2. Hero Section (Dynamic Sliding Banner Carousel) */}
+        <PromoCarousel onOpenRepairModal={() => setIsRepairOpen(true)} />
 
-            {/* Left Side: Premium Collage Visual representing accessories */}
-            <div className="lg:col-span-5 order-2 lg:order-1 flex justify-center items-center">
-              <div className="relative w-full max-w-[360px] aspect-square bg-white border border-slate-100 rounded-3xl p-6 shadow-xl flex items-center justify-center">
-                {/* Visual Graphic simulating premium accessories layout (Bento mockups) */}
-                <div className="grid grid-cols-12 gap-3 w-full h-full relative">
-                  
-                  {/* Phone Mockup box */}
-                  <div className="col-span-7 bg-slate-50 border border-slate-100 rounded-2xl p-4 shadow-sm flex flex-col justify-between relative overflow-hidden group hover:border-accent/40 transition-colors duration-300">
-                    <div className="absolute right-2 top-2 w-2 h-2 rounded-full bg-emerald-500"></div>
-                    <div className="w-full aspect-[9/16] max-h-24 bg-slate-900 rounded-lg mx-auto relative flex items-center justify-center">
-                      {/* Notch */}
-                      <div className="absolute top-1 w-8 h-1.5 bg-black rounded-full"></div>
-                      <div className="text-[6px] text-white/50 text-center font-mono select-none">12:00 PM</div>
-                    </div>
-                    <div className="text-[10px] font-bold text-center mt-2 truncate text-slate-700">Premium Phone</div>
-                  </div>
-
-                  {/* Charger Cable box */}
-                  <div className="col-span-5 bg-slate-50 border border-slate-100 rounded-2xl p-3 shadow-sm flex flex-col justify-center items-center hover:border-accent/40 transition-colors duration-300">
-                    <div className="w-10 h-10 rounded-full border border-slate-200 border-dashed flex items-center justify-center text-slate-400">
-                      <Cpu className="w-5 h-5" />
-                    </div>
-                    <div className="text-[9px] font-bold text-slate-500 mt-2 text-center">أحدث الرقاقات</div>
-                  </div>
-
-                  {/* Case / Case accessory box */}
-                  <div className="col-span-5 bg-slate-50 border border-slate-100 rounded-2xl p-3 shadow-sm flex flex-col justify-center items-center hover:border-accent/40 transition-colors duration-300">
-                    <div className="w-8 h-10 bg-slate-200 rounded border border-slate-300 relative flex items-center justify-center">
-                      <div className="w-2.5 h-2.5 rounded-full bg-slate-400 absolute top-1"></div>
-                    </div>
-                    <span className="text-[8px] font-bold text-slate-400 mt-1.5">حماية كاملة</span>
-                  </div>
-
-                  {/* Headphones box */}
-                  <div className="col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-4 text-white shadow-md flex flex-col justify-between hover:border-accent/60 transition-colors duration-300">
-                    <Headphones className="w-5 h-5 text-accent" />
-                    <div>
-                      <div className="text-[9px] text-slate-400 font-bold">سمّاعات لاسلكية</div>
-                      <div className="text-[10px] font-extrabold text-white">صوت فائق الدقة</div>
-                    </div>
-                  </div>
-
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </section>
+        {/* Flash Sale Countdown Deal */}
+        <FlashSaleBanner />
 
         {/* Dynamic Custom Promo Banner */}
         {siteSettings.promoBanner?.isEnabled && (
@@ -960,6 +708,9 @@ export default function Home() {
           </section>
         )}
 
+        {/* Bundles Lookbook Section */}
+        <BundlesSection />
+
         {/* 4. Product Showcase Grid */}
         <section id="products" className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-right">
@@ -1152,10 +903,10 @@ export default function Home() {
               </span>
               <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight leading-tight">
                 مركز الصيانة المعتمد <br />
-                <span className="text-accent">تصليح فوري وضمان معتمد</span>
+                <span className="text-accent">صيانة فورية وضمان معتمد</span>
               </h2>
               <p className="text-xs sm:text-sm text-slate-400 leading-relaxed max-w-3xl">
-                نعلم مدى أهمية هاتفك الذكي في حياتك اليومية، لذلك قمنا بتجهيز مركز صيانة متكامل بأحدث أدوات التشخيص والفحص. نقوم باستبدال الشاشات، صيانة البطاريات، منفذ الشحن، وحل جميع مشكلات النظام فوراً مع ضمان معتمد وقطع غيار أصلية.
+                نعلم مدى أهمية هاتفك الذكي في حياتك اليومية، لذلك قمنا بتجهيز مركز صيانة متكامل بأحدث أدوات التشخيص والفحص. نقوم باستبدال الشاشات، صيانة البطاريات، منفذ الشحن، وحل جميع مشاكل النظام فوراً مع ضمان معتمد وقطع غيار أصلية.
               </p>
 
               <div className="flex flex-wrap gap-4 justify-start pt-2">
@@ -1232,7 +983,7 @@ export default function Home() {
                 <span className="block text-xs font-bold text-slate-400 uppercase font-mono">Raw an Center</span>
               </div>
               <p className="text-xs text-slate-500 leading-relaxed">
-                مركز الروان المعتمد لشراء الهواتف الذكية وحافظاتها الفاخرة، والمركز المعتمد الأسرع في الصيانة بالمنطقة.
+                مركز الروان المعتمد لبيع وشراء الهواتف الذكية وحافضاتها الأنيقة والعصرية، والمركز المعتمد الأسرع في الصيانة بالمنطقة.
               </p>
             </div>
 
@@ -1297,17 +1048,6 @@ export default function Home() {
         </div>
       </footer>
 
-      {/* 7. Mobile-Only Sticky Floating Bottom Button */}
-      <div className="fixed bottom-4 left-4 right-4 md:hidden z-40">
-        <button
-          onClick={() => setIsRepairOpen(true)}
-          className="w-full bg-[#38BDF8] hover:bg-[#0ea5e9] text-white text-center py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg hover:scale-[1.01] transition-transform duration-200 cursor-pointer"
-        >
-          <Wrench className="w-4.5 h-4.5" />
-          <span>احجز موعد صيانة</span>
-        </button>
-      </div>
-
       {/* Cart Drawer */}
       <CartDrawer
         isOpen={isCartOpen}
@@ -1356,6 +1096,9 @@ export default function Home() {
           onSelectProduct={(prod) => setSelectedProduct(prod)}
         />
       )}
+
+      {/* Promotional Pop-up Modal */}
+      <PromoPopUp />
 
     </div>
   );

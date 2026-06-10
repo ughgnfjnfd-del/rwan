@@ -112,12 +112,66 @@ export interface SiteSettings {
   promoBanner: PromoBanner;
 }
 
+export interface SlideItem {
+  id: string;
+  tabLabel: string;
+  badge: string;
+  title: string;
+  titleAccent: string;
+  description: string;
+  btnText: string;
+  btnLink?: string;
+  actionType: "link" | "repair";
+  bgStyle: string;
+  theme: "dark" | "light";
+  graphicType: "macbook" | "iphone" | "repair" | "accessories" | "custom" | "product";
+  customImageUrl?: string;
+  productId?: string;
+}
+
+export interface MarqueeSettings {
+  isEnabled: boolean;
+  items: string[];
+}
+
+export interface FlashSale {
+  isEnabled: boolean;
+  productId: string;
+  discountPrice: number;
+  endTime: string;
+  stockLimit: number;
+  initialStock: number;
+}
+
+export interface ProductBundle {
+  id: string;
+  title: string;
+  description: string;
+  productIds: string[];
+  price: number;
+  bgStyle: string;
+}
+
+export interface PromoPopUp {
+  isEnabled: boolean;
+  title: string;
+  description: string;
+  imageUrl: string;
+  btnText: string;
+  btnLink: string;
+}
+
 interface AppContextType {
   products: Product[];
   appointments: Appointment[];
   cartItems: CartItem[];
   wishlist: string[];
   siteSettings: SiteSettings;
+  heroSlides: SlideItem[];
+  marqueeSettings: MarqueeSettings;
+  flashSale: FlashSale;
+  productBundles: ProductBundle[];
+  promoPopUp: PromoPopUp;
   addProduct: (product: Omit<Product, "id">) => void;
   updateProduct: (id: string, product: Partial<Product>) => void;
   deleteProduct: (id: string) => void;
@@ -130,6 +184,12 @@ interface AppContextType {
   clearCart: () => void;
   toggleWishlist: (productId: string) => void;
   updateSiteSettings: (settings: Partial<SiteSettings>) => Promise<void>;
+  updateHeroSlides: (slides: SlideItem[]) => Promise<void>;
+  updateMarqueeSettings: (settings: MarqueeSettings) => Promise<void>;
+  updateFlashSale: (sale: FlashSale) => Promise<void>;
+  updateProductBundles: (bundles: ProductBundle[]) => Promise<void>;
+  updatePromoPopUp: (popup: PromoPopUp) => Promise<void>;
+  addBundleToCart: (productIds: string[]) => void;
   isInitialized: boolean;
 }
 
@@ -158,7 +218,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       bgStyle: "glass-rose"
     }
   });
+  const [heroSlides, setHeroSlides] = useState<SlideItem[]>([]);
   const [wishlist, setWishlist] = useState<string[]>([]);
+  const [marqueeSettings, setMarqueeSettings] = useState<MarqueeSettings>({
+    isEnabled: false,
+    items: [
+      "🚚 توصيل سريع ومجاني لكافة محافظات العراق عند الشراء بأكثر من 50 ألف د.ع",
+      "🔧 صيانة فورية معتمدة بضمان حقيقي يصل إلى 3 أيام",
+      "✨ خصومات تصل إلى 25% على الملحقات والشواحن الأصلية"
+    ]
+  });
+  const [flashSale, setFlashSale] = useState<FlashSale>({
+    isEnabled: false,
+    productId: "",
+    discountPrice: 0,
+    endTime: new Date(Date.now() + 8 * 3600000).toISOString(),
+    stockLimit: 5,
+    initialStock: 10
+  });
+  const [productBundles, setProductBundles] = useState<ProductBundle[]>([]);
+  const [promoPopUp, setPromoPopUp] = useState<PromoPopUp>({
+    isEnabled: false,
+    title: "مرحباً بك في مركز الروان!",
+    description: "احصل على خصم فوري بقيمة 10% على صيانة جهازك الأول عند الحجز الآن.",
+    imageUrl: "",
+    btnText: "احجز صيانة الآن",
+    btnLink: "#repair"
+  });
   const [isInitialized, setIsInitialized] = useState(false);
 
   // Load from Supabase & LocalStorage
@@ -184,6 +270,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const socialsObj = settingsData.find((s: any) => s.key === "socials")?.value;
           const shippingObj = settingsData.find((s: any) => s.key === "shipping")?.value;
           const promoBannerObj = settingsData.find((s: any) => s.key === "promo_banner")?.value;
+          const heroSlidesObj = settingsData.find((s: any) => s.key === "hero_slides")?.value;
           
           setSiteSettings((prev) => ({
             email: contactObj?.email || prev.email,
@@ -200,6 +287,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               bgStyle: promoBannerObj?.bgStyle || prev.promoBanner.bgStyle,
             }
           }));
+
+          if (heroSlidesObj && Array.isArray(heroSlidesObj)) {
+            setHeroSlides(heroSlidesObj);
+          } else {
+            setHeroSlides([]);
+          }
+
+          const marqueeObj = settingsData.find((s: any) => s.key === "marquee_settings")?.value;
+          const flashSaleObj = settingsData.find((s: any) => s.key === "flash_sale")?.value;
+          const bundlesObj = settingsData.find((s: any) => s.key === "product_bundles")?.value;
+          const promoPopUpObj = settingsData.find((s: any) => s.key === "promo_popup")?.value;
+
+          if (marqueeObj) setMarqueeSettings(marqueeObj);
+          if (flashSaleObj) setFlashSale(flashSaleObj);
+          if (Array.isArray(bundlesObj)) setProductBundles(bundlesObj);
+          if (promoPopUpObj) setPromoPopUp(promoPopUpObj);
+        } else {
+          setHeroSlides([]);
         }
 
         // Fetch appointments
@@ -440,6 +545,75 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Hero Slides update action
+  const updateHeroSlides = async (updatedSlides: SlideItem[]) => {
+    setHeroSlides(updatedSlides);
+
+    // Update Supabase
+    const { error } = await supabase
+      .from("site_settings")
+      .upsert({ key: "hero_slides", value: updatedSlides });
+    
+    if (error) {
+      console.error("Error updating hero slides in Supabase", error);
+      throw error;
+    }
+  };
+
+  const updateMarqueeSettings = async (settings: MarqueeSettings) => {
+    setMarqueeSettings(settings);
+    const { error } = await supabase
+      .from("site_settings")
+      .upsert({ key: "marquee_settings", value: settings });
+    if (error) console.error("Error updating marquee settings in Supabase", error);
+  };
+
+  const updateFlashSale = async (sale: FlashSale) => {
+    setFlashSale(sale);
+    const { error } = await supabase
+      .from("site_settings")
+      .upsert({ key: "flash_sale", value: sale });
+    if (error) console.error("Error updating flash sale settings in Supabase", error);
+  };
+
+  const updateProductBundles = async (bundles: ProductBundle[]) => {
+    setProductBundles(bundles);
+    const { error } = await supabase
+      .from("site_settings")
+      .upsert({ key: "product_bundles", value: bundles });
+    if (error) console.error("Error updating product bundles in Supabase", error);
+  };
+
+  const updatePromoPopUp = async (popup: PromoPopUp) => {
+    setPromoPopUp(popup);
+    const { error } = await supabase
+      .from("site_settings")
+      .upsert({ key: "promo_popup", value: popup });
+    if (error) console.error("Error updating promo popup settings in Supabase", error);
+  };
+
+  const addBundleToCart = (productIds: string[]) => {
+    let newCartItems = [...cartItems];
+    
+    productIds.forEach((pid) => {
+      const product = products.find((p) => p.id === pid);
+      if (product) {
+        const existingIndex = newCartItems.findIndex((item) => item.product.id === product.id);
+        if (existingIndex > -1) {
+          newCartItems[existingIndex] = {
+            ...newCartItems[existingIndex],
+            quantity: newCartItems[existingIndex].quantity + 1
+          };
+        } else {
+          newCartItems.push({ product, quantity: 1 });
+        }
+      }
+    });
+
+    setCartItems(newCartItems);
+    saveCartToStorage(newCartItems);
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -447,6 +621,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         appointments,
         cartItems,
         siteSettings,
+        heroSlides,
+        marqueeSettings,
+        flashSale,
+        productBundles,
+        promoPopUp,
         addProduct,
         updateProduct,
         deleteProduct,
@@ -460,6 +639,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         wishlist,
         toggleWishlist,
         updateSiteSettings,
+        updateHeroSlides,
+        updateMarqueeSettings,
+        updateFlashSale,
+        updateProductBundles,
+        updatePromoPopUp,
+        addBundleToCart,
         isInitialized,
       }}
     >

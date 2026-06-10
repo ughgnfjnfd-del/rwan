@@ -4,7 +4,7 @@ import { Wrench, CheckCircle2, AlertTriangle, ShieldCheck } from "lucide-react";
 export default function RepairTermsPage() {
   return (
     <div className="space-y-6 text-right">
-      
+
       {/* Page Title */}
       <div className="border-b border-slate-100 pb-4 flex items-center gap-3">
         <div className="p-2 bg-blue-50 rounded-xl text-blue-500">
@@ -22,7 +22,7 @@ export default function RepairTermsPage() {
 
       {/* Grid: Pre-repair requirements vs Diagnostics */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        
+
         {/* Customer Responsibility */}
         <div className="bg-slate-50 border border-card-border p-5 rounded-2xl space-y-3">
           <h3 className="font-extrabold text-sm sm:text-base text-slate-800 flex items-center gap-2">
@@ -65,7 +65,7 @@ export default function RepairTermsPage() {
         </h3>
         <ul className="text-xs text-slate-600 space-y-2 leading-relaxed">
           <li>
-            • <strong>فترة الاستلام القصوى</strong>: يجب على الزبون استلام هاتفه فور إبلاغه بانتهاء عملية الصيانة. أقصى مدة للاحتفاظ بالجهاز هي 30 يوماً من تاريخ الاتصال به.
+            • <strong>فترة الاستلام القصوى</strong>: يجب على الزبون استلام هاتفه فور إبلاغه بانتهاء عملية الصيانة. أقصى مدة للاحتفاظ بالجهاز هي ً من تاريخ الاتصال به.
           </li>
           <li>
             • <strong>إخلاء المسؤولية</strong>: يخلى المركز مسؤوليته تماماً عن الأجهزة التي يتركها أصحابها لأكثر من 45 يوماً دون استلام أو تواصل، وللمركز الحق في التصرف بها لتغطية تكاليف قطع الغيار المستخدمة.
@@ -81,7 +81,7 @@ export default function RepairTermsPage() {
         <ShieldCheck className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
         <div>
           <span className="font-bold block text-blue-800 mb-1">ضمان ما بعد التصليح</span>
-          جميع عمليات الصيانة وقطع الغيار المستبدلة (شاشات، بطاريات، منافذ شحن، إلخ) مشمولة بضمان حقيقي لمدة 3 يوماً. في حال تكرار نفس المشكلة نتيجة خلل في القطعة، نقوم بإعادة صيانتها مجاناً.
+          جميع عمليات الصيانة وقطع الغيار المستبدلة (شاشات، بطاريات، منافذ شحن، إلخ) مشمولة بضمان حقيقي لمدة 3 أيام. في حال تكرار نفس المشكلة نتيجة خلل في القطعة، نقوم بإعادة صيانتها مجاناً.
         </div>
       </div>
 

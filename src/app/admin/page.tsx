@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { useApp, Product, Appointment } from "@/context/AppContext";
+import { useApp, Product, Appointment, SlideItem, MarqueeSettings, FlashSale, PromoPopUp, ProductBundle } from "@/context/AppContext";
 import { supabase } from "@/lib/supabase";
 import {
   Lock,
@@ -22,12 +22,70 @@ import {
   Search,
   FileText,
   AlertCircle,
+  Flame,
   Star,
   Mail,
   Phone,
   Globe,
-  PlusCircle
+  PlusCircle,
+  Upload,
+  ArrowUp,
+  ArrowDown
 } from "lucide-react";
+
+// Helper function to compress and resize images on client side
+const compressAndResizeImage = (file: File, maxWidth = 800, maxHeight = 800, quality = 0.8): Promise<Blob> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+
+        // Resize calculation
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("Failed to get 2D canvas context"));
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error("Canvas compression returned null blob"));
+            }
+          },
+          "image/jpeg",
+          quality
+        );
+      };
+      img.onerror = (err) => reject(err);
+    };
+    reader.onerror = (err) => reject(err);
+  });
+};
 
 export default function AdminPage() {
   const {
@@ -39,7 +97,17 @@ export default function AdminPage() {
     updateAppointmentStatus,
     deleteAppointment,
     siteSettings,
-    updateSiteSettings
+    updateSiteSettings,
+    heroSlides,
+    updateHeroSlides,
+    marqueeSettings,
+    updateMarqueeSettings,
+    flashSale,
+    updateFlashSale,
+    productBundles,
+    updateProductBundles,
+    promoPopUp,
+    updatePromoPopUp
   } = useApp();
 
   // Authentication States
@@ -49,12 +117,193 @@ export default function AdminPage() {
   const [loginError, setLoginError] = useState("");
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
 
+  // Slides States
+  const [isSlideModalOpen, setIsSlideModalOpen] = useState(false);
+  const [editingSlideId, setEditingSlideId] = useState<string | null>(null);
+  const [selectedSlideFile, setSelectedSlideFile] = useState<File | null>(null);
+  const [slideImagePreview, setSlideImagePreview] = useState<string | null>(null);
+  const [isUploadingSlide, setIsUploadingSlide] = useState(false);
+
+  const [slideForm, setSlideForm] = useState<Omit<SlideItem, "id">>({
+    tabLabel: "",
+    badge: "",
+    title: "",
+    titleAccent: "",
+    description: "",
+    btnText: "",
+    btnLink: "",
+    actionType: "link",
+    bgStyle: "from-[#F3F4F6] via-[#E5E7EB] to-[#DBEAFE] text-slate-900",
+    theme: "light",
+    graphicType: "macbook",
+    customImageUrl: "",
+    productId: ""
+  });
+
+  const handleOpenAddSlide = () => {
+    setEditingSlideId(null);
+    setSelectedSlideFile(null);
+    setSlideImagePreview(null);
+    setSlideForm({
+      tabLabel: "",
+      badge: "",
+      title: "",
+      titleAccent: "",
+      description: "",
+      btnText: "",
+      btnLink: "",
+      actionType: "link",
+      bgStyle: "from-[#F3F4F6] via-[#E5E7EB] to-[#DBEAFE] text-slate-900",
+      theme: "light",
+      graphicType: "macbook",
+      customImageUrl: "",
+      productId: ""
+    });
+    setIsSlideModalOpen(true);
+  };
+
+  const handleOpenEditSlide = (slide: SlideItem) => {
+    setEditingSlideId(slide.id);
+    setSelectedSlideFile(null);
+    setSlideImagePreview(slide.customImageUrl || null);
+    setSlideForm({
+      tabLabel: slide.tabLabel,
+      badge: slide.badge,
+      title: slide.title,
+      titleAccent: slide.titleAccent,
+      description: slide.description,
+      btnText: slide.btnText,
+      btnLink: slide.btnLink || "",
+      actionType: slide.actionType,
+      bgStyle: slide.bgStyle,
+      theme: slide.theme,
+      graphicType: slide.graphicType,
+      customImageUrl: slide.customImageUrl || "",
+      productId: slide.productId || ""
+    });
+    setIsSlideModalOpen(true);
+  };
+
+  const handleSaveSlide = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!slideForm.tabLabel || !slideForm.title || !slideForm.btnText) {
+      alert("يرجى ملء جميع الحقول المطلوبة");
+      return;
+    }
+
+    let customImageValue = slideForm.customImageUrl || "";
+
+    if (slideForm.graphicType === "custom" && selectedSlideFile) {
+      setIsUploadingSlide(true);
+      try {
+        const compressedBlob = await compressAndResizeImage(selectedSlideFile, 800, 800, 0.8);
+        const fileExtension = selectedSlideFile.name.split('.').pop() || 'jpg';
+        const cleanName = selectedSlideFile.name.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 20);
+        const filePath = `slides/${Date.now()}-${cleanName}.${fileExtension}`;
+
+        const { data, error: uploadError } = await supabase.storage
+          .from("products")
+          .upload(filePath, compressedBlob, {
+            contentType: `image/${fileExtension === 'png' ? 'png' : 'jpeg'}`,
+            cacheControl: "3600",
+            upsert: false
+          });
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from("products")
+          .getPublicUrl(filePath);
+
+        customImageValue = publicUrl;
+      } catch (error: any) {
+        console.error("Error uploading slide image:", error);
+        alert(`حدث خطأ أثناء رفع الصورة: ${error.message || error}`);
+        setIsUploadingSlide(false);
+        return;
+      } finally {
+        setIsUploadingSlide(false);
+      }
+    }
+
+    const slideData: SlideItem = {
+      id: editingSlideId || `slide-${Date.now()}`,
+      tabLabel: slideForm.tabLabel,
+      badge: slideForm.badge,
+      title: slideForm.title,
+      titleAccent: slideForm.titleAccent,
+      description: slideForm.description,
+      btnText: slideForm.btnText,
+      btnLink: slideForm.btnLink,
+      actionType: slideForm.actionType,
+      bgStyle: slideForm.bgStyle,
+      theme: slideForm.theme,
+      graphicType: slideForm.graphicType,
+      customImageUrl: customImageValue,
+      productId: slideForm.productId
+    };
+
+    let updatedSlides: SlideItem[];
+    if (editingSlideId) {
+      updatedSlides = heroSlides.map((s) => (s.id === editingSlideId ? slideData : s));
+    } else {
+      updatedSlides = [...heroSlides, slideData];
+    }
+
+    try {
+      await updateHeroSlides(updatedSlides);
+      setIsSlideModalOpen(false);
+    } catch (err: any) {
+      alert(`حدث خطأ أثناء حفظ الشريحة: ${err.message || err}`);
+    }
+  };
+
+  const handleDeleteSlide = async (id: string) => {
+    if (confirm("هل أنت متأكد من حذف هذه الشريحة الإعلانية؟")) {
+      const updatedSlides = heroSlides.filter((s) => s.id !== id);
+      try {
+        await updateHeroSlides(updatedSlides);
+      } catch (err: any) {
+        alert(`حدث خطأ أثناء حذف الشريحة: ${err.message || err}`);
+      }
+    }
+  };
+
+  const handleMoveSlide = async (index: number, direction: "up" | "down") => {
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= heroSlides.length) return;
+
+    const updated = [...heroSlides];
+    const temp = updated[index];
+    updated[index] = updated[targetIndex];
+    updated[targetIndex] = temp;
+
+    try {
+      await updateHeroSlides(updated);
+    } catch (err: any) {
+      alert(`حدث خطأ أثناء تغيير ترتيب الشرائح: ${err.message || err}`);
+    }
+  };
+
   useEffect(() => {
     // Check active sessions and sets the user
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setIsLoggedIn(!!session);
-      setIsLoadingAuth(false);
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          // If refresh token is invalid or missing, clear the session data from local storage
+          if (error.message?.includes("Refresh Token")) {
+            await supabase.auth.signOut().catch(() => {});
+          }
+          setIsLoggedIn(false);
+        } else {
+          setIsLoggedIn(!!session);
+        }
+      } catch (err) {
+        setIsLoggedIn(false);
+      } finally {
+        setIsLoadingAuth(false);
+      }
     };
     checkSession();
 
@@ -66,19 +315,23 @@ export default function AdminPage() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Tab State: "overview", "products", "repairs", "settings"
-  const [activeTab, setActiveTab] = useState<"overview" | "products" | "repairs" | "settings">("overview");
+  // Tab State: "overview", "products", "repairs", "settings", "slides", "bundles"
+  const [activeTab, setActiveTab] = useState<"overview" | "products" | "repairs" | "settings" | "slides" | "bundles">("overview");
 
   // Product CRUD States
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
   const [productForm, setProductForm] = useState({
     name: "",
     nameEn: "",
     price: 0,
     discountPrice: 0,
     category: "موبايلات",
-    imageType: "preset" as "preset" | "url",
+    imageType: "preset" as "preset" | "url" | "upload",
     imagePreset: "iphone",
     imageUrl: "",
     description: "",
@@ -108,6 +361,199 @@ export default function AdminPage() {
     url: "",
     name: "فيسبوك",
   });
+
+  // Infinite Marquee States
+  const [marqueeForm, setMarqueeForm] = useState<MarqueeSettings>({
+    isEnabled: false,
+    items: []
+  });
+  const [newMarqueeItem, setNewMarqueeItem] = useState("");
+
+  useEffect(() => {
+    if (marqueeSettings) {
+      setMarqueeForm(marqueeSettings);
+    }
+  }, [marqueeSettings]);
+
+  const handleAddMarqueeItem = () => {
+    if (!newMarqueeItem.trim()) return;
+    setMarqueeForm({
+      ...marqueeForm,
+      items: [...marqueeForm.items, newMarqueeItem.trim()]
+    });
+    setNewMarqueeItem("");
+  };
+
+  const handleRemoveMarqueeItem = (idx: number) => {
+    setMarqueeForm({
+      ...marqueeForm,
+      items: marqueeForm.items.filter((_, i) => i !== idx)
+    });
+  };
+
+  const handleSaveMarquee = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await updateMarqueeSettings(marqueeForm);
+      alert("تم حفظ إعدادات شريط الإعلانات بنجاح! 🚀");
+    } catch (err: any) {
+      alert(`حدث خطأ أثناء الحفظ: ${err.message || err}`);
+    }
+  };
+
+  // Promo Pop-Up States
+  const [promoPopUpForm, setPromoPopUpForm] = useState<PromoPopUp>({
+    isEnabled: false,
+    title: "",
+    description: "",
+    imageUrl: "",
+    btnText: "",
+    btnLink: ""
+  });
+
+  useEffect(() => {
+    if (promoPopUp) {
+      setPromoPopUpForm(promoPopUp);
+    }
+  }, [promoPopUp]);
+
+  const handleSavePromoPopUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await updatePromoPopUp(promoPopUpForm);
+      alert("تم حفظ إعدادات العرض المنبثق بنجاح! 🔔");
+    } catch (err: any) {
+      alert(`حدث خطأ أثناء الحفظ: ${err.message || err}`);
+    }
+  };
+
+  // Flash Sale States
+  const [flashSaleForm, setFlashSaleForm] = useState<FlashSale>({
+    isEnabled: false,
+    productId: "",
+    discountPrice: 0,
+    endTime: "",
+    stockLimit: 0,
+    initialStock: 0
+  });
+
+  useEffect(() => {
+    if (flashSale) {
+      const localEndTime = flashSale.endTime ? new Date(flashSale.endTime).toISOString().slice(0, 16) : "";
+      setFlashSaleForm({
+        ...flashSale,
+        endTime: localEndTime,
+        productId: flashSale.productId || "",
+        discountPrice: flashSale.discountPrice || 0,
+        stockLimit: flashSale.stockLimit || 0,
+        initialStock: flashSale.initialStock || 0,
+        isEnabled: flashSale.isEnabled || false
+      });
+    }
+  }, [flashSale]);
+
+  const handleSaveFlashSale = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!flashSaleForm.productId) {
+      alert("يرجى اختيار المنتج أولاً");
+      return;
+    }
+    try {
+      const isoEndTime = flashSaleForm.endTime ? new Date(flashSaleForm.endTime).toISOString() : "";
+      await updateFlashSale({
+        ...flashSaleForm,
+        endTime: isoEndTime
+      });
+      alert("تم حفظ إعدادات العرض الخاطف بنجاح! 🔥");
+    } catch (err: any) {
+      alert(`حدث خطأ أثناء الحفظ: ${err.message || err}`);
+    }
+  };
+
+  // Bundles CRUD States
+  const [isBundleModalOpen, setIsBundleModalOpen] = useState(false);
+  const [editingBundleId, setEditingBundleId] = useState<string | null>(null);
+  const [bundleForm, setBundleForm] = useState<Omit<ProductBundle, "id">>({
+    title: "",
+    description: "",
+    productIds: [],
+    price: 0,
+    bgStyle: "from-[#312E81] via-[#1E1B4B] to-[#090533]"
+  });
+
+  const handleOpenAddBundle = () => {
+    setEditingBundleId(null);
+    setBundleForm({
+      title: "",
+      description: "",
+      productIds: [],
+      price: 0,
+      bgStyle: "from-[#312E81] via-[#1E1B4B] to-[#090533]"
+    });
+    setIsBundleModalOpen(true);
+  };
+
+  const handleOpenEditBundle = (bundle: ProductBundle) => {
+    setEditingBundleId(bundle.id);
+    setBundleForm({
+      title: bundle.title,
+      description: bundle.description,
+      productIds: bundle.productIds || [],
+      price: bundle.price || 0,
+      bgStyle: bundle.bgStyle || "from-[#312E81] via-[#1E1B4B] to-[#090533]"
+    });
+    setIsBundleModalOpen(true);
+  };
+
+  const handleSaveBundle = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bundleForm.title || bundleForm.productIds.length < 2 || bundleForm.price <= 0) {
+      alert("يرجى إدخال اسم الحزمة، واختيار منتجين على الأقل، وتحديد السعر");
+      return;
+    }
+
+    const bundleData: ProductBundle = {
+      id: editingBundleId || `bundle-${Date.now()}`,
+      title: bundleForm.title,
+      description: bundleForm.description,
+      productIds: bundleForm.productIds,
+      price: bundleForm.price,
+      bgStyle: bundleForm.bgStyle
+    };
+
+    let updatedBundles: ProductBundle[];
+    if (editingBundleId) {
+      updatedBundles = productBundles.map((b) => (b.id === editingBundleId ? bundleData : b));
+    } else {
+      updatedBundles = [...productBundles, bundleData];
+    }
+
+    try {
+      await updateProductBundles(updatedBundles);
+      setIsBundleModalOpen(false);
+    } catch (err: any) {
+      alert(`حدث خطأ أثناء حفظ الحزمة: ${err.message || err}`);
+    }
+  };
+
+  const handleDeleteBundle = async (id: string) => {
+    if (confirm("هل أنت متأكد من حذف هذه الحزمة الترويجية؟")) {
+      const updated = productBundles.filter((b) => b.id !== id);
+      try {
+        await updateProductBundles(updated);
+      } catch (err: any) {
+        alert(`حدث خطأ أثناء حذف الحزمة: ${err.message || err}`);
+      }
+    }
+  };
+
+  const handleToggleProductInBundle = (pid: string) => {
+    const isSelected = bundleForm.productIds.includes(pid);
+    const updatedIds = isSelected
+      ? bundleForm.productIds.filter((id) => id !== pid)
+      : [...bundleForm.productIds, pid];
+    setBundleForm({ ...bundleForm, productIds: updatedIds });
+  };
 
   // Sync settingsForm state when siteSettings loads
   useEffect(() => {
@@ -205,6 +651,8 @@ export default function AdminPage() {
   // Open Add Product Form
   const handleOpenAdd = () => {
     setEditingProductId(null);
+    setSelectedFile(null);
+    setImagePreview(null);
     setProductForm({
       name: "",
       nameEn: "",
@@ -224,14 +672,19 @@ export default function AdminPage() {
   // Open Edit Product Form
   const handleOpenEdit = (product: Product) => {
     setEditingProductId(product.id);
+    setSelectedFile(null);
     const isPreset = ["iphone", "samsung", "cases", "headphones", "earbuds", "cable", "smartwatch", "powerbank", "screen-protector"].includes(product.image) || product.image.startsWith("charger-");
+    
+    // Set current image preview for custom images
+    setImagePreview(isPreset ? null : product.image);
+
     setProductForm({
       name: product.name,
       nameEn: product.nameEn,
       price: product.price,
       discountPrice: product.discountPrice || 0,
       category: product.category,
-      imageType: isPreset ? "preset" : "url",
+      imageType: isPreset ? "preset" : "upload",
       imagePreset: isPreset ? product.image : "iphone",
       imageUrl: isPreset ? "" : product.image,
       description: product.description || "",
@@ -242,14 +695,70 @@ export default function AdminPage() {
   };
 
   // Save Product (Add or Edit)
-  const handleSaveProduct = (e: React.FormEvent) => {
+  const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!productForm.name || !productForm.nameEn || productForm.price <= 0) {
       alert("يرجى ملء جميع الحقول بشكل صحيح");
       return;
     }
 
-    const imageValue = productForm.imageType === "preset" ? productForm.imagePreset : productForm.imageUrl;
+    let imageValue = "";
+    
+    if (productForm.imageType === "preset") {
+      imageValue = productForm.imagePreset;
+    } else if (productForm.imageType === "url") {
+      imageValue = productForm.imageUrl;
+      if (!imageValue) {
+        alert("يرجى إدخال رابط الصورة");
+        return;
+      }
+    } else if (productForm.imageType === "upload") {
+      if (selectedFile) {
+        setIsUploading(true);
+        try {
+          // Compress image to JPEG quality 0.8 and max 800px width/height
+          const compressedBlob = await compressAndResizeImage(selectedFile, 800, 800, 0.8);
+          
+          // Generate a clean safe unique filename
+          const fileExtension = selectedFile.name.split('.').pop() || 'jpg';
+          const cleanName = selectedFile.name.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 20);
+          const filePath = `${Date.now()}-${cleanName}.${fileExtension}`;
+          
+          // Upload to Supabase Storage
+          const { data, error: uploadError } = await supabase.storage
+            .from("products")
+            .upload(filePath, compressedBlob, {
+              contentType: `image/${fileExtension === 'png' ? 'png' : 'jpeg'}`,
+              cacheControl: "3600",
+              upsert: false
+            });
+
+          if (uploadError) {
+            throw uploadError;
+          }
+
+          // Get the public URL of the uploaded image
+          const { data: { publicUrl } } = supabase.storage
+            .from("products")
+            .getPublicUrl(filePath);
+
+          imageValue = publicUrl;
+        } catch (error: any) {
+          console.error("Error uploading image:", error);
+          alert(`حدث خطأ أثناء رفع الصورة: ${error.message || error.details || "يرجى التأكد من إنشاء Storage Bucket باسم 'products' وجعلها عامة (Public) في Supabase."}`);
+          setIsUploading(false);
+          return;
+        } finally {
+          setIsUploading(false);
+        }
+      } else if (editingProductId && imagePreview) {
+        // Keep existing custom image URL
+        imageValue = imagePreview;
+      } else {
+        alert("يرجى اختيار صورة للرفع");
+        return;
+      }
+    }
     
     if (!imageValue) {
       alert("يرجى إدخال رابط الصورة أو اختيار شكل جرافيكي");
@@ -268,12 +777,17 @@ export default function AdminPage() {
       isPopular: productForm.isPopular,
     };
 
-    if (editingProductId) {
-      updateProduct(editingProductId, productData);
-    } else {
-      addProduct(productData);
+    try {
+      if (editingProductId) {
+        await updateProduct(editingProductId, productData);
+      } else {
+        await addProduct(productData);
+      }
+      setIsProductModalOpen(false);
+    } catch (err: any) {
+      console.error("Error saving product:", err);
+      alert(`حدث خطأ أثناء حفظ المنتج: ${err.message || err}`);
     }
-    setIsProductModalOpen(false);
   };
 
   // Statistics calculations
@@ -477,6 +991,30 @@ export default function AdminPage() {
           >
             <FileText className="w-4.5 h-4.5" />
             <span>إعدادات الموقع</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("slides")}
+            className={`w-full flex items-center gap-3 p-3.5 rounded-xl text-sm font-bold transition-all text-right cursor-pointer ${
+              activeTab === "slides"
+                ? "bg-[#1a1a1a] text-white shadow-md"
+                : "hover:bg-slate-50 text-slate-600"
+            }`}
+          >
+            <Star className="w-4.5 h-4.5" />
+            <span>الشرائح الإعلانية ({heroSlides.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("bundles")}
+            className={`w-full flex items-center gap-3 p-3.5 rounded-xl text-sm font-bold transition-all text-right cursor-pointer ${
+              activeTab === "bundles"
+                ? "bg-[#1a1a1a] text-white shadow-md"
+                : "hover:bg-slate-50 text-slate-600"
+            }`}
+          >
+            <ShoppingBag className="w-4.5 h-4.5" />
+            <span>حزم التوفير ({productBundles.length})</span>
           </button>
         </aside>
 
@@ -1140,17 +1678,517 @@ export default function AdminPage() {
 
                 </div>
 
-                {/* Submit Action */}
-                <div className="flex justify-end pt-3 border-t border-slate-100">
-                  <button
-                    type="submit"
-                    className="bg-[#1a1a1a] hover:bg-slate-800 text-white font-bold text-xs sm:text-sm px-8 py-3 rounded-xl shadow-md transition-all cursor-pointer hover:scale-[1.01]"
-                  >
-                    حفظ إعدادات الموقع
-                  </button>
+              </form>
+
+              {/* --- Infinite Marquee Settings Section --- */}
+              <form onSubmit={handleSaveMarquee} className="bg-slate-50/50 border border-slate-100 rounded-2xl p-5 space-y-4 text-right">
+                <div className="flex justify-between items-center border-b border-slate-200/60 pb-2">
+                  <h3 className="font-extrabold text-sm text-slate-800 flex items-center gap-2">
+                    <Globe className="w-4 h-4 text-accent" />
+                    إعدادات شريط الإعلانات المتحرك (Marquee Ticker)
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="marqueeEnabled"
+                      checked={marqueeForm.isEnabled}
+                      onChange={(e) => setMarqueeForm({ ...marqueeForm, isEnabled: e.target.checked })}
+                      className="w-4 h-4 text-accent border-slate-300 rounded focus:ring-accent cursor-pointer"
+                    />
+                    <label htmlFor="marqueeEnabled" className="text-xs font-bold text-slate-700 cursor-pointer select-none">
+                      تفعيل شريط الإعلانات أعلى الصفحة
+                    </label>
+                  </div>
                 </div>
 
+                {marqueeForm.isEnabled && (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-xs font-semibold text-slate-700">الجمل الإعلانية الحالية:</label>
+                      {marqueeForm.items.length === 0 ? (
+                        <div className="p-3 border border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-400">
+                          لا توجد جمل إعلانية حالياً.
+                        </div>
+                      ) : (
+                        <div className="space-y-1.5">
+                          {marqueeForm.items.map((item, index) => (
+                            <div key={index} className="flex justify-between items-center bg-white border border-slate-150 p-2.5 rounded-xl">
+                              <span className="text-xs text-slate-700 font-medium">{item}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveMarqueeItem(index)}
+                                className="text-[10px] font-bold text-rose-500 hover:text-rose-700 p-1 hover:bg-rose-50 rounded"
+                              >
+                                حذف
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex gap-2 items-end pt-2 border-t border-slate-100">
+                      <div className="flex-1 space-y-1">
+                        <label className="text-[10px] font-semibold text-slate-500">أضف جملة إعلانية جديدة (مع إيموجي للتجميل):</label>
+                        <input
+                          type="text"
+                          value={newMarqueeItem}
+                          onChange={(e) => setNewMarqueeItem(e.target.value)}
+                          placeholder="مثال: 🚚 توصيل مجاني وسريع لكافة المحافظات"
+                          className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:border-accent"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleAddMarqueeItem}
+                        className="bg-[#1a1a1a] hover:bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all h-fit"
+                      >
+                        إضافة
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-end pt-2 border-t border-slate-150">
+                  <button
+                    type="submit"
+                    className="bg-[#1a1a1a] hover:bg-slate-800 text-white font-bold text-[11px] px-6 py-2.5 rounded-xl transition-all shadow-sm cursor-pointer animate-fade-in"
+                  >
+                    حفظ إعدادات شريط الإعلانات
+                  </button>
+                </div>
               </form>
+
+              {/* --- Exit Intent / Promo Pop-Up Section --- */}
+              <form onSubmit={handleSavePromoPopUp} className="bg-slate-50/50 border border-slate-100 rounded-2xl p-5 space-y-4 text-right">
+                <div className="flex justify-between items-center border-b border-slate-200/60 pb-2">
+                  <h3 className="font-extrabold text-sm text-slate-800 flex items-center gap-2">
+                    <Star className="w-4 h-4 text-rose-500 fill-rose-500" />
+                    العرض المنبثق الترويجي للزوار (Promo Pop-up)
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="promoPopUpEnabled"
+                      checked={promoPopUpForm.isEnabled}
+                      onChange={(e) => setPromoPopUpForm({ ...promoPopUpForm, isEnabled: e.target.checked })}
+                      className="w-4 h-4 text-accent border-slate-350 rounded focus:ring-accent cursor-pointer"
+                    />
+                    <label htmlFor="promoPopUpEnabled" className="text-xs font-bold text-slate-700 cursor-pointer select-none">
+                      تفعيل العرض المنبثق
+                    </label>
+                  </div>
+                </div>
+
+                {promoPopUpForm.isEnabled && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
+                    {/* Title */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-700">عنوان العرض الرئيسي *</label>
+                      <input
+                        type="text"
+                        value={promoPopUpForm.title}
+                        onChange={(e) => setPromoPopUpForm({ ...promoPopUpForm, title: e.target.value })}
+                        placeholder="مثال: خصم 10% على أول صيانة!"
+                        className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:border-accent"
+                        required
+                      />
+                    </div>
+
+                    {/* Image URL */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-700">رابط صورة تسويقية (اختياري)</label>
+                      <input
+                        type="url"
+                        value={promoPopUpForm.imageUrl}
+                        onChange={(e) => setPromoPopUpForm({ ...promoPopUpForm, imageUrl: e.target.value })}
+                        placeholder="https://example.com/banner.png"
+                        className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:border-accent font-mono text-left"
+                        dir="ltr"
+                      />
+                    </div>
+
+                    {/* Description */}
+                    <div className="space-y-1 md:col-span-2">
+                      <label className="text-xs font-semibold text-slate-700">وصف العرض والتعليمات *</label>
+                      <textarea
+                        value={promoPopUpForm.description}
+                        onChange={(e) => setPromoPopUpForm({ ...promoPopUpForm, description: e.target.value })}
+                        placeholder="اكتب تفاصيل مقنعة ومبهرة لجذب الزوار..."
+                        rows={2}
+                        className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:border-accent text-right resize-none"
+                        required
+                      />
+                    </div>
+
+                    {/* Button Text */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-700">نص زر التوجيه *</label>
+                      <input
+                        type="text"
+                        value={promoPopUpForm.btnText}
+                        onChange={(e) => setPromoPopUpForm({ ...promoPopUpForm, btnText: e.target.value })}
+                        placeholder="مثال: احجز الآن"
+                        className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:border-accent"
+                        required
+                      />
+                    </div>
+
+                    {/* Button Link */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-700">رابط زر التوجيه *</label>
+                      <input
+                        type="text"
+                        value={promoPopUpForm.btnLink}
+                        onChange={(e) => setPromoPopUpForm({ ...promoPopUpForm, btnLink: e.target.value })}
+                        placeholder="مثال: #repair أو رابط خارجي"
+                        className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:border-accent font-mono text-left"
+                        dir="ltr"
+                        required
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-end pt-2 border-t border-slate-150">
+                  <button
+                    type="submit"
+                    className="bg-[#1a1a1a] hover:bg-slate-800 text-white font-bold text-[11px] px-6 py-2.5 rounded-xl transition-all shadow-sm cursor-pointer"
+                  >
+                    حفظ إعدادات العرض المنبثق
+                  </button>
+                </div>
+              </form>
+
+              {/* --- Flash Sale Settings Section --- */}
+              <form onSubmit={handleSaveFlashSale} className="bg-slate-50/50 border border-slate-100 rounded-2xl p-5 space-y-4 text-right">
+                <div className="flex justify-between items-center border-b border-slate-200/60 pb-2">
+                  <h3 className="font-extrabold text-sm text-slate-800 flex items-center gap-2">
+                    <Flame className="w-4 h-4 text-red-500 fill-red-500" />
+                    صفقة اليوم الخاطفة الفائقة (Flash Sale Countdown)
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="flashSaleEnabled"
+                      checked={flashSaleForm.isEnabled}
+                      onChange={(e) => setFlashSaleForm({ ...flashSaleForm, isEnabled: e.target.checked })}
+                      className="w-4 h-4 text-accent border-slate-350 rounded focus:ring-accent cursor-pointer"
+                    />
+                    <label htmlFor="flashSaleEnabled" className="text-xs font-bold text-slate-700 cursor-pointer select-none">
+                      تفعيل الصفقة الخاطفة بالصفحة الرئيسية
+                    </label>
+                  </div>
+                </div>
+
+                {flashSaleForm.isEnabled && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
+                    {/* Select Product */}
+                    <div className="space-y-1 md:col-span-2">
+                      <label className="text-xs font-semibold text-slate-700">المنتج المشمول في العرض الخاطف *</label>
+                      <select
+                        value={flashSaleForm.productId}
+                        onChange={(e) => setFlashSaleForm({ ...flashSaleForm, productId: e.target.value })}
+                        className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:border-accent cursor-pointer"
+                        required
+                      >
+                        <option value="">-- اختر المنتج من مخزنك --</option>
+                        {products.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name} ({p.price.toLocaleString()} د.ع)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Discount Price */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-700">سعر الصفقة المخفض (د.ع) *</label>
+                      <input
+                        type="number"
+                        value={flashSaleForm.discountPrice || ""}
+                        onChange={(e) => setFlashSaleForm({ ...flashSaleForm, discountPrice: parseInt(e.target.value) || 0 })}
+                        placeholder="سعر العرض الخاص..."
+                        className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:border-accent font-mono"
+                        required
+                      />
+                    </div>
+
+                    {/* End time */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-700">وقت وتاريخ انتهاء الصفقة *</label>
+                      <input
+                        type="datetime-local"
+                        value={flashSaleForm.endTime}
+                        onChange={(e) => setFlashSaleForm({ ...flashSaleForm, endTime: e.target.value })}
+                        className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:border-accent font-mono text-left"
+                        required
+                      />
+                    </div>
+
+                    {/* Initial stock */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-700">إجمالي كمية العرض المعروضة (Initial Stock) *</label>
+                      <input
+                        type="number"
+                        value={flashSaleForm.initialStock || ""}
+                        onChange={(e) => setFlashSaleForm({ ...flashSaleForm, initialStock: parseInt(e.target.value) || 0 })}
+                        placeholder="كمية البدء..."
+                        className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:border-accent font-mono"
+                        required
+                      />
+                    </div>
+
+                    {/* Stock limit */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-700">الكمية المتبقية حالياً (Remaining Stock) *</label>
+                      <input
+                        type="number"
+                        value={flashSaleForm.stockLimit || ""}
+                        onChange={(e) => setFlashSaleForm({ ...flashSaleForm, stockLimit: parseInt(e.target.value) || 0 })}
+                        placeholder="الكمية المتبقية..."
+                        className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:border-accent font-mono"
+                        required
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-end pt-2 border-t border-slate-150">
+                  <button
+                    type="submit"
+                    className="bg-[#1a1a1a] hover:bg-slate-800 text-white font-bold text-[11px] px-6 py-2.5 rounded-xl transition-all shadow-sm cursor-pointer animate-fade-in"
+                  >
+                    حفظ إعدادات الصفقة الخاطفة
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* TAB 5: BANNER SLIDES MANAGEMENT */}
+          {activeTab === "slides" && (
+            <div className="space-y-6 text-right" dir="rtl">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-4">
+                <div>
+                  <h2 className="text-xl font-extrabold text-[#1a1a1a]">إدارة الشرائح الإعلانية (Hero Slides)</h2>
+                  <p className="text-xs text-slate-400">إضافة وتعديل وحذف وترتيب الشرائح الإعلانية المعروضة في واجهة المتجر الرئيسية</p>
+                </div>
+                
+                <button
+                  onClick={handleOpenAddSlide}
+                  className="bg-[#1a1a1a] hover:bg-slate-800 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  إضافة شريحة جديدة
+                </button>
+              </div>
+
+              {heroSlides.length === 0 ? (
+                <div className="p-12 border border-dashed border-slate-200 rounded-xl text-center text-slate-400 text-xs animate-fade-in">
+                  لا توجد شرائح إعلانية مضافة حالياً. اضغط على الزر أعلاه لإضافة أول شريحة.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4">
+                  {heroSlides.map((slide, idx) => (
+                    <div key={slide.id} className="border border-slate-250/50 rounded-2xl bg-white p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-slate-350 hover:shadow-md transition-all duration-200">
+                      
+                      {/* Left: Move and edit controls */}
+                      <div className="flex items-center gap-2 w-full md:w-auto order-3 md:order-1 justify-end md:justify-start">
+                        {/* Move Up */}
+                        <button
+                          type="button"
+                          onClick={() => handleMoveSlide(idx, "up")}
+                          disabled={idx === 0}
+                          className="p-1.5 border border-slate-200 bg-white rounded-lg text-slate-500 hover:bg-slate-150 disabled:opacity-30 disabled:hover:bg-white cursor-pointer"
+                          title="تحريك للأعلى"
+                        >
+                          <ArrowUp className="w-4 h-4" />
+                        </button>
+                        {/* Move Down */}
+                        <button
+                          type="button"
+                          onClick={() => handleMoveSlide(idx, "down")}
+                          disabled={idx === heroSlides.length - 1}
+                          className="p-1.5 border border-slate-200 bg-white rounded-lg text-slate-500 hover:bg-slate-150 disabled:opacity-30 disabled:hover:bg-white cursor-pointer"
+                          title="تحريك للأسفل"
+                        >
+                          <ArrowDown className="w-4 h-4" />
+                        </button>
+                        
+                        <div className="w-[1px] h-6 bg-slate-200 mx-1"></div>
+                        
+                        {/* Edit */}
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditSlide(slide)}
+                          className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer"
+                        >
+                          <Edit2 className="w-3 h-3" />
+                          تعديل
+                        </button>
+                        
+                        {/* Delete */}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSlide(slide.id)}
+                          className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200/50 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          حذف
+                        </button>
+                      </div>
+
+                      {/* Center: Badge and details */}
+                      <div className="flex-1 space-y-1 text-right w-full order-2 md:order-2">
+                        <div className="flex items-center gap-2 justify-start flex-wrap">
+                          <span className="bg-[#1a1a1a]/10 text-[#1a1a1a] text-[10px] font-extrabold px-2.5 py-0.5 rounded-full">
+                            {slide.tabLabel}
+                          </span>
+                          {slide.badge && (
+                            <span className="bg-amber-50 text-amber-700 border border-amber-200/40 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                              شارة: {slide.badge}
+                            </span>
+                          )}
+                          <span className="bg-slate-100 text-slate-650 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                            الشكل: {
+                              slide.graphicType === "macbook" ? "MacBook" :
+                              slide.graphicType === "iphone" ? "iPhone" :
+                              slide.graphicType === "repair" ? "صيانة" :
+                              slide.graphicType === "accessories" ? "ملحقات" :
+                              slide.graphicType === "product" ? "صورة منتج" : "صورة مخصصة"
+                            }
+                          </span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${slide.theme === 'dark' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'}`}>
+                            السمة: {slide.theme === 'dark' ? 'داكنة' : 'فاتحة'}
+                          </span>
+                        </div>
+                        <h3 className="font-extrabold text-sm text-slate-800 pt-1">{slide.title}</h3>
+                        <p className="text-xs text-accent font-extrabold">{slide.titleAccent}</p>
+                        <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">{slide.description}</p>
+                      </div>
+
+                      {/* Right: Background preview / graphic icon preview */}
+                      <div className="w-16 h-16 rounded-xl border border-slate-200 overflow-hidden flex items-center justify-center bg-slate-100 relative shadow-inner order-1 md:order-3 flex-shrink-0">
+                        {slide.graphicType === "custom" && slide.customImageUrl ? (
+                          <img src={slide.customImageUrl} alt="" className="w-full h-full object-cover" />
+                        ) : slide.graphicType === "product" ? (
+                          (() => {
+                            const product = products.find((p) => p.id === slide.productId);
+                            if (product) {
+                              const isPreset = ["iphone", "samsung", "cases", "headphones", "earbuds", "cable", "smartwatch", "powerbank", "screen-protector"].includes(product.image) || product.image.startsWith("charger-");
+                              if (!isPreset) {
+                                return <img src={product.image} alt="" className="w-full h-full object-cover" />;
+                              } else {
+                                return (
+                                  <span className="text-xl font-bold uppercase text-slate-450">
+                                    {
+                                      product.image === "iphone" || product.image === "samsung" ? "📱" :
+                                      product.image === "headphones" || product.image === "earbuds" ? "🎧" : "📦"
+                                    }
+                                  </span>
+                                );
+                              }
+                            }
+                            return <span className="text-xl font-bold uppercase text-slate-450">📦</span>;
+                          })()
+                        ) : (
+                          <span className="text-xl font-bold uppercase text-slate-450">
+                            {
+                              slide.graphicType === "macbook" ? "💻" :
+                              slide.graphicType === "iphone" ? "📱" :
+                              slide.graphicType === "repair" ? "🛠️" : "🎧"
+                            }
+                          </span>
+                        )}
+                        <div 
+                          className="absolute bottom-0 inset-x-0 h-1.5" 
+                          style={{ 
+                            background: slide.bgStyle.includes("from-[") 
+                              ? `linear-gradient(to right, ${slide.bgStyle.split(" ")[0].replace("from-[", "").replace("]", "")}, ${slide.bgStyle.split(" ").slice(-2)[0].replace("to-[", "").replace("]", "")})` 
+                              : '#eee' 
+                          }}
+                        ></div>
+                      </div>
+
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 6: PRODUCT BUNDLES MANAGEMENT */}
+          {activeTab === "bundles" && (
+            <div className="space-y-6 text-right" dir="rtl">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-4">
+                <div>
+                  <h2 className="text-xl font-extrabold text-[#1a1a1a]">إدارة حزم الصفقات الترويجية (Bundles)</h2>
+                  <p className="text-xs text-slate-400">دمج وتجميع منتجات المتجر في مجموعات تسويقية واحدة بخصم خاص</p>
+                </div>
+                
+                <button
+                  onClick={handleOpenAddBundle}
+                  className="bg-[#1a1a1a] hover:bg-slate-800 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  إنشاء حزمة جديدة
+                </button>
+              </div>
+
+              {productBundles.length === 0 ? (
+                <div className="p-12 border border-dashed border-slate-200 rounded-xl text-center text-slate-400 text-xs animate-fade-in">
+                  لا توجد حزم صفقات مضافة حالياً. اضغط على الزر أعلاه لإنشاء أول حزمة ترويجية.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4">
+                  {productBundles.map((bundle) => (
+                    <div key={bundle.id} className="border border-slate-200 rounded-2xl bg-white p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-slate-350 hover:shadow-md transition-all duration-200">
+                      
+                      {/* Left: Controls */}
+                      <div className="flex items-center gap-2 w-full md:w-auto order-3 md:order-1 justify-end md:justify-start">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditBundle(bundle)}
+                          className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer"
+                        >
+                          <Edit2 className="w-3 h-3" />
+                          تعديل
+                        </button>
+                        
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteBundle(bundle.id)}
+                          className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200/50 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 cursor-pointer"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                          حذف
+                        </button>
+                      </div>
+
+                      {/* Center: Details */}
+                      <div className="flex-1 space-y-1 text-right w-full order-2 md:order-2">
+                        <div className="flex items-center gap-2 justify-start flex-wrap">
+                          <span className="bg-[#1a1a1a]/10 text-[#1a1a1a] text-[10px] font-extrabold px-2.5 py-0.5 rounded-full">
+                            حزمة: {bundle.productIds.length} منتجات
+                          </span>
+                          <span className="bg-emerald-50 text-emerald-700 border border-emerald-100 text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                            سعر السلة: {bundle.price.toLocaleString()} د.ع
+                          </span>
+                        </div>
+                        <h3 className="font-extrabold text-sm text-slate-800 pt-1">{bundle.title}</h3>
+                        <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">{bundle.description}</p>
+                      </div>
+
+                      {/* Right: Color banner preview */}
+                      <div className={`w-16 h-16 rounded-xl border border-white/10 overflow-hidden flex items-center justify-center bg-gradient-to-br ${bundle.bgStyle} shadow order-1 md:order-3 flex-shrink-0`}>
+                        <ShoppingBag className="w-6 h-6 text-white" />
+                      </div>
+
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -1158,14 +2196,14 @@ export default function AdminPage() {
 
       </main>
 
-      {/* --- ADD/EDIT PRODUCT MODAL (BENTO DESIGN) --- */}
+      {/* --- ADD/EDIT PRODUCT MODAL (BENTO DESIGN - FIXED SCROLL) --- */}
       {isProductModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setIsProductModalOpen(false)} />
           
-          <div className="relative z-50 w-full max-w-md bg-white rounded-2xl border border-card-border p-6 shadow-2xl space-y-4">
+          <div className="relative z-50 w-full max-w-md bg-white rounded-2xl border border-card-border p-6 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden gap-4">
             
-            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3 flex-shrink-0">
               <h3 className="font-extrabold text-base text-slate-800">
                 {editingProductId ? "تعديل بيانات المنتج" : "إضافة منتج جديد للمخزن"}
               </h3>
@@ -1177,7 +2215,7 @@ export default function AdminPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSaveProduct} className="space-y-4 text-right">
+            <form onSubmit={handleSaveProduct} className="space-y-4 text-right overflow-y-auto flex-1 pl-1 pr-1 py-1">
               
               {/* Product Name AR */}
               <div className="space-y-1">
@@ -1224,11 +2262,12 @@ export default function AdminPage() {
                   <label className="text-xs font-semibold text-slate-700">نوع الصورة</label>
                   <select
                     value={productForm.imageType}
-                    onChange={(e) => setProductForm({ ...productForm, imageType: e.target.value as "preset" | "url" })}
+                    onChange={(e) => setProductForm({ ...productForm, imageType: e.target.value as "preset" | "url" | "upload" })}
                     className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:border-accent cursor-pointer"
                   >
                     <option value="preset">شكل جرافيكي افتراضي (Preset)</option>
                     <option value="url">رابط صورة مخصصة (Image URL)</option>
+                    <option value="upload">رفع صورة من الجهاز (Upload File)</option>
                   </select>
                 </div>
               </div>
@@ -1259,7 +2298,7 @@ export default function AdminPage() {
                     <option value="screen-protector">Screen Protector (لاصق حماية زجاجي)</option>
                   </select>
                 </div>
-              ) : (
+              ) : productForm.imageType === "url" ? (
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-slate-700">رابط الصورة المخصصة *</label>
                   <input
@@ -1271,6 +2310,58 @@ export default function AdminPage() {
                     dir="ltr"
                     required
                   />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-slate-700">رفع صورة من جهازك *</label>
+                  <div className="border-2 border-dashed border-slate-200 rounded-xl p-4 bg-slate-50/50 hover:bg-slate-50 transition-colors flex flex-col items-center justify-center cursor-pointer relative group">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setSelectedFile(file);
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            setImagePreview(reader.result as string);
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                    />
+                    <Upload className="w-8 h-8 text-slate-400 group-hover:text-accent transition-colors mb-2" />
+                    <span className="text-xs text-slate-500 font-medium">اسحب الصورة هنا أو اضغط للتصفح</span>
+                    <span className="text-[10px] text-slate-400 mt-1">يدعم PNG, JPG, WebP (سيتم تصغيرها وضغطها تلقائياً)</span>
+                  </div>
+
+                  {imagePreview && (
+                    <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 p-2 rounded-xl mt-2 relative">
+                      <div className="w-12 h-12 rounded border border-slate-200 overflow-hidden flex-shrink-0 bg-white">
+                        <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                      </div>
+                      <div className="flex-1 text-right min-w-0">
+                        <span className="block text-xs font-bold text-slate-700 truncate">
+                          {selectedFile ? selectedFile.name : "الصورة الحالية للمنتج"}
+                        </span>
+                        <span className="block text-[10px] text-slate-400 font-mono">
+                          {selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(2)} MB` : "رابط سحابي"}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedFile(null);
+                          setImagePreview(null);
+                        }}
+                        className="p-1 hover:bg-rose-50 text-rose-500 rounded-lg transition-colors cursor-pointer"
+                        title="إزالة الصورة"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1339,7 +2430,7 @@ export default function AdminPage() {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex gap-3 pt-3 border-t border-slate-100">
+              <div className="flex gap-3 pt-3 border-t border-slate-100 flex-shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsProductModalOpen(false)}
@@ -1349,9 +2440,435 @@ export default function AdminPage() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 bg-accent hover:bg-accent-hover text-white font-bold py-2 rounded-xl text-xs shadow-md cursor-pointer text-center"
+                  disabled={isUploading}
+                  className="flex-1 bg-accent hover:bg-accent-hover text-white font-bold py-2 rounded-xl text-xs shadow-md cursor-pointer text-center flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  حفظ البيانات
+                  {isUploading ? (
+                    <>
+                      <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                      جاري الحفظ...
+                    </>
+                  ) : (
+                    "حفظ البيانات"
+                  )}
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- ADD/EDIT SLIDE MODAL (FIXED SCROLL) --- */}
+      {isSlideModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setIsSlideModalOpen(false)} />
+          
+          <div className="relative z-50 w-full max-w-md bg-white rounded-2xl border border-card-border p-6 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden gap-4">
+            
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3 flex-shrink-0">
+              <h3 className="font-extrabold text-base text-slate-800">
+                {editingSlideId ? "تعديل بيانات الشريحة الإعلانية" : "إضافة شريحة إعلانية جديدة"}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsSlideModalOpen(false)}
+                className="p-1 rounded-full hover:bg-slate-100 text-slate-400 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveSlide} className="space-y-4 text-right overflow-y-auto flex-1 pl-1 pr-1 py-1">
+              
+              {/* Tab Label */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700">اسم التبويب السفلي *</label>
+                <input
+                  type="text"
+                  value={slideForm.tabLabel}
+                  onChange={(e) => setSlideForm({ ...slideForm, tabLabel: e.target.value })}
+                  placeholder="مثال: MacBook M5"
+                  className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:border-accent"
+                  required
+                />
+              </div>
+
+              {/* Badge */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700">شارة العرض (Badge)</label>
+                <input
+                  type="text"
+                  value={slideForm.badge}
+                  onChange={(e) => setSlideForm({ ...slideForm, badge: e.target.value })}
+                  placeholder="مثال: جديد وحصري"
+                  className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:border-accent"
+                />
+              </div>
+
+              {/* Title */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700">العنوان الرئيسي العريض *</label>
+                <input
+                  type="text"
+                  value={slideForm.title}
+                  onChange={(e) => setSlideForm({ ...slideForm, title: e.target.value })}
+                  placeholder="مثال: MacBook Air M5"
+                  className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:border-accent"
+                  required
+                />
+              </div>
+
+              {/* Title Accent */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700">العنوان الملون الفرعي *</label>
+                <input
+                  type="text"
+                  value={slideForm.titleAccent}
+                  onChange={(e) => setSlideForm({ ...slideForm, titleAccent: e.target.value })}
+                  placeholder="مثال: بقوة شريحة M5 الثورية"
+                  className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:border-accent"
+                  required
+                />
+              </div>
+
+              {/* Description */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700">الوصف الكامل للإعلان *</label>
+                <textarea
+                  value={slideForm.description}
+                  onChange={(e) => setSlideForm({ ...slideForm, description: e.target.value })}
+                  placeholder="اكتب تفاصيل مقنعة للإعلان تظهر للزوار..."
+                  rows={3}
+                  className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:border-accent resize-none"
+                  required
+                />
+              </div>
+
+              {/* Button Text */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700">نص الزر الإجرائي *</label>
+                <input
+                  type="text"
+                  value={slideForm.btnText}
+                  onChange={(e) => setSlideForm({ ...slideForm, btnText: e.target.value })}
+                  placeholder="مثال: احجز الآن"
+                  className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:border-accent"
+                  required
+                />
+              </div>
+
+              {/* Action Type & Theme */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700">نوع الإجراء</label>
+                  <select
+                    value={slideForm.actionType}
+                    onChange={(e) => setSlideForm({ ...slideForm, actionType: e.target.value as "link" | "repair" })}
+                    className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:border-accent cursor-pointer"
+                  >
+                    <option value="link">توجيه لرابط بالموقع (Link)</option>
+                    <option value="repair">فتح نافذة حجز صيانة (Repair)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700">نمط السمة العامة</label>
+                  <select
+                    value={slideForm.theme}
+                    onChange={(e) => setSlideForm({ ...slideForm, theme: e.target.value as "dark" | "light" })}
+                    className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:border-accent cursor-pointer"
+                  >
+                    <option value="light">نصوص داكنة وخلفية فاتحة (Light)</option>
+                    <option value="dark">نصوص بيضاء وخلفية داكنة (Dark)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Button Link - only shown if actionType is link */}
+              {slideForm.actionType === "link" && (
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700">رابط الزر (#products للقسم أو URL كامل) *</label>
+                  <input
+                    type="text"
+                    value={slideForm.btnLink}
+                    onChange={(e) => setSlideForm({ ...slideForm, btnLink: e.target.value })}
+                    placeholder="مثال: #products"
+                    className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:border-accent font-mono text-left"
+                    dir="ltr"
+                    required
+                  />
+                </div>
+              )}
+
+              {/* BG style selection */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700">شكل ولون خلفية المنزلق التدرجية *</label>
+                <select
+                  value={slideForm.bgStyle}
+                  onChange={(e) => setSlideForm({ ...slideForm, bgStyle: e.target.value })}
+                  className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:border-accent cursor-pointer"
+                >
+                  <option value="from-[#F3F4F6] via-[#E5E7EB] to-[#DBEAFE] text-slate-900">فضي / رمادي (Light Theme)</option>
+                  <option value="from-[#EFF6FF] via-[#E0F2FE] to-[#FEF3C7] text-slate-800">سماوي / ذهبي رقيق (Light Theme)</option>
+                  <option value="from-[#111827] via-[#1F2937] to-[#030712] text-white">تيتانيوم داكن (Dark Theme)</option>
+                  <option value="from-[#1E293B] via-[#0F172A] to-[#020617] text-white">أزرق داكن ليلي (Dark Theme)</option>
+                  <option value="from-[#312E81] via-[#1E1B4B] to-[#090533] text-white">نيلي بنفسجي (Dark Theme)</option>
+                </select>
+              </div>
+
+              {/* Graphic Type */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700">نوع الشكل التوضيحي الجانبي</label>
+                <select
+                  value={slideForm.graphicType}
+                  onChange={(e) => setSlideForm({ ...slideForm, graphicType: e.target.value as any })}
+                  className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:border-accent cursor-pointer"
+                >
+                  <option value="macbook">MacBook M5 CSS Mockup</option>
+                  <option value="iphone">iPhone 16 Pro CSS Mockup</option>
+                  <option value="repair">Certified Repair Floating Visual</option>
+                  <option value="accessories">Premium Accessories Box Visual</option>
+                  <option value="product">صورة منتج من المتجر (Product Image)</option>
+                  <option value="custom">تحميل صورة خاصة بالكامل (Custom Image)</option>
+                </select>
+              </div>
+
+              {/* Product selection - only shown if graphicType is product */}
+              {slideForm.graphicType === "product" && (
+                <div className="space-y-1 animate-fade-in">
+                  <label className="text-xs font-semibold text-slate-700">اختر المنتج لعرضه في البانر *</label>
+                  <select
+                    value={slideForm.productId || ""}
+                    onChange={(e) => setSlideForm({ ...slideForm, productId: e.target.value })}
+                    className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:border-accent cursor-pointer"
+                    required
+                  >
+                    <option value="">-- اختر المنتج من المخزن --</option>
+                    {products.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.nameEn})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Custom Image Upload / URL - only shown if graphicType is custom */}
+              {slideForm.graphicType === "custom" && (
+                <div className="space-y-3 pt-1 border-t border-slate-100">
+                  <div className="grid grid-cols-2 gap-4 items-end">
+                    <div className="space-y-1 col-span-2">
+                      <label className="text-xs font-semibold text-slate-700">رابط صورة مباشرة (اختياري)</label>
+                      <input
+                        type="url"
+                        value={slideForm.customImageUrl}
+                        onChange={(e) => setSlideForm({ ...slideForm, customImageUrl: e.target.value })}
+                        placeholder="https://example.com/slide-banner.png"
+                        className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:border-accent font-mono text-left"
+                        dir="ltr"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-700">أو رفع صورة من جهازك</label>
+                    <div className="border-2 border-dashed border-slate-200 rounded-xl p-3 bg-slate-50/50 hover:bg-slate-50 transition-colors flex flex-col items-center justify-center cursor-pointer relative group">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setSelectedSlideFile(file);
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              setSlideImagePreview(reader.result as string);
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                      />
+                      <Upload className="w-6 h-6 text-slate-400 group-hover:text-accent transition-colors mb-1" />
+                      <span className="text-[11px] text-slate-500 font-medium">اختر ملف صورة من جهازك</span>
+                    </div>
+
+                    {slideImagePreview && (
+                      <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 p-2 rounded-xl mt-2 relative">
+                        <div className="w-12 h-12 rounded border border-slate-200 overflow-hidden flex-shrink-0 bg-white">
+                          <img src={slideImagePreview} alt="Preview" className="w-full h-full object-cover" />
+                        </div>
+                        <div className="flex-1 text-right min-w-0">
+                          <span className="block text-xs font-bold text-slate-700 truncate">
+                            {selectedSlideFile ? selectedSlideFile.name : "الصورة المخصصة الحالية"}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedSlideFile(null);
+                            setSlideImagePreview(null);
+                          }}
+                          className="p-1 hover:bg-rose-50 text-rose-500 rounded-lg transition-colors cursor-pointer"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-3 border-t border-slate-100 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsSlideModalOpen(false)}
+                  className="flex-1 border border-slate-200 text-slate-600 font-bold py-2 rounded-xl text-xs cursor-pointer text-center"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUploadingSlide}
+                  className="flex-1 bg-accent hover:bg-accent-hover text-white font-bold py-2 rounded-xl text-xs shadow-md cursor-pointer text-center flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isUploadingSlide ? (
+                    <>
+                      <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                      جاري الرفع...
+                    </>
+                  ) : (
+                    "حفظ الشريحة"
+                  )}
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- ADD/EDIT BUNDLE MODAL (CMS MANAGER) --- */}
+      {isBundleModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setIsBundleModalOpen(false)} />
+          
+          <div className="relative z-50 w-full max-w-md bg-white rounded-2xl border border-card-border p-6 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden gap-4" dir="rtl">
+            
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3 flex-shrink-0">
+              <h3 className="font-extrabold text-base text-slate-800">
+                {editingBundleId ? "تعديل بيانات الحزمة الترويجية" : "إنشاء حزمة توفير جديدة"}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsBundleModalOpen(false)}
+                className="p-1 rounded-full hover:bg-slate-100 text-slate-400 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveBundle} className="space-y-4 text-right overflow-y-auto flex-1 pl-1 pr-1 py-1">
+              
+              {/* Bundle Title */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700">اسم الحزمة الترويجية *</label>
+                <input
+                  type="text"
+                  value={bundleForm.title}
+                  onChange={(e) => setBundleForm({ ...bundleForm, title: e.target.value })}
+                  placeholder="مثال: حزمة الحماية الشاملة"
+                  className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:border-accent"
+                  required
+                />
+              </div>
+
+              {/* Description */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700">وصف الحزمة ومميزاتها *</label>
+                <textarea
+                  value={bundleForm.description}
+                  onChange={(e) => setBundleForm({ ...bundleForm, description: e.target.value })}
+                  placeholder="اكتب تفاصيل المنتجات المشمولة وقيمة التوفير للزبائن..."
+                  rows={3}
+                  className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:border-accent resize-none"
+                  required
+                />
+              </div>
+
+              {/* Background gradient selection */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700">نمط خلفية كارت الحزمة التدرجي *</label>
+                <select
+                  value={bundleForm.bgStyle}
+                  onChange={(e) => setBundleForm({ ...bundleForm, bgStyle: e.target.value })}
+                  className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:border-accent cursor-pointer"
+                >
+                  <option value="from-[#312E81] via-[#1E1B4B] to-[#090533]">بنفسجي نيلي ليلي (Dark)</option>
+                  <option value="from-[#1E293B] via-[#0F172A] to-[#020617]">تيتانيوم داكن (Dark)</option>
+                  <option value="from-blue-600 via-indigo-600 to-sky-500">سماوي حديث متوهج (Cyber)</option>
+                  <option value="from-emerald-600 via-teal-600 to-cyan-500">زمردي تكنو فخم (Cyber)</option>
+                  <option value="from-rose-500 via-pink-600 to-red-500">ناري فاقع رائع (Cyber)</option>
+                </select>
+              </div>
+
+              {/* Price */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700">سعر الحزمة الإجمالي المخفض (د.ع) *</label>
+                <input
+                  type="number"
+                  value={bundleForm.price || ""}
+                  onChange={(e) => setBundleForm({ ...bundleForm, price: parseInt(e.target.value) || 0 })}
+                  placeholder="سعر البيع للحزمة الإجمالية..."
+                  className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:border-accent font-mono"
+                  required
+                />
+              </div>
+
+              {/* Products Checklist (Select Multi-products) */}
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-slate-700 block">اختر المنتجات المشمولة في الحزمة (اختر 2 أو أكثر) *</label>
+                <div className="border border-slate-200 rounded-xl p-3 bg-slate-50 space-y-2 max-h-48 overflow-y-auto">
+                  {products.map((p) => {
+                    const isChecked = bundleForm.productIds.includes(p.id);
+                    return (
+                      <div
+                        key={p.id}
+                        onClick={() => handleToggleProductInBundle(p.id)}
+                        className="flex items-center gap-2.5 p-1.5 rounded-lg hover:bg-slate-200/50 cursor-pointer select-none"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {}}
+                          className="w-4 h-4 text-accent border-slate-350 rounded focus:ring-accent cursor-pointer"
+                        />
+                        <div className="flex-1 text-right">
+                          <span className="block text-xs font-bold text-slate-800">{p.name}</span>
+                          <span className="block text-[10px] text-slate-400 font-mono">{p.price.toLocaleString()} د.ع | {p.category}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-3 border-t border-slate-100 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsBundleModalOpen(false)}
+                  className="flex-1 border border-slate-200 text-slate-600 font-bold py-2 rounded-xl text-xs cursor-pointer text-center"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-[#1a1a1a] hover:bg-slate-850 text-white font-bold py-2 rounded-xl text-xs shadow-md cursor-pointer text-center"
+                >
+                  حفظ الحزمة الترويجية
                 </button>
               </div>
 

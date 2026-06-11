@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Search,
   Heart,
@@ -18,7 +18,9 @@ import {
   MapPin,
   Clock,
   ThumbsUp,
-  Lock
+  Lock,
+  Zap,
+  Cable
 } from "lucide-react";
 import CartDrawer from "@/components/CartDrawer";
 import RepairModal from "@/components/RepairModal";
@@ -38,15 +40,38 @@ interface ProductDetailModalProps {
   product: Product;
   isOpen: boolean;
   onClose: () => void;
-  onAddToCart: (product: Product) => void;
+  onAddToCart: (product: Product, selectedColor?: { name: string; hex: string; image?: string | null } | null) => void;
   allProducts: Product[];
   onSelectProduct: (product: Product) => void;
 }
 
 function ProductDetailModal({ product, isOpen, onClose, onAddToCart, allProducts, onSelectProduct }: ProductDetailModalProps) {
   const [qty, setQty] = useState(1);
+  const [selectedColor, setSelectedColor] = useState<{ name: string; hex: string; image?: string | null } | null>(null);
+
+  useEffect(() => {
+    if (product.colors && product.colors.length > 0) {
+      setSelectedColor(product.colors[0]);
+    } else {
+      setSelectedColor(null);
+    }
+  }, [product]);
+
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
+
+  const isPreset = ["iphone", "samsung", "cases", "headphones", "earbuds", "cable", "smartwatch", "powerbank", "screen-protector"].includes(product.image) || product.image.startsWith("charger-");
 
   // Generate default description based on categories/image presets
   const defaultDesc = product.description || (
@@ -100,13 +125,24 @@ function ProductDetailModal({ product, isOpen, onClose, onAddToCart, allProducts
       {/* Modal Box */}
       <div className="relative bg-white rounded-3xl border border-slate-100 shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto z-10 flex flex-col md:flex-row font-sans text-right animate-in fade-in-50 zoom-in-95 duration-200">
         
+        {/* Floating Close Button for Mobile & Desktop */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 left-4 z-20 p-2 rounded-full bg-slate-100/90 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-all border border-slate-200 cursor-pointer shadow-sm flex items-center justify-center"
+          title="إغلاق"
+        >
+          <X className="w-4.5 h-4.5" />
+        </button>
+
         {/* Left Column: Visual Mockup Showcase */}
         <div className="md:w-5/12 bg-slate-50 border-l border-slate-100 p-8 flex flex-col items-center justify-center relative min-h-[300px] md:min-h-0">
-          <div className="absolute top-4 left-4 bg-slate-100 text-slate-500 font-mono text-[9px] px-2.5 py-1 rounded-full font-bold uppercase select-none">
-            {product.image}
-          </div>
-          <div className="scale-125 md:scale-150 transform transition-transform duration-300 py-8">
-            <ProductMockup image={product.image} name={product.name} sizeClass="w-32 aspect-[9/18]" />
+          {isPreset && (
+            <div className="absolute top-4 right-4 bg-slate-100 text-slate-500 font-mono text-[9px] px-2.5 py-1 rounded-full font-bold uppercase select-none">
+              {product.image}
+            </div>
+          )}
+          <div className={`${isPreset ? "scale-125 md:scale-150 py-8" : "w-full max-w-[240px] md:max-w-[280px] aspect-square flex items-center justify-center"} transform transition-transform duration-300`}>
+            <ProductMockup image={selectedColor?.image || product.image} name={product.name} sizeClass="w-32 aspect-[9/18]" />
           </div>
         </div>
 
@@ -118,9 +154,6 @@ function ProductDetailModal({ product, isOpen, onClose, onAddToCart, allProducts
               <span className="bg-accent/10 text-accent font-bold text-xs px-3 py-1 rounded-full">
                 {product.category}
               </span>
-              <button onClick={onClose} className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 cursor-pointer text-sm">
-                ✕
-              </button>
             </div>
             <h2 className="text-xl sm:text-2xl font-extrabold text-slate-800 leading-tight">
               {product.name}
@@ -132,13 +165,68 @@ function ProductDetailModal({ product, isOpen, onClose, onAddToCart, allProducts
             )}
             <div className="flex items-center gap-1.5 text-amber-500">
               <div className="flex gap-0.5">
-                {[1, 2, 3, 4, 5].map((s) => (
-                  <Star key={s} className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-                ))}
+                {[1, 2, 3, 4, 5].map((s) => {
+                  const ratingVal = product.rating || 5;
+                  const isFilled = s <= Math.round(ratingVal);
+                  return (
+                    <Star
+                      key={s}
+                      className={`w-3.5 h-3.5 ${
+                        isFilled ? "fill-amber-500 text-amber-500" : "text-slate-300"
+                      }`}
+                    />
+                  );
+                })}
               </div>
-              <span className="text-xs font-bold text-slate-500">4.9 (24 تقييم)</span>
+              <span className="text-xs font-bold text-slate-500">
+                {(product.rating || 5).toFixed(1)} ({product.reviewsCount || 24} تقييم)
+              </span>
             </div>
           </div>
+
+          {/* Colors Selection - Apple Style */}
+          {product.colors && product.colors.length > 0 && (
+            <div className="py-3.5 border-y border-slate-100 space-y-3 animate-in fade-in duration-300">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-extrabold text-slate-700">
+                  اللون المتوفر:
+                </span>
+                {selectedColor && (
+                  <span className="text-[11px] font-extrabold text-slate-800 bg-slate-100 border border-slate-200 px-3 py-0.5 rounded-full shadow-xs">
+                    {selectedColor.name}
+                  </span>
+                )}
+              </div>
+              
+              <div className="flex flex-wrap gap-3">
+                {product.colors.map((color, idx) => {
+                  const isSelected = selectedColor?.name === color.name;
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => setSelectedColor(color)}
+                      className={`relative w-9 h-9 rounded-full flex items-center justify-center p-0.5 transition-all duration-300 transform active:scale-95 cursor-pointer ${
+                        isSelected 
+                          ? "ring-2 ring-slate-800 ring-offset-2 scale-110 shadow-md" 
+                          : "hover:scale-105 border border-slate-200 hover:border-slate-400 shadow-sm"
+                      }`}
+                      title={color.name}
+                    >
+                      <span
+                        className="w-full h-full rounded-full block border border-black/10"
+                        style={{ backgroundColor: color.hex }}
+                      />
+                      {isSelected && (
+                        <span className="absolute inset-0 rounded-full bg-black/10 flex items-center justify-center text-[11px] text-white font-bold select-none drop-shadow-sm">
+                          ✓
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Description */}
           <div className="space-y-1.5">
@@ -197,7 +285,7 @@ function ProductDetailModal({ product, isOpen, onClose, onAddToCart, allProducts
               <button
                 onClick={() => {
                   for (let i = 0; i < qty; i++) {
-                    onAddToCart(product);
+                    onAddToCart(product, selectedColor);
                   }
                   onClose();
                 }}
@@ -208,8 +296,6 @@ function ProductDetailModal({ product, isOpen, onClose, onAddToCart, allProducts
               </button>
             </div>
           </div>
-
-
 
           {/* Related Products section */}
           {related.length > 0 && (
@@ -272,17 +358,18 @@ export default function Home() {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
 
   // Cart Handlers
-  const handleAddToCart = (product: Product) => {
-    addToCart(product);
+  const handleAddToCart = (product: Product, selectedColor?: { name: string; hex: string; image?: string | null } | null) => {
+    const color = selectedColor !== undefined ? selectedColor : (product.colors && product.colors.length > 0 ? product.colors[0] : null);
+    addToCart(product, color);
     setIsCartOpen(true);
   };
 
-  const handleUpdateQuantity = (productId: string, quantity: number) => {
-    updateCartQuantity(productId, quantity);
+  const handleUpdateQuantity = (productId: string, quantity: number, selectedColorName?: string | null) => {
+    updateCartQuantity(productId, quantity, selectedColorName);
   };
 
-  const handleRemoveItem = (productId: string) => {
-    removeFromCart(productId);
+  const handleRemoveItem = (productId: string, selectedColorName?: string | null) => {
+    removeFromCart(productId, selectedColorName);
   };
 
   const handleCheckout = () => {
@@ -344,7 +431,7 @@ export default function Home() {
   });
 
   // Group categories that have items in the filtered products
-  const activeCategories = ["موبايلات", "ملحقات"].filter((cat) =>
+  const activeCategories = ["موبايلات", "كفرات", "سماعات", "شواحن", "كيبلات", "ملحقات"].filter((cat) =>
     filteredProducts.some((p) => p.category === cat)
   );
 
@@ -369,7 +456,7 @@ export default function Home() {
                 مركز الروان
               </span>
               <span className="block text-[10px] sm:text-xs font-semibold tracking-wider text-slate-400 uppercase -mt-1 font-mono">
-                Raw an Center
+                Rawn Center
               </span>
             </div>
             <div className="w-1.5 h-8 bg-accent rounded-full hidden sm:block"></div>
@@ -458,7 +545,7 @@ export default function Home() {
             <div className="flex items-center justify-between border-b border-card-border pb-4">
               <div>
                 <span className="block text-md font-extrabold">مركز الروان</span>
-                <span className="block text-[9px] font-bold text-slate-400 uppercase font-mono">Raw an Center</span>
+                <span className="block text-[9px] font-bold text-slate-400 uppercase font-mono">Rawn Center</span>
               </div>
               <button
                 onClick={() => setIsMobileMenuOpen(false)}
@@ -498,53 +585,6 @@ export default function Home() {
         {/* 2. Hero Section (Dynamic Sliding Banner Carousel) */}
         <PromoCarousel onOpenRepairModal={() => setIsRepairOpen(true)} />
 
-        {/* Flash Sale Countdown Deal */}
-        <FlashSaleBanner />
-
-        {/* Dynamic Custom Promo Banner */}
-        {siteSettings.promoBanner?.isEnabled && (
-          <section
-            className={`rounded-3xl p-6 sm:p-8 lg:p-10 relative overflow-hidden shadow-xl border flex flex-col md:flex-row items-center justify-between gap-6 transition-all duration-300 ${
-              siteSettings.promoBanner.bgStyle === "glass-blue"
-                ? "bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-500 text-white border-blue-500/20 shadow-blue-500/20"
-                : siteSettings.promoBanner.bgStyle === "glass-emerald"
-                ? "bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-500 text-white border-emerald-500/20 shadow-emerald-500/20"
-                : siteSettings.promoBanner.bgStyle === "glass-amber"
-                ? "bg-gradient-to-r from-amber-500 via-orange-600 to-yellow-500 text-white border-amber-500/20 shadow-amber-500/20"
-                : siteSettings.promoBanner.bgStyle === "glass-dark"
-                ? "bg-gradient-to-r from-slate-900 via-slate-800 to-slate-950 text-white border-slate-800 shadow-slate-950/40"
-                : "bg-gradient-to-r from-rose-500 via-pink-600 to-red-500 text-white border-rose-500/20 shadow-rose-500/20" // default glass-rose
-            }`}
-          >
-            {/* Glowing background bubble decorative graphics */}
-            <div className="absolute top-[-50%] right-[-10%] w-72 h-72 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>
-            <div className="absolute bottom-[-50%] left-[-10%] w-72 h-72 bg-black/10 rounded-full blur-3xl pointer-events-none"></div>
-
-            {/* Right Side: Text info */}
-            <div className="flex-1 text-right space-y-3 z-10 w-full" dir="rtl">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/20 text-white backdrop-blur-md font-bold text-[10px] sm:text-xs rounded-full border border-white/10 animate-bounce">
-                ✨ {siteSettings.promoBanner.badge}
-              </span>
-              <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight leading-tight">
-                {siteSettings.promoBanner.title}
-              </h2>
-              <p className="text-xs sm:text-sm text-white/90 leading-relaxed max-w-3xl">
-                {siteSettings.promoBanner.description}
-              </p>
-            </div>
-
-            {/* Left Side: Call to action button */}
-            <div className="z-10 w-full md:w-auto flex justify-start md:justify-end">
-              <a
-                href={siteSettings.promoBanner.buttonLink}
-                className="w-full md:w-auto text-center bg-white text-slate-900 font-extrabold text-xs sm:text-sm px-8 py-4 rounded-2xl shadow-lg hover:bg-slate-100 active:scale-[0.99] transition-all duration-200 uppercase tracking-wide block hover:scale-[1.02]"
-              >
-                {siteSettings.promoBanner.buttonText}
-              </a>
-            </div>
-          </section>
-        )}
-
         {/* 3. Bento Grid Categories */}
         <section id="categories" className="space-y-6">
           <div className="text-right">
@@ -552,7 +592,7 @@ export default function Home() {
             <p className="text-xs text-slate-500">اختر القسم الذي ترغب في استكشافه أو طلب خدماته</p>
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             
             {/* Category Card 1: Mobiles */}
             <div
@@ -574,7 +614,87 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Category Card 2: Accessories */}
+            {/* Category Card 2: Cases */}
+            <div
+              onClick={() => setActiveCategory("كفرات")}
+              className={`p-5 rounded-2xl border text-right transition-all duration-200 hover:shadow-md cursor-pointer group flex flex-col justify-between h-40 ${
+                activeCategory === "كفرات"
+                  ? "bg-slate-50 border-accent/60 ring-1 ring-accent/60"
+                  : "bg-white border-card-border hover:border-slate-300"
+              }`}
+            >
+              <div className="p-2.5 bg-slate-100 rounded-xl text-slate-700 w-fit group-hover:scale-105 transition-transform duration-200">
+                <Shield className="w-5 h-5 text-[#1a1a1a]" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-sm sm:text-base text-[#1a1a1a] mb-1">كفرات</h3>
+                <p className="text-[10px] text-slate-500 leading-normal">
+                  حقائب حماية وحافظات أنيقة ومقاومة للصدمات.
+                </p>
+              </div>
+            </div>
+
+            {/* Category Card 3: Headphones */}
+            <div
+              onClick={() => setActiveCategory("سماعات")}
+              className={`p-5 rounded-2xl border text-right transition-all duration-200 hover:shadow-md cursor-pointer group flex flex-col justify-between h-40 ${
+                activeCategory === "سماعات"
+                  ? "bg-slate-50 border-accent/60 ring-1 ring-accent/60"
+                  : "bg-white border-card-border hover:border-slate-300"
+              }`}
+            >
+              <div className="p-2.5 bg-slate-100 rounded-xl text-slate-700 w-fit group-hover:scale-105 transition-transform duration-200">
+                <Headphones className="w-5 h-5 text-[#1a1a1a]" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-sm sm:text-base text-[#1a1a1a] mb-1">سماعات</h3>
+                <p className="text-[10px] text-slate-500 leading-normal">
+                  سماعات رأس وأذن لاسلكية بأعلى دقة صوت.
+                </p>
+              </div>
+            </div>
+
+            {/* Category Card 4: Chargers */}
+            <div
+              onClick={() => setActiveCategory("شواحن")}
+              className={`p-5 rounded-2xl border text-right transition-all duration-200 hover:shadow-md cursor-pointer group flex flex-col justify-between h-40 ${
+                activeCategory === "شواحن"
+                  ? "bg-slate-50 border-accent/60 ring-1 ring-accent/60"
+                  : "bg-white border-card-border hover:border-slate-300"
+              }`}
+            >
+              <div className="p-2.5 bg-slate-100 rounded-xl text-slate-700 w-fit group-hover:scale-105 transition-transform duration-200">
+                <Zap className="w-5 h-5 text-[#1a1a1a]" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-sm sm:text-base text-[#1a1a1a] mb-1">شواحن</h3>
+                <p className="text-[10px] text-slate-500 leading-normal">
+                  منصات شحن ورؤوس شواحن أصلية معتمدة.
+                </p>
+              </div>
+            </div>
+
+            {/* Category Card 5: Cables */}
+            <div
+              onClick={() => setActiveCategory("كيبلات")}
+              className={`p-5 rounded-2xl border text-right transition-all duration-200 hover:shadow-md cursor-pointer group flex flex-col justify-between h-40 ${
+                activeCategory === "كيبلات"
+                  ? "bg-slate-50 border-accent/60 ring-1 ring-accent/60"
+                  : "bg-white border-card-border hover:border-slate-300"
+              }`}
+            >
+              <div className="p-2.5 bg-slate-100 rounded-xl text-slate-700 w-fit group-hover:scale-105 transition-transform duration-200">
+                <Cable className="w-5 h-5 text-[#1a1a1a]" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-sm sm:text-base text-[#1a1a1a] mb-1">كيبلات</h3>
+                <p className="text-[10px] text-slate-500 leading-normal">
+                  كابلات شحن ومزامنة بيانات عالية المتانة.
+                </p>
+              </div>
+            </div>
+
+            {/* Category Card 6: Accessories */}
             <div
               onClick={() => setActiveCategory("ملحقات")}
               className={`p-5 rounded-2xl border text-right transition-all duration-200 hover:shadow-md cursor-pointer group flex flex-col justify-between h-40 ${
@@ -584,36 +704,41 @@ export default function Home() {
               }`}
             >
               <div className="p-2.5 bg-slate-100 rounded-xl text-slate-700 w-fit group-hover:scale-105 transition-transform duration-200">
-                <Headphones className="w-5 h-5 text-[#1a1a1a]" />
+                <ShoppingBag className="w-5 h-5 text-[#1a1a1a]" />
               </div>
               <div>
                 <h3 className="font-extrabold text-sm sm:text-base text-[#1a1a1a] mb-1">ملحقات</h3>
                 <p className="text-[10px] text-slate-500 leading-normal">
-                  سماعات، شواحن، كابلات، وحافظات أصلية فاخرة.
+                  لاصقات حماية شاشة، ساعات، وملحقات أخرى.
                 </p>
               </div>
             </div>
 
-            {/* Category Card 3: Repair Services */}
+            {/* Category Card 7: Repair Services */}
             <div
-              onClick={() => {
-                setIsRepairOpen(true);
-              }}
-              className="bg-white border border-card-border p-5 rounded-2xl text-right transition-all duration-200 hover:border-slate-300 hover:shadow-md cursor-pointer group flex flex-col justify-between h-40"
+              onClick={() => setIsRepairOpen(true)}
+              className="bg-[#1a1a1a] border border-[#1a1a1a] p-5 rounded-2xl text-right transition-all duration-200 hover:shadow-lg hover:scale-[1.005] cursor-pointer group flex flex-col justify-between h-40 col-span-2 md:col-span-3 lg:col-span-2 text-white relative overflow-hidden"
             >
-              <div className="p-2.5 bg-slate-100 rounded-xl text-slate-700 w-fit group-hover:scale-105 transition-transform duration-200">
-                <Wrench className="w-5 h-5 text-[#1a1a1a]" />
+              {/* background flare effect for emphasis */}
+              <div className="absolute top-[-20%] left-[-20%] w-40 h-40 bg-accent/20 rounded-full blur-2xl pointer-events-none"></div>
+              
+              <div className="p-2.5 bg-white/10 rounded-xl text-white w-fit group-hover:scale-105 transition-transform duration-200 border border-white/5">
+                <Wrench className="w-5 h-5 text-accent" />
               </div>
               <div>
-                <h3 className="font-extrabold text-sm sm:text-base text-[#1a1a1a] mb-1">خدمات صيانة</h3>
-                <p className="text-[10px] text-slate-500 leading-normal">
-                  فحص مجاني فوري وصيانة سريعة موثوقة.
+                <h3 className="font-extrabold text-sm sm:text-base text-white mb-1 flex items-center gap-1.5">
+                  خدمات الصيانة المعتمدة
+                  <span className="bg-accent text-white font-extrabold text-[9px] px-2 py-0.5 rounded-full uppercase">فوري</span>
+                </h3>
+                <p className="text-[10px] text-slate-300 leading-normal">
+                  فحص مجاني فوري وصيانة سريعة للأجهزة مع ضمان حقيقي يصل إلى 3 أيام.
                 </p>
               </div>
             </div>
 
           </div>
         </section>
+
 
         {/* Special Offers Section */}
         {products.some(p => p.discountPrice && p.discountPrice > 0) && (
@@ -725,7 +850,7 @@ export default function Home() {
             
             {/* Filter buttons */}
             <div className="flex gap-2 justify-start sm:justify-end overflow-x-auto pb-1">
-              {["الكل", "موبايلات", "ملحقات"].map((cat) => (
+              {["الكل", "موبايلات", "كفرات", "سماعات", "شواحن", "كيبلات", "ملحقات"].map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setActiveCategory(cat)}
@@ -865,6 +990,9 @@ export default function Home() {
           )}
         </section>
 
+        {/* Flash Sale Countdown Deal */}
+        <FlashSaleBanner />
+
         {/* 5. Authorized Repair Center section */}
         <section id="repair" className="bg-[#1a1a1a] text-white rounded-3xl p-6 sm:p-10 lg:p-12 overflow-hidden relative border border-slate-800">
           {/* Subtle background graphic design */}
@@ -929,58 +1057,94 @@ export default function Home() {
           </div>
         </section>
 
-        {/* 6. Extra Bento: Store Information & About Us */}
-        <section id="about" className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Card 1: Work Hours */}
-          <div className="bg-slate-50 border border-card-border p-6 rounded-2xl text-right space-y-3 hover:border-slate-300 transition-colors">
-            <div className="p-2.5 bg-white rounded-xl border border-slate-100 text-slate-700 w-fit">
-              <Clock className="w-5 h-5 text-accent" />
-            </div>
-            <h3 className="font-extrabold text-base text-[#1a1a1a]">ساعات العمل</h3>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              نحن جاهزون لخدمتكم طوال أيام الأسبوع: <br />
-              <strong></strong> من 3:00 مساءً حتى 12:00 مساءً. <br />
-              <strong>الجمعة</strong>: من 3:00 مساءً حتى 12:00 مساءً.
-            </p>
-          </div>
+        {/* Dynamic Custom Promo Banner */}
+        {siteSettings.promoBanner?.isEnabled && (
+          <section
+            className={`rounded-3xl p-6 sm:p-8 lg:p-10 relative overflow-hidden shadow-xl border flex flex-col md:flex-row items-center justify-between gap-6 transition-all duration-300 ${
+              siteSettings.promoBanner.bgStyle === "glass-blue"
+                ? "bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-500 text-white border-blue-500/20 shadow-blue-500/20"
+                : siteSettings.promoBanner.bgStyle === "glass-emerald"
+                ? "bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-500 text-white border-emerald-500/20 shadow-emerald-500/20"
+                : siteSettings.promoBanner.bgStyle === "glass-amber"
+                ? "bg-gradient-to-r from-amber-500 via-orange-600 to-yellow-500 text-white border-amber-500/20 shadow-amber-500/20"
+                : siteSettings.promoBanner.bgStyle === "glass-dark"
+                ? "bg-gradient-to-r from-slate-900 via-slate-800 to-slate-950 text-white border-slate-800 shadow-slate-950/40"
+                : "bg-gradient-to-r from-rose-500 via-pink-600 to-red-500 text-white border-rose-500/20 shadow-rose-500/20" // default glass-rose
+            }`}
+          >
+            {/* Glowing background bubble decorative graphics */}
+            <div className="absolute top-[-50%] right-[-10%] w-72 h-72 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>
+            <div className="absolute bottom-[-50%] left-[-10%] w-72 h-72 bg-black/10 rounded-full blur-3xl pointer-events-none"></div>
 
-          {/* Card 2: Location */}
-          <div className="bg-slate-50 border border-card-border p-6 rounded-2xl text-right space-y-3 hover:border-slate-300 transition-colors">
-            <div className="p-2.5 bg-white rounded-xl border border-slate-100 text-slate-700 w-fit">
-              <MapPin className="w-5 h-5 text-accent" />
+            {/* Right Side: Text info */}
+            <div className="flex-1 text-right space-y-3 z-10 w-full" dir="rtl">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/20 text-white backdrop-blur-md font-bold text-[10px] sm:text-xs rounded-full border border-white/10 animate-bounce">
+                ✨ {siteSettings.promoBanner.badge}
+              </span>
+              <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight leading-tight">
+                {siteSettings.promoBanner.title}
+              </h2>
+              <p className="text-xs sm:text-sm text-white/90 leading-relaxed max-w-3xl">
+                {siteSettings.promoBanner.description}
+              </p>
             </div>
-            <h3 className="font-extrabold text-base text-[#1a1a1a]">موقع المعرض</h3>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              العراق، الناصرية، الصالحية، شارع التقاعد. <br />
-            </p>
-          </div>
 
-          {/* Card 3: Support */}
-          <div className="bg-slate-50 border border-card-border p-6 rounded-2xl text-right space-y-3 hover:border-slate-300 transition-colors">
-            <div className="p-2.5 bg-white rounded-xl border border-slate-100 text-slate-700 w-fit">
-              <Phone className="w-5 h-5 text-accent" />
+            {/* Left Side: Call to action button */}
+            <div className="z-10 w-full md:w-auto flex justify-start md:justify-end">
+              <a
+                href={siteSettings.promoBanner.buttonLink}
+                className="w-full md:w-auto text-center bg-white text-slate-900 font-extrabold text-xs sm:text-sm px-8 py-4 rounded-2xl shadow-lg hover:bg-slate-100 active:scale-[0.99] transition-all duration-200 uppercase tracking-wide block hover:scale-[1.02]"
+              >
+                {siteSettings.promoBanner.buttonText}
+              </a>
             </div>
-            <h3 className="font-extrabold text-base text-[#1a1a1a]">الاتصال المباشر</h3>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              للاستفسارات والطلبات الخاصة: <br />
-              رقم الهاتف: <strong dir="ltr" className="inline-block text-left">{siteSettings.phone}</strong> <br />
-              البريد الإلكتروني: <strong>{siteSettings.email}</strong>
-            </p>
-          </div>
-        </section>
+          </section>
+        )}
 
       </main>
 
       {/* Footer */}
       <footer id="contact" className="bg-slate-50 border-t border-card-border py-12 mt-12 text-right">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          
+          {/* Top Footer Row: Store Info (Working Hours & Showroom Location) */}
+          <div id="about" className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-8 mb-8 border-b border-slate-200">
+            
+            {/* Showroom Location */}
+            <div className="flex items-center gap-4 justify-start">
+              <div className="p-3 bg-white rounded-xl border border-card-border text-slate-700 shadow-xs">
+                <MapPin className="w-5 h-5 text-accent" />
+              </div>
+              <div className="text-right">
+                <h4 className="font-extrabold text-sm text-[#1a1a1a]">موقع المعرض</h4>
+                <p className="text-xs text-slate-500 mt-1">
+                  العراق، الناصرية، الصالحية، شارع التقاعد.
+                </p>
+              </div>
+            </div>
+
+            {/* Working Hours */}
+            <div className="flex items-center gap-4 justify-start">
+              <div className="p-3 bg-white rounded-xl border border-card-border text-slate-700 shadow-xs">
+                <Clock className="w-5 h-5 text-accent" />
+              </div>
+              <div className="text-right">
+                <h4 className="font-extrabold text-sm text-[#1a1a1a]">ساعات العمل</h4>
+                <p className="text-xs text-slate-500 mt-1">
+                  نحن جاهزون لخدمتكم طوال أيام الأسبوع: من 3:00 مساءً حتى 12:00 مساءً.
+                </p>
+              </div>
+            </div>
+
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             
             {/* Column 1: Brand */}
             <div className="space-y-4">
               <div>
                 <span className="block text-lg font-extrabold text-[#1a1a1a]">مركز الروان</span>
-                <span className="block text-xs font-bold text-slate-400 uppercase font-mono">Raw an Center</span>
+                <span className="block text-xs font-bold text-slate-400 uppercase font-mono">Rawn Center</span>
               </div>
               <p className="text-xs text-slate-500 leading-relaxed">
                 مركز الروان المعتمد لبيع وشراء الهواتف الذكية وحافضاتها الأنيقة والعصرية، والمركز المعتمد الأسرع في الصيانة بالمنطقة.
@@ -1029,7 +1193,7 @@ export default function Home() {
 
           <div className="border-t border-slate-200 mt-8 pt-8 flex flex-col sm:flex-row items-center justify-between text-center gap-4 text-xs text-slate-400">
             <div>
-              &copy; {new Date().getFullYear()} مركز الروان (Raw an Center). جميع الحقوق محفوظة.
+              &copy; {new Date().getFullYear()} مركز الروان (Rawn Center). جميع الحقوق محفوظة.
             </div>
             <div className="flex gap-4">
               {siteSettings.socials.map((social, index) => (
@@ -1089,8 +1253,8 @@ export default function Home() {
           product={selectedProduct}
           isOpen={!!selectedProduct}
           onClose={() => setSelectedProduct(null)}
-          onAddToCart={(prod) => {
-            handleAddToCart(prod);
+          onAddToCart={(prod, color) => {
+            handleAddToCart(prod, color);
           }}
           allProducts={products}
           onSelectProduct={(prod) => setSelectedProduct(prod)}

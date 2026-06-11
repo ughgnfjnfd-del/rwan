@@ -3,13 +3,14 @@
 import React, { useEffect } from "react";
 import { X, Trash2, Plus, Minus, ShoppingBag } from "lucide-react";
 import { Product, CartItem } from "@/context/AppContext";
+import ProductMockup from "@/components/ProductMockup";
 
 interface CartDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   items: CartItem[];
-  onUpdateQuantity: (productId: string, quantity: number) => void;
-  onRemoveItem: (productId: string) => void;
+  onUpdateQuantity: (productId: string, quantity: number, selectedColorName?: string | null) => void;
+  onRemoveItem: (productId: string, selectedColorName?: string | null) => void;
   onCheckout: () => void;
   shippingFee?: string;
 }
@@ -94,15 +95,16 @@ export default function CartDrawer({
           ) : (
             items.map((item) => (
               <div
-                key={item.product.id}
+                key={`${item.product.id}-${item.selectedColor?.name || "default"}`}
                 className="flex gap-4 p-3 border border-card-border rounded-xl hover:shadow-sm transition-shadow duration-200"
               >
                 {/* Product Image */}
-                <div className="w-20 h-20 bg-slate-50 rounded-lg overflow-hidden flex items-center justify-center border border-slate-100 flex-shrink-0 relative">
-                  {/* Since we don't have real images yet, we can draw a premium placeholder with icon or text */}
-                  <div className="text-[10px] text-slate-400 font-semibold uppercase p-1 text-center">
-                    {item.product.nameEn}
-                  </div>
+                <div className="w-16 h-16 flex items-center justify-center bg-slate-50 border border-slate-100 rounded-lg overflow-hidden p-1 flex-shrink-0 relative">
+                  <ProductMockup
+                    image={item.selectedColor?.image || item.product.image}
+                    name={item.product.name}
+                    sizeClass="w-9 aspect-[9/18]"
+                  />
                 </div>
 
                 {/* Details */}
@@ -111,9 +113,22 @@ export default function CartDrawer({
                     <h4 className="font-bold text-sm text-[#1a1a1a] truncate">
                       {item.product.name}
                     </h4>
-                    <span className="text-xs text-slate-400 uppercase">
-                      {item.product.category}
-                    </span>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[10px] text-slate-400 uppercase">
+                        {item.product.category}
+                      </span>
+                      {item.selectedColor && (
+                        <div className="flex items-center gap-1 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-full">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full border border-black/10 shadow-xs block"
+                            style={{ backgroundColor: item.selectedColor.hex }}
+                          />
+                          <span className="text-[9px] font-bold text-slate-600">
+                            {item.selectedColor.name}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex items-center justify-between mt-2">
@@ -121,7 +136,7 @@ export default function CartDrawer({
                     <div className="flex items-center border border-slate-200 rounded-lg bg-slate-50/50">
                       <button
                         onClick={() =>
-                          onUpdateQuantity(item.product.id, item.quantity - 1)
+                          onUpdateQuantity(item.product.id, item.quantity - 1, item.selectedColor?.name)
                         }
                         className="p-1 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-r-lg transition-colors cursor-pointer"
                       >
@@ -132,7 +147,7 @@ export default function CartDrawer({
                       </span>
                       <button
                         onClick={() =>
-                          onUpdateQuantity(item.product.id, item.quantity + 1)
+                          onUpdateQuantity(item.product.id, item.quantity + 1, item.selectedColor?.name)
                         }
                         className="p-1 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-l-lg transition-colors cursor-pointer"
                       >
@@ -145,7 +160,7 @@ export default function CartDrawer({
                         {((item.product.discountPrice || item.product.price) * item.quantity).toLocaleString()} د.ع
                       </span>
                       <button
-                        onClick={() => onRemoveItem(item.product.id)}
+                        onClick={() => onRemoveItem(item.product.id, item.selectedColor?.name)}
                         className="text-slate-400 hover:text-rose-500 p-1 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
                       >
                         <Trash2 className="w-4 h-4" />

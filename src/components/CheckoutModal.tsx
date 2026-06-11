@@ -123,8 +123,11 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onSubmit, sh
                 </div>
                 <div className="max-h-24 overflow-y-auto space-y-1 pr-1">
                   {cartItems.map(item => (
-                    <div key={item.product.id} className="flex justify-between text-slate-500">
-                      <span className="truncate max-w-[240px]">• {item.product.name} (x{item.quantity})</span>
+                    <div key={`${item.product.id}-${item.selectedColor?.name || "default"}`} className="flex justify-between text-slate-500">
+                      <span className="truncate max-w-[240px]">
+                        • {item.product.name}
+                        {item.selectedColor ? ` (${item.selectedColor.name})` : ""} (x{item.quantity})
+                      </span>
                       <span className="font-mono text-slate-600">{((item.product.discountPrice || item.product.price) * item.quantity).toLocaleString()} د.ع</span>
                     </div>
                   ))}

@@ -171,10 +171,8 @@ export default function PromoCarousel({ onOpenRepairModal }: PromoCarouselProps)
               </a>
             )}
           </div>
-        </div>
-
-        {/* 2. Slide Visual Showcase (LTL/Left) */}
-        <div className="w-full lg:w-5/12 flex items-center justify-center min-h-[180px] sm:min-h-[220px] lg:min-h-0 z-10 order-1 lg:order-1 relative">
+        </div>        {/* 2. Slide Visual Showcase (LTL/Left) */}
+        <div className={`w-full ${activeSlide.graphicType === "custom" ? "lg:w-1/2" : "lg:w-5/12"} flex items-center justify-center min-h-[200px] sm:min-h-[260px] lg:min-h-0 z-10 order-1 lg:order-1 relative`}>
           
           {/* Laptop Mockup (MacBook Slide) */}
           {activeSlide.graphicType === "macbook" && (
@@ -252,7 +250,7 @@ export default function PromoCarousel({ onOpenRepairModal }: PromoCarouselProps)
                     <span className="text-[6px] text-sky-400 font-extrabold tracking-widest mt-1">SUPER CHIP</span>
                   </div>
 
-                  <div className="h-4 flex items-center justify-between border-t border-zinc-800/40 pt-1.5 text-[6px] text-zinc-400">
+                  <div className="h-4 flex items-center justify-between border-t border-zinc-800/40 pt-1.5 text-[6px] text-zinc-405">
                     <span>Apple Intelligence</span>
                     <div className="w-3 h-3 bg-gradient-to-tr from-orange-400 to-pink-500 rounded-full animate-spin"></div>
                   </div>
@@ -282,8 +280,8 @@ export default function PromoCarousel({ onOpenRepairModal }: PromoCarouselProps)
                   CPU
                 </div>
                 <div className="w-full space-y-1">
-                  <div className="w-full h-1 bg-slate-850 rounded"></div>
-                  <div className="w-3/4 h-1 bg-slate-850 rounded"></div>
+                  <div className="w-full h-1 bg-slate-855 rounded"></div>
+                  <div className="w-3/4 h-1 bg-slate-855 rounded"></div>
                   <div className="w-1/2 h-1 bg-emerald-400/40 rounded"></div>
                 </div>
                 <span className="text-[6px] text-emerald-500 font-extrabold font-mono uppercase tracking-widest text-center">Active</span>
@@ -321,15 +319,22 @@ export default function PromoCarousel({ onOpenRepairModal }: PromoCarouselProps)
 
           {/* Custom Uploaded Image */}
           {activeSlide.graphicType === "custom" && (
-            <div className="relative w-full max-w-[280px] sm:max-w-[320px] aspect-video flex items-center justify-center animate-float-slow">
+            <div className="relative w-full max-w-[380px] sm:max-w-[460px] lg:max-w-[520px] flex items-center justify-center animate-float-slow">
+              {/* Soft neon backglow for the custom image */}
+              <div className="absolute inset-0 bg-gradient-to-tr from-sky-400/20 via-indigo-500/10 to-pink-500/20 rounded-[2.5rem] blur-2xl opacity-60"></div>
+              
               {activeSlide.customImageUrl ? (
-                <img
-                  src={activeSlide.customImageUrl}
-                  alt={activeSlide.title}
-                  className="max-w-full max-h-[220px] object-contain rounded-2xl shadow-xl border border-white/20"
-                />
+                <div className="relative p-2.5 bg-white/10 backdrop-blur-md rounded-3xl border border-white/20 shadow-2xl overflow-hidden hover:scale-[1.02] transition-transform duration-300">
+                  <img
+                    src={activeSlide.customImageUrl}
+                    alt={activeSlide.title}
+                    className="max-w-full max-h-[300px] sm:max-h-[350px] lg:max-h-[380px] object-contain rounded-2xl"
+                  />
+                  {/* Glossy overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 pointer-events-none"></div>
+                </div>
               ) : (
-                <div className="w-full h-[180px] bg-slate-200/50 rounded-2xl flex items-center justify-center text-slate-450 border border-dashed border-slate-300 text-xs">
+                <div className="w-full h-[220px] bg-slate-200/50 rounded-3xl flex items-center justify-center text-slate-450 border border-dashed border-slate-300 text-xs">
                   لا توجد صورة مخصصة مضافة
                 </div>
               )}
@@ -358,7 +363,7 @@ export default function PromoCarousel({ onOpenRepairModal }: PromoCarouselProps)
                     } else {
                       // Custom image upload from database
                       return (
-                        <div className="w-36 h-48 flex items-center justify-center p-2 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 shadow-2xl overflow-hidden">
+                        <div className="w-44 sm:w-52 h-56 sm:h-64 flex items-center justify-center p-2.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 shadow-2xl overflow-hidden hover:scale-[1.02] transition-transform duration-300">
                           <img
                             src={product.image}
                             alt={product.name}
@@ -369,7 +374,7 @@ export default function PromoCarousel({ onOpenRepairModal }: PromoCarouselProps)
                     }
                   }
                   return (
-                    <div className="w-48 h-36 bg-slate-200/50 rounded-2xl flex items-center justify-center text-slate-400 border border-dashed border-slate-350 text-xs text-center p-4">
+                    <div className="w-48 h-36 bg-slate-200/50 rounded-2xl flex items-center justify-center text-slate-450 border border-dashed border-slate-350 text-xs text-center p-4">
                       لم يتم اختيار منتج صالح
                     </div>
                   );

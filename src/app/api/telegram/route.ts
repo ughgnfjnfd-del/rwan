@@ -28,7 +28,8 @@ export async function POST(request: Request) {
       
       text += `<b>📦 المنتجات المطلوبة:</b>\n`;
       items.forEach((item: any, i: number) => {
-        text += `${i + 1}. <b>${item.product.name}</b>\n`;
+        const colorText = item.selectedColor ? ` (اللون: ${item.selectedColor.name})` : "";
+        text += `${i + 1}. <b>${item.product.name}${colorText}</b>\n`;
         text += `   الكمية: ${item.quantity} | السعر: ${(item.product.price * item.quantity).toLocaleString()} د.ع\n`;
       });
       
@@ -52,23 +53,32 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid notification type" }, { status: 400 });
     }
 
-    const telegramUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
-    const res = await fetch(telegramUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: text,
-        parse_mode: "HTML",
-      }),
+    const chatIds = chatId.split(",").map(id => id.trim()).filter(Boolean);
+    const sendPromises = chatIds.map(async (id) => {
+      const telegramUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+      const res = await fetch(telegramUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          chat_id: id,
+          text: text,
+          parse_mode: "HTML",
+        }),
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error(`Telegram API Error for chat ID ${id}:`, errText);
+      }
+      return res.ok;
     });
 
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error("Telegram API Error:", errText);
-      return NextResponse.json({ error: "Failed to send Telegram message" }, { status: 500 });
+    const results = await Promise.all(sendPromises);
+    const anySuccess = results.some(r => r === true);
+
+    if (!anySuccess) {
+      return NextResponse.json({ error: "Failed to send Telegram message to any configured chat ID" }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });

@@ -35,3 +35,23 @@ export const supabase = createClient(
   supabaseAnonKey || 'placeholder'
 );
 
+export const deleteImageFromSupabase = async (url: string) => {
+  if (!url || !url.includes("/storage/v1/object/public/products/")) return;
+  try {
+    const marker = "/storage/v1/object/public/products/";
+    const index = url.indexOf(marker);
+    if (index !== -1) {
+      const filePath = decodeURIComponent(url.substring(index + marker.length));
+      const { error } = await supabase.storage.from("products").remove([filePath]);
+      if (error) {
+        console.error("Error removing file from Supabase Storage:", error);
+      } else {
+        console.log("Successfully removed old image from Supabase Storage:", filePath);
+      }
+    }
+  } catch (err) {
+    console.error("Failed to delete old image from storage:", err);
+  }
+};
+
+

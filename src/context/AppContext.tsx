@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase, deleteImageFromSupabase } from "@/lib/supabase";
 
 // Types
 export interface Product {
@@ -15,6 +15,9 @@ export interface Product {
   description?: string;
   specs?: string;
   isPopular?: boolean;
+  colors?: Array<{ name: string; hex: string; image?: string | null }> | null;
+  rating?: number | null;
+  reviewsCount?: number | null;
 }
 
 // Database Helpers & Mappers
@@ -28,7 +31,10 @@ const mapDBProduct = (dbProd: any): Product => ({
   category: dbProd.category,
   description: dbProd.description || "",
   specs: dbProd.specs || "",
-  isPopular: dbProd.is_popular || dbProd.isPopular || false
+  isPopular: dbProd.is_popular || dbProd.isPopular || false,
+  colors: dbProd.colors || null,
+  rating: dbProd.rating !== undefined && dbProd.rating !== null ? Number(dbProd.rating) : 5,
+  reviewsCount: dbProd.reviews_count !== undefined && dbProd.reviews_count !== null ? Number(dbProd.reviews_count) : 24,
 });
 
 const mapLocalProductToDB = (prod: Partial<Product>) => {
@@ -45,6 +51,9 @@ const mapLocalProductToDB = (prod: Partial<Product>) => {
   if (prod.description !== undefined) dbProd.description = prod.description;
   if (prod.specs !== undefined) dbProd.specs = prod.specs;
   if (prod.isPopular !== undefined) dbProd.is_popular = prod.isPopular;
+  if (prod.colors !== undefined) dbProd.colors = prod.colors;
+  if (prod.rating !== undefined) dbProd.rating = prod.rating;
+  if (prod.reviewsCount !== undefined) dbProd.reviews_count = prod.reviewsCount;
   return dbProd;
 };
 
@@ -79,6 +88,7 @@ const mapLocalAppointmentToDB = (appt: any) => {
 export interface CartItem {
   product: Product;
   quantity: number;
+  selectedColor?: { name: string; hex: string; image?: string | null } | null;
 }
 
 export interface Appointment {
@@ -178,9 +188,9 @@ interface AppContextType {
   addAppointment: (appointment: Omit<Appointment, "id" | "status" | "createdAt">) => void;
   updateAppointmentStatus: (id: string, status: Appointment["status"]) => void;
   deleteAppointment: (id: string) => void;
-  addToCart: (product: Product) => void;
-  removeFromCart: (productId: string) => void;
-  updateCartQuantity: (productId: string, quantity: number) => void;
+  addToCart: (product: Product, selectedColor?: { name: string; hex: string; image?: string | null } | null) => void;
+  removeFromCart: (productId: string, selectedColorName?: string | null) => void;
+  updateCartQuantity: (productId: string, quantity: number, selectedColorName?: string | null) => void;
   clearCart: () => void;
   toggleWishlist: (productId: string) => void;
   updateSiteSettings: (settings: Partial<SiteSettings>) => Promise<void>;
@@ -256,7 +266,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           .from("products")
           .select("*")
           .order('created_at', { ascending: false });
-        
+
         if (productsError) throw productsError;
         if (productsData) setProducts(productsData.map(mapDBProduct));
 
@@ -264,14 +274,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const { data: settingsData, error: settingsError } = await supabase
           .from("site_settings")
           .select("*");
-        
+
         if (!settingsError && settingsData) {
           const contactObj = settingsData.find((s: any) => s.key === "contact")?.value;
           const socialsObj = settingsData.find((s: any) => s.key === "socials")?.value;
           const shippingObj = settingsData.find((s: any) => s.key === "shipping")?.value;
           const promoBannerObj = settingsData.find((s: any) => s.key === "promo_banner")?.value;
           const heroSlidesObj = settingsData.find((s: any) => s.key === "hero_slides")?.value;
-          
+
           setSiteSettings((prev) => ({
             email: contactObj?.email || prev.email,
             phone: contactObj?.phone || prev.phone,
@@ -312,7 +322,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           .from("appointments")
           .select("*")
           .order('createdat', { ascending: false });
-        
+
         if (apptsError) throw apptsError;
         if (apptsData) setAppointments(apptsData.map(mapDBAppointment));
 
@@ -350,7 +360,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       ...newProduct,
       id: `prod-${Date.now()}`,
     };
-    
+
     // Optimistic UI Update
     const updated = [product, ...products];
     setProducts(updated);
@@ -364,6 +374,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateProduct = async (id: string, updatedFields: Partial<Product>) => {
+    const oldProduct = products.find((p) => p.id === id);
+    const oldImage = oldProduct?.image;
+    const newImage = updatedFields.image;
+
     // Optimistic UI Update
     const updated = products.map((prod) =>
       prod.id === id ? { ...prod, ...updatedFields } : prod
@@ -377,17 +391,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       .update(dbPayload)
       .eq("id", id)
       .select();
-      
+
     if (error) {
       console.error("Error updating product in Supabase", error);
       alert(`حدث خطأ أثناء تحديث المنتج في قاعدة البيانات: ${error.message || error.details}`);
     } else if (!data || data.length === 0) {
       console.warn("Product update did not match any row or was blocked by RLS policies.");
       alert("لم يتم تحديث المنتج في قاعدة البيانات. قد يكون ذلك بسبب انتهاء صلاحية الجلسة أو قيود الحماية (RLS). يرجى إعادة تسجيل الدخول.");
+    } else {
+      // Delete the old custom image if the image has changed
+      if (oldImage && newImage && oldImage !== newImage) {
+        await deleteImageFromSupabase(oldImage);
+      }
     }
   };
 
   const deleteProduct = async (id: string) => {
+    // Find image URL before deleting
+    const productToDelete = products.find((p) => p.id === id);
+    const oldImage = productToDelete?.image;
+
     // Optimistic UI Update
     const updated = products.filter((prod) => prod.id !== id);
     setProducts(updated);
@@ -401,6 +424,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const { error } = await supabase.from("products").delete().eq("id", id);
     if (error) {
       console.error("Error deleting product from Supabase", error);
+    } else if (oldImage) {
+      await deleteImageFromSupabase(oldImage);
     }
   };
 
@@ -412,7 +437,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       status: "pending",
       createdAt: new Date().toISOString(),
     };
-    
+
     // Optimistic UI Update
     const updated = [appt, ...appointments];
     setAppointments(updated);
@@ -436,7 +461,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       .from("appointments")
       .update({ status })
       .eq("id", id);
-      
+
     if (error) {
       console.error("Error updating appointment in Supabase", error);
     }
@@ -455,35 +480,43 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Cart Actions (LocalStorage only)
-  const addToCart = (product: Product) => {
+  const addToCart = (product: Product, selectedColor?: { name: string; hex: string; image?: string | null } | null) => {
     let updated: CartItem[];
-    const existing = cartItems.find((item) => item.product.id === product.id);
+    const existing = cartItems.find((item) => 
+      item.product.id === product.id && 
+      (!selectedColor || item.selectedColor?.name === selectedColor.name)
+    );
     if (existing) {
       updated = cartItems.map((item) =>
-        item.product.id === product.id
+        item.product.id === product.id && 
+        (!selectedColor || item.selectedColor?.name === selectedColor.name)
           ? { ...item, quantity: item.quantity + 1 }
           : item
       );
     } else {
-      updated = [...cartItems, { product, quantity: 1 }];
+      updated = [...cartItems, { product, quantity: 1, selectedColor: selectedColor || null }];
     }
     setCartItems(updated);
     saveCartToStorage(updated);
   };
 
-  const removeFromCart = (productId: string) => {
-    const updated = cartItems.filter((item) => item.product.id !== productId);
+  const removeFromCart = (productId: string, selectedColorName?: string | null) => {
+    const updated = cartItems.filter((item) => 
+      !(item.product.id === productId && (!selectedColorName || item.selectedColor?.name === selectedColorName))
+    );
     setCartItems(updated);
     saveCartToStorage(updated);
   };
 
-  const updateCartQuantity = (productId: string, quantity: number) => {
+  const updateCartQuantity = (productId: string, quantity: number, selectedColorName?: string | null) => {
     if (quantity <= 0) {
-      removeFromCart(productId);
+      removeFromCart(productId, selectedColorName);
       return;
     }
     const updated = cartItems.map((item) =>
-      item.product.id === productId ? { ...item, quantity } : item
+      item.product.id === productId && (!selectedColorName || item.selectedColor?.name === selectedColorName)
+        ? { ...item, quantity }
+        : item
     );
     setCartItems(updated);
     saveCartToStorage(updated);
@@ -553,7 +586,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const { error } = await supabase
       .from("site_settings")
       .upsert({ key: "hero_slides", value: updatedSlides });
-    
+
     if (error) {
       console.error("Error updating hero slides in Supabase", error);
       throw error;
@@ -594,7 +627,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const addBundleToCart = (productIds: string[]) => {
     let newCartItems = [...cartItems];
-    
+
     productIds.forEach((pid) => {
       const product = products.find((p) => p.id === pid);
       if (product) {

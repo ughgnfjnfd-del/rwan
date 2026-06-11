@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useApp, Product, Appointment, SlideItem, MarqueeSettings, FlashSale, PromoPopUp, ProductBundle } from "@/context/AppContext";
-import { supabase } from "@/lib/supabase";
+import { supabase, deleteImageFromSupabase } from "@/lib/supabase";
 import {
   Lock,
   User,
@@ -191,6 +191,8 @@ export default function AdminPage() {
       return;
     }
 
+    const oldSlide = heroSlides.find((s) => s.id === editingSlideId);
+    const oldImageUrl = oldSlide?.customImageUrl;
     let customImageValue = slideForm.customImageUrl || "";
 
     if (slideForm.graphicType === "custom" && selectedSlideFile) {
@@ -253,6 +255,11 @@ export default function AdminPage() {
     try {
       await updateHeroSlides(updatedSlides);
       setIsSlideModalOpen(false);
+      
+      // Clean up old slide image if it changed and was an uploaded custom image
+      if (oldImageUrl && oldImageUrl !== customImageValue) {
+        await deleteImageFromSupabase(oldImageUrl);
+      }
     } catch (err: any) {
       alert(`حدث خطأ أثناء حفظ الشريحة: ${err.message || err}`);
     }
@@ -260,9 +267,15 @@ export default function AdminPage() {
 
   const handleDeleteSlide = async (id: string) => {
     if (confirm("هل أنت متأكد من حذف هذه الشريحة الإعلانية؟")) {
+      const slideToDelete = heroSlides.find((s) => s.id === id);
+      const oldImageUrl = slideToDelete?.customImageUrl;
+
       const updatedSlides = heroSlides.filter((s) => s.id !== id);
       try {
         await updateHeroSlides(updatedSlides);
+        if (oldImageUrl) {
+          await deleteImageFromSupabase(oldImageUrl);
+        }
       } catch (err: any) {
         alert(`حدث خطأ أثناء حذف الشريحة: ${err.message || err}`);
       }
@@ -293,7 +306,7 @@ export default function AdminPage() {
         if (error) {
           // If refresh token is invalid or missing, clear the session data from local storage
           if (error.message?.includes("Refresh Token")) {
-            await supabase.auth.signOut().catch(() => {});
+            await supabase.auth.signOut().catch(() => { });
           }
           setIsLoggedIn(false);
         } else {
@@ -337,7 +350,11 @@ export default function AdminPage() {
     description: "",
     specs: "",
     isPopular: false,
+    rating: 5,
+    reviewsCount: 24,
   });
+
+  const [productColors, setProductColors] = useState<Array<{ name: string; hex: string; image?: string | null; file?: File | null }>>([]);
 
   // Site Settings States
   const [settingsForm, setSettingsForm] = useState({
@@ -355,7 +372,7 @@ export default function AdminPage() {
       bgStyle: "glass-rose"
     }
   });
-  
+
   const [newSocial, setNewSocial] = useState({
     platform: "facebook",
     url: "",
@@ -585,7 +602,7 @@ export default function AdminPage() {
     else if (platform === "telegram") name = "تيليجرام";
     else if (platform === "youtube") name = "يوتيوب";
     else if (platform === "custom") name = "موقع مخصص";
-    
+
     setNewSocial({ platform, url: "", name });
   };
 
@@ -614,7 +631,7 @@ export default function AdminPage() {
       alert("يرجى ملء البريد الإلكتروني ورقم الهاتف");
       return;
     }
-    
+
     try {
       await updateSiteSettings(settingsForm);
       alert("تم حفظ إعدادات الموقع بنجاح!");
@@ -632,7 +649,7 @@ export default function AdminPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError("");
-    
+
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -665,7 +682,10 @@ export default function AdminPage() {
       description: "",
       specs: "",
       isPopular: false,
+      rating: 5,
+      reviewsCount: 24,
     });
+    setProductColors([]);
     setIsProductModalOpen(true);
   };
 
@@ -674,7 +694,7 @@ export default function AdminPage() {
     setEditingProductId(product.id);
     setSelectedFile(null);
     const isPreset = ["iphone", "samsung", "cases", "headphones", "earbuds", "cable", "smartwatch", "powerbank", "screen-protector"].includes(product.image) || product.image.startsWith("charger-");
-    
+
     // Set current image preview for custom images
     setImagePreview(isPreset ? null : product.image);
 
@@ -690,7 +710,10 @@ export default function AdminPage() {
       description: product.description || "",
       specs: product.specs || "",
       isPopular: product.isPopular || false,
+      rating: product.rating !== undefined && product.rating !== null ? product.rating : 5,
+      reviewsCount: product.reviewsCount !== undefined && product.reviewsCount !== null ? product.reviewsCount : 24,
     });
+    setProductColors(product.colors || []);
     setIsProductModalOpen(true);
   };
 
@@ -703,7 +726,7 @@ export default function AdminPage() {
     }
 
     let imageValue = "";
-    
+
     if (productForm.imageType === "preset") {
       imageValue = productForm.imagePreset;
     } else if (productForm.imageType === "url") {
@@ -718,12 +741,12 @@ export default function AdminPage() {
         try {
           // Compress image to JPEG quality 0.8 and max 800px width/height
           const compressedBlob = await compressAndResizeImage(selectedFile, 800, 800, 0.8);
-          
+
           // Generate a clean safe unique filename
           const fileExtension = selectedFile.name.split('.').pop() || 'jpg';
           const cleanName = selectedFile.name.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 20);
           const filePath = `${Date.now()}-${cleanName}.${fileExtension}`;
-          
+
           // Upload to Supabase Storage
           const { data, error: uploadError } = await supabase.storage
             .from("products")
@@ -759,10 +782,53 @@ export default function AdminPage() {
         return;
       }
     }
-    
+
     if (!imageValue) {
       alert("يرجى إدخال رابط الصورة أو اختيار شكل جرافيكي");
       return;
+    }
+
+    // Upload color-specific images if any
+    const finalColors = [];
+    for (const color of productColors) {
+      let colorImage = color.image || null;
+      if (color.file) {
+        setIsUploading(true);
+        try {
+          const compressedBlob = await compressAndResizeImage(color.file, 800, 800, 0.8);
+          const fileExtension = color.file.name.split('.').pop() || 'jpg';
+          const cleanName = color.file.name.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 20);
+          const filePath = `color-${Date.now()}-${cleanName}.${fileExtension}`;
+          
+          const { data, error: uploadError } = await supabase.storage
+            .from("products")
+            .upload(filePath, compressedBlob, {
+              contentType: `image/${fileExtension === 'png' ? 'png' : 'jpeg'}`,
+              cacheControl: "3600",
+              upsert: false
+            });
+
+          if (uploadError) throw uploadError;
+
+          const { data: { publicUrl } } = supabase.storage
+            .from("products")
+            .getPublicUrl(filePath);
+
+          colorImage = publicUrl;
+        } catch (error: any) {
+          console.error("Error uploading color image:", error);
+          alert(`حدث خطأ أثناء رفع صورة اللون ${color.name}: ${error.message || error}`);
+          setIsUploading(false);
+          return;
+        } finally {
+          setIsUploading(false);
+        }
+      }
+      finalColors.push({
+        name: color.name,
+        hex: color.hex,
+        image: colorImage
+      });
     }
 
     const productData = {
@@ -775,6 +841,9 @@ export default function AdminPage() {
       description: productForm.description,
       specs: productForm.specs,
       isPopular: productForm.isPopular,
+      colors: finalColors,
+      rating: productForm.rating,
+      reviewsCount: productForm.reviewsCount,
     };
 
     try {
@@ -795,7 +864,7 @@ export default function AdminPage() {
   const pendingRepairs = appointments.filter((a) => a.status === "pending").length;
   const activeRepairs = appointments.filter((a) => a.status === "in-progress").length;
   const completedRepairs = appointments.filter((a) => a.status === "completed").length;
-  
+
   // Simulated revenue: 45,000 IQD per completed repair + sum of all products
   const estimatedRevenue = completedRepairs * 45000 + products.reduce((acc, curr) => acc + curr.price * 0.1, 0);
 
@@ -827,7 +896,7 @@ export default function AdminPage() {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans text-right" dir="rtl">
         <div className="w-full max-w-md bg-white border border-card-border rounded-2xl p-8 shadow-xl space-y-6">
-          
+
           {/* Logo & Header */}
           <div className="text-center space-y-2">
             <div className="text-accent text-3xl font-extrabold flex justify-center gap-1.5 items-center">
@@ -898,11 +967,11 @@ export default function AdminPage() {
   // --- DASHBOARD VIEW ---
   return (
     <div className="min-h-screen bg-slate-50/50 flex flex-col font-sans text-right" dir="rtl">
-      
+
       {/* Admin Nav Header */}
       <header className="sticky top-0 z-40 bg-white border-b border-card-border shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          
+
           <div className="flex items-center gap-4">
             <div>
               <span className="block text-base font-extrabold text-[#1a1a1a]">لوحة إدارة المحتوى (CMS)</span>
@@ -935,18 +1004,17 @@ export default function AdminPage() {
 
       {/* Content Body */}
       <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        
+
         {/* Navigation Sidebar (CMS Tabs) */}
         <aside className="lg:col-span-3 bg-white border border-card-border p-4 rounded-2xl space-y-2">
           <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider px-2 mb-3">التبويبات الرئيسية</h3>
-          
+
           <button
             onClick={() => setActiveTab("overview")}
-            className={`w-full flex items-center gap-3 p-3.5 rounded-xl text-sm font-bold transition-all text-right cursor-pointer ${
-              activeTab === "overview"
+            className={`w-full flex items-center gap-3 p-3.5 rounded-xl text-sm font-bold transition-all text-right cursor-pointer ${activeTab === "overview"
                 ? "bg-[#1a1a1a] text-white shadow-md"
                 : "hover:bg-slate-50 text-slate-600"
-            }`}
+              }`}
           >
             <TrendingUp className="w-4.5 h-4.5" />
             <span>نظرة عامة وإحصائيات</span>
@@ -954,11 +1022,10 @@ export default function AdminPage() {
 
           <button
             onClick={() => setActiveTab("products")}
-            className={`w-full flex items-center gap-3 p-3.5 rounded-xl text-sm font-bold transition-all text-right cursor-pointer ${
-              activeTab === "products"
+            className={`w-full flex items-center gap-3 p-3.5 rounded-xl text-sm font-bold transition-all text-right cursor-pointer ${activeTab === "products"
                 ? "bg-[#1a1a1a] text-white shadow-md"
                 : "hover:bg-slate-50 text-slate-600"
-            }`}
+              }`}
           >
             <ShoppingBag className="w-4.5 h-4.5" />
             <span>إدارة المنتجات ({totalProducts})</span>
@@ -966,11 +1033,10 @@ export default function AdminPage() {
 
           <button
             onClick={() => setActiveTab("repairs")}
-            className={`w-full flex items-center gap-3 p-3.5 rounded-xl text-sm font-bold transition-all text-right cursor-pointer ${
-              activeTab === "repairs"
+            className={`w-full flex items-center gap-3 p-3.5 rounded-xl text-sm font-bold transition-all text-right cursor-pointer ${activeTab === "repairs"
                 ? "bg-[#1a1a1a] text-white shadow-md"
                 : "hover:bg-slate-50 text-slate-600"
-            }`}
+              }`}
           >
             <Wrench className="w-4.5 h-4.5" />
             <span>حجوزات الصيانة ({appointments.length})</span>
@@ -983,11 +1049,10 @@ export default function AdminPage() {
 
           <button
             onClick={() => setActiveTab("settings")}
-            className={`w-full flex items-center gap-3 p-3.5 rounded-xl text-sm font-bold transition-all text-right cursor-pointer ${
-              activeTab === "settings"
+            className={`w-full flex items-center gap-3 p-3.5 rounded-xl text-sm font-bold transition-all text-right cursor-pointer ${activeTab === "settings"
                 ? "bg-[#1a1a1a] text-white shadow-md"
                 : "hover:bg-slate-50 text-slate-600"
-            }`}
+              }`}
           >
             <FileText className="w-4.5 h-4.5" />
             <span>إعدادات الموقع</span>
@@ -995,11 +1060,10 @@ export default function AdminPage() {
 
           <button
             onClick={() => setActiveTab("slides")}
-            className={`w-full flex items-center gap-3 p-3.5 rounded-xl text-sm font-bold transition-all text-right cursor-pointer ${
-              activeTab === "slides"
+            className={`w-full flex items-center gap-3 p-3.5 rounded-xl text-sm font-bold transition-all text-right cursor-pointer ${activeTab === "slides"
                 ? "bg-[#1a1a1a] text-white shadow-md"
                 : "hover:bg-slate-50 text-slate-600"
-            }`}
+              }`}
           >
             <Star className="w-4.5 h-4.5" />
             <span>الشرائح الإعلانية ({heroSlides.length})</span>
@@ -1007,11 +1071,10 @@ export default function AdminPage() {
 
           <button
             onClick={() => setActiveTab("bundles")}
-            className={`w-full flex items-center gap-3 p-3.5 rounded-xl text-sm font-bold transition-all text-right cursor-pointer ${
-              activeTab === "bundles"
+            className={`w-full flex items-center gap-3 p-3.5 rounded-xl text-sm font-bold transition-all text-right cursor-pointer ${activeTab === "bundles"
                 ? "bg-[#1a1a1a] text-white shadow-md"
                 : "hover:bg-slate-50 text-slate-600"
-            }`}
+              }`}
           >
             <ShoppingBag className="w-4.5 h-4.5" />
             <span>حزم التوفير ({productBundles.length})</span>
@@ -1020,7 +1083,7 @@ export default function AdminPage() {
 
         {/* CMS Display Panel */}
         <section className="lg:col-span-9 bg-white border border-card-border rounded-2xl p-6 sm:p-8 min-h-[500px]">
-          
+
           {/* TAB 1: OVERVIEW */}
           {activeTab === "overview" && (
             <div className="space-y-8">
@@ -1031,7 +1094,7 @@ export default function AdminPage() {
 
               {/* Bento Box Stats */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                
+
                 {/* Stat 1: Total products */}
                 <div className="bg-slate-50/50 border border-slate-100 p-5 rounded-2xl space-y-2">
                   <div className="p-2 bg-blue-50 text-blue-500 rounded-lg w-fit">
@@ -1105,15 +1168,14 @@ export default function AdminPage() {
                             <td className="p-3 text-slate-600">{appt.issueType}</td>
                             <td className="p-3 text-slate-500 font-mono">{appt.date}</td>
                             <td className="p-3 text-left">
-                              <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
-                                appt.status === "pending"
+                              <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${appt.status === "pending"
                                   ? "bg-amber-50 text-amber-600 border border-amber-100"
                                   : appt.status === "in-progress"
-                                  ? "bg-blue-50 text-blue-600 border border-blue-100"
-                                  : appt.status === "completed"
-                                  ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
-                                  : "bg-rose-50 text-rose-600 border border-rose-100"
-                              }`}>
+                                    ? "bg-blue-50 text-blue-600 border border-blue-100"
+                                    : appt.status === "completed"
+                                      ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                                      : "bg-rose-50 text-rose-600 border border-rose-100"
+                                }`}>
                                 {appt.status === "pending" && "انتظار"}
                                 {appt.status === "in-progress" && "صيانة"}
                                 {appt.status === "completed" && "مكتمل"}
@@ -1139,7 +1201,7 @@ export default function AdminPage() {
                   <h2 className="text-xl font-extrabold text-[#1a1a1a]">إدارة مخزن المنتجات</h2>
                   <p className="text-xs text-slate-400">إضافة وتحديث وحذف الهواتف والملحقات المعروضة في المتجر</p>
                 </div>
-                
+
                 <button
                   onClick={handleOpenAdd}
                   className="bg-accent hover:bg-accent-hover text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
@@ -1182,7 +1244,7 @@ export default function AdminPage() {
                     <tbody className="divide-y divide-slate-100">
                       {filteredProducts.map((prod) => (
                         <tr key={prod.id} className="hover:bg-slate-50/50">
-                          
+
                           {/* Mini render of CSS Mockup preview or custom image */}
                           <td className="p-3">
                             <div className="w-10 h-10 bg-slate-100 rounded border border-slate-200 flex items-center justify-center text-[7px] text-slate-400 select-none uppercase overflow-hidden font-bold">
@@ -1258,11 +1320,10 @@ export default function AdminPage() {
                     <button
                       key={filter}
                       onClick={() => setRepairFilter(filter)}
-                      className={`text-[10px] font-bold px-3 py-1.5 rounded-lg border transition-all cursor-pointer truncate ${
-                        repairFilter === filter
+                      className={`text-[10px] font-bold px-3 py-1.5 rounded-lg border transition-all cursor-pointer truncate ${repairFilter === filter
                           ? "bg-[#1a1a1a] border-[#1a1a1a] text-white"
                           : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                      }`}
+                        }`}
                     >
                       {filter === "all" && "الكل"}
                       {filter === "pending" && "قيد الانتظار"}
@@ -1295,7 +1356,7 @@ export default function AdminPage() {
                     <tbody className="divide-y divide-slate-100">
                       {filteredRepairs.map((appt) => (
                         <tr key={appt.id} className="hover:bg-slate-50/50">
-                          
+
                           <td className="p-3 font-bold text-slate-400 font-mono">{appt.id}</td>
 
                           <td className="p-3 space-y-0.5">
@@ -1316,15 +1377,14 @@ export default function AdminPage() {
                           </td>
 
                           <td className="p-3">
-                            <span className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-bold ${
-                              appt.status === "pending"
+                            <span className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-bold ${appt.status === "pending"
                                 ? "bg-amber-50 text-amber-600 border border-amber-100"
                                 : appt.status === "in-progress"
-                                ? "bg-blue-50 text-blue-600 border border-blue-100"
-                                : appt.status === "completed"
-                                ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
-                                : "bg-rose-50 text-rose-600 border border-rose-100"
-                            }`}>
+                                  ? "bg-blue-50 text-blue-600 border border-blue-100"
+                                  : appt.status === "completed"
+                                    ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                                    : "bg-rose-50 text-rose-600 border border-rose-100"
+                              }`}>
                               {appt.status === "pending" && "قيد الانتظار"}
                               {appt.status === "in-progress" && "قيد الصيانة"}
                               {appt.status === "completed" && "مكتملة"}
@@ -1334,7 +1394,7 @@ export default function AdminPage() {
 
                           {/* Quick Actions */}
                           <td className="p-3 text-left space-x-1 space-x-reverse flex items-center justify-end">
-                            
+
                             {/* Wrench: Mark In Progress */}
                             {appt.status === "pending" && (
                               <button
@@ -1402,7 +1462,7 @@ export default function AdminPage() {
               </div>
 
               <form onSubmit={handleSaveSettings} className="space-y-6 text-right">
-                
+
                 {/* Contact Info Section */}
                 <div className="bg-slate-50/50 border border-slate-100 rounded-2xl p-5 space-y-4">
                   <h3 className="font-extrabold text-sm text-slate-800 flex items-center gap-2">
@@ -1974,7 +2034,7 @@ export default function AdminPage() {
                   <h2 className="text-xl font-extrabold text-[#1a1a1a]">إدارة الشرائح الإعلانية (Hero Slides)</h2>
                   <p className="text-xs text-slate-400">إضافة وتعديل وحذف وترتيب الشرائح الإعلانية المعروضة في واجهة المتجر الرئيسية</p>
                 </div>
-                
+
                 <button
                   onClick={handleOpenAddSlide}
                   className="bg-[#1a1a1a] hover:bg-slate-800 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
@@ -1992,7 +2052,7 @@ export default function AdminPage() {
                 <div className="grid grid-cols-1 gap-4">
                   {heroSlides.map((slide, idx) => (
                     <div key={slide.id} className="border border-slate-250/50 rounded-2xl bg-white p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-slate-350 hover:shadow-md transition-all duration-200">
-                      
+
                       {/* Left: Move and edit controls */}
                       <div className="flex items-center gap-2 w-full md:w-auto order-3 md:order-1 justify-end md:justify-start">
                         {/* Move Up */}
@@ -2015,9 +2075,9 @@ export default function AdminPage() {
                         >
                           <ArrowDown className="w-4 h-4" />
                         </button>
-                        
+
                         <div className="w-[1px] h-6 bg-slate-200 mx-1"></div>
-                        
+
                         {/* Edit */}
                         <button
                           type="button"
@@ -2027,7 +2087,7 @@ export default function AdminPage() {
                           <Edit2 className="w-3 h-3" />
                           تعديل
                         </button>
-                        
+
                         {/* Delete */}
                         <button
                           type="button"
@@ -2053,10 +2113,10 @@ export default function AdminPage() {
                           <span className="bg-slate-100 text-slate-650 text-[10px] font-semibold px-2 py-0.5 rounded-full">
                             الشكل: {
                               slide.graphicType === "macbook" ? "MacBook" :
-                              slide.graphicType === "iphone" ? "iPhone" :
-                              slide.graphicType === "repair" ? "صيانة" :
-                              slide.graphicType === "accessories" ? "ملحقات" :
-                              slide.graphicType === "product" ? "صورة منتج" : "صورة مخصصة"
+                                slide.graphicType === "iphone" ? "iPhone" :
+                                  slide.graphicType === "repair" ? "صيانة" :
+                                    slide.graphicType === "accessories" ? "ملحقات" :
+                                      slide.graphicType === "product" ? "صورة منتج" : "صورة مخصصة"
                             }
                           </span>
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${slide.theme === 'dark' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'}`}>
@@ -2084,7 +2144,7 @@ export default function AdminPage() {
                                   <span className="text-xl font-bold uppercase text-slate-450">
                                     {
                                       product.image === "iphone" || product.image === "samsung" ? "📱" :
-                                      product.image === "headphones" || product.image === "earbuds" ? "🎧" : "📦"
+                                        product.image === "headphones" || product.image === "earbuds" ? "🎧" : "📦"
                                     }
                                   </span>
                                 );
@@ -2096,17 +2156,17 @@ export default function AdminPage() {
                           <span className="text-xl font-bold uppercase text-slate-450">
                             {
                               slide.graphicType === "macbook" ? "💻" :
-                              slide.graphicType === "iphone" ? "📱" :
-                              slide.graphicType === "repair" ? "🛠️" : "🎧"
+                                slide.graphicType === "iphone" ? "📱" :
+                                  slide.graphicType === "repair" ? "🛠️" : "🎧"
                             }
                           </span>
                         )}
-                        <div 
-                          className="absolute bottom-0 inset-x-0 h-1.5" 
-                          style={{ 
-                            background: slide.bgStyle.includes("from-[") 
-                              ? `linear-gradient(to right, ${slide.bgStyle.split(" ")[0].replace("from-[", "").replace("]", "")}, ${slide.bgStyle.split(" ").slice(-2)[0].replace("to-[", "").replace("]", "")})` 
-                              : '#eee' 
+                        <div
+                          className="absolute bottom-0 inset-x-0 h-1.5"
+                          style={{
+                            background: slide.bgStyle.includes("from-[")
+                              ? `linear-gradient(to right, ${slide.bgStyle.split(" ")[0].replace("from-[", "").replace("]", "")}, ${slide.bgStyle.split(" ").slice(-2)[0].replace("to-[", "").replace("]", "")})`
+                              : '#eee'
                           }}
                         ></div>
                       </div>
@@ -2126,7 +2186,7 @@ export default function AdminPage() {
                   <h2 className="text-xl font-extrabold text-[#1a1a1a]">إدارة حزم الصفقات الترويجية (Bundles)</h2>
                   <p className="text-xs text-slate-400">دمج وتجميع منتجات المتجر في مجموعات تسويقية واحدة بخصم خاص</p>
                 </div>
-                
+
                 <button
                   onClick={handleOpenAddBundle}
                   className="bg-[#1a1a1a] hover:bg-slate-800 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
@@ -2144,7 +2204,7 @@ export default function AdminPage() {
                 <div className="grid grid-cols-1 gap-4">
                   {productBundles.map((bundle) => (
                     <div key={bundle.id} className="border border-slate-200 rounded-2xl bg-white p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-slate-350 hover:shadow-md transition-all duration-200">
-                      
+
                       {/* Left: Controls */}
                       <div className="flex items-center gap-2 w-full md:w-auto order-3 md:order-1 justify-end md:justify-start">
                         <button
@@ -2155,7 +2215,7 @@ export default function AdminPage() {
                           <Edit2 className="w-3 h-3" />
                           تعديل
                         </button>
-                        
+
                         <button
                           type="button"
                           onClick={() => handleDeleteBundle(bundle.id)}
@@ -2200,9 +2260,9 @@ export default function AdminPage() {
       {isProductModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setIsProductModalOpen(false)} />
-          
+
           <div className="relative z-50 w-full max-w-md bg-white rounded-2xl border border-card-border p-6 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden gap-4">
-            
+
             <div className="flex justify-between items-center border-b border-slate-100 pb-3 flex-shrink-0">
               <h3 className="font-extrabold text-base text-slate-800">
                 {editingProductId ? "تعديل بيانات المنتج" : "إضافة منتج جديد للمخزن"}
@@ -2216,7 +2276,7 @@ export default function AdminPage() {
             </div>
 
             <form onSubmit={handleSaveProduct} className="space-y-4 text-right overflow-y-auto flex-1 pl-1 pr-1 py-1">
-              
+
               {/* Product Name AR */}
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-700">اسم المنتج بالعربية *</label>
@@ -2254,6 +2314,10 @@ export default function AdminPage() {
                     className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:border-accent cursor-pointer"
                   >
                     <option value="موبايلات">موبايلات</option>
+                    <option value="كفرات">كفرات</option>
+                    <option value="سماعات">سماعات</option>
+                    <option value="شواحن">شواحن</option>
+                    <option value="كيبلات">كيبلات</option>
                     <option value="ملحقات">ملحقات</option>
                   </select>
                 </div>
@@ -2415,6 +2479,132 @@ export default function AdminPage() {
                 <p className="text-[10px] text-slate-400">إذا تم إدخال سعر خصم أقل من السعر الأصلي، سيظهر المنتج كـ "عرض مميز" تلقائياً.</p>
               </div>
 
+              {/* Rating and Reviews Count */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700">التقييم (مثال: 4.8) *</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="1"
+                    max="5"
+                    value={productForm.rating}
+                    onChange={(e) => setProductForm({ ...productForm, rating: parseFloat(e.target.value) || 5 })}
+                    className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:border-accent font-mono"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700">عدد التقييمات (مثال: 24) *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={productForm.reviewsCount}
+                    onChange={(e) => setProductForm({ ...productForm, reviewsCount: parseInt(e.target.value) || 0 })}
+                    className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:border-accent font-mono"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Colors Selection Section */}
+              <div className="space-y-3 border border-slate-200 rounded-xl p-3 bg-slate-50">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-bold text-slate-700">خيارات الألوان المتاحة ({productColors.length})</label>
+                  <button
+                    type="button"
+                    onClick={() => setProductColors([...productColors, { name: "", hex: "#1a1a1a", image: null, file: null }])}
+                    className="text-[10px] bg-[#1a1a1a] hover:bg-slate-800 text-white px-2.5 py-1 rounded-lg font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-3 h-3" />
+                    إضافة لون جديد
+                  </button>
+                </div>
+                
+                {productColors.length === 0 ? (
+                  <p className="text-[10px] text-slate-400 text-center py-2">لا توجد ألوان مضافة لهذا المنتج. سيتم استخدام الصورة الأساسية فقط.</p>
+                ) : (
+                  <div className="space-y-2.5 max-h-48 overflow-y-auto pr-1">
+                    {productColors.map((color, index) => (
+                      <div key={index} className="flex items-center gap-2 bg-white p-2 bg-slate-50/50 rounded-xl border border-slate-200 shadow-xs relative">
+                        {/* Color Picker */}
+                        <div className="relative w-8 h-8 rounded-full border border-slate-200 overflow-hidden flex-shrink-0 cursor-pointer shadow-sm">
+                          <input
+                            type="color"
+                            value={color.hex}
+                            onChange={(e) => {
+                              const updated = [...productColors];
+                              updated[index].hex = e.target.value;
+                              setProductColors(updated);
+                            }}
+                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full scale-150"
+                          />
+                          <div className="w-full h-full" style={{ backgroundColor: color.hex }} />
+                        </div>
+
+                        {/* Color Name */}
+                        <input
+                          type="text"
+                          value={color.name}
+                          onChange={(e) => {
+                            const updated = [...productColors];
+                            updated[index].name = e.target.value;
+                            setProductColors(updated);
+                          }}
+                          placeholder="اسم اللون (مثال: أسود تيتانيوم)"
+                          className="flex-1 text-[11px] border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-accent bg-slate-50/50"
+                          required
+                        />
+
+                        {/* Hex display */}
+                        <span className="text-[9px] font-mono text-slate-400 uppercase select-none w-12 text-center">
+                          {color.hex}
+                        </span>
+
+                        {/* Color Image Upload */}
+                        <div className="relative w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer overflow-hidden flex-shrink-0" title="رفع صورة مخصصة للون">
+                          {color.file || color.image ? (
+                            <img
+                              src={color.file ? URL.createObjectURL(color.file) : color.image || ""}
+                              alt="Preview"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <Upload className="w-3.5 h-3.5 text-slate-400" />
+                          )}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const updated = [...productColors];
+                                updated[index].file = file;
+                                setProductColors(updated);
+                              }
+                            }}
+                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                          />
+                        </div>
+
+                        {/* Remove Button */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = productColors.filter((_, i) => i !== index);
+                            setProductColors(updated);
+                          }}
+                          className="text-rose-500 hover:bg-rose-50 p-1.5 rounded-lg transition-colors cursor-pointer"
+                          title="حذف هذا اللون"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {/* Is Popular Checkbox */}
               <div className="flex items-center gap-2 border border-slate-200 rounded-xl p-3 bg-slate-50">
                 <input
@@ -2463,9 +2653,9 @@ export default function AdminPage() {
       {isSlideModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setIsSlideModalOpen(false)} />
-          
+
           <div className="relative z-50 w-full max-w-md bg-white rounded-2xl border border-card-border p-6 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden gap-4">
-            
+
             <div className="flex justify-between items-center border-b border-slate-100 pb-3 flex-shrink-0">
               <h3 className="font-extrabold text-base text-slate-800">
                 {editingSlideId ? "تعديل بيانات الشريحة الإعلانية" : "إضافة شريحة إعلانية جديدة"}
@@ -2480,7 +2670,7 @@ export default function AdminPage() {
             </div>
 
             <form onSubmit={handleSaveSlide} className="space-y-4 text-right overflow-y-auto flex-1 pl-1 pr-1 py-1">
-              
+
               {/* Tab Label */}
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-700">اسم التبويب السفلي *</label>
@@ -2754,9 +2944,9 @@ export default function AdminPage() {
       {isBundleModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setIsBundleModalOpen(false)} />
-          
+
           <div className="relative z-50 w-full max-w-md bg-white rounded-2xl border border-card-border p-6 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden gap-4" dir="rtl">
-            
+
             <div className="flex justify-between items-center border-b border-slate-100 pb-3 flex-shrink-0">
               <h3 className="font-extrabold text-base text-slate-800">
                 {editingBundleId ? "تعديل بيانات الحزمة الترويجية" : "إنشاء حزمة توفير جديدة"}
@@ -2771,7 +2961,7 @@ export default function AdminPage() {
             </div>
 
             <form onSubmit={handleSaveBundle} className="space-y-4 text-right overflow-y-auto flex-1 pl-1 pr-1 py-1">
-              
+
               {/* Bundle Title */}
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-700">اسم الحزمة الترويجية *</label>
@@ -2842,7 +3032,7 @@ export default function AdminPage() {
                         <input
                           type="checkbox"
                           checked={isChecked}
-                          onChange={() => {}}
+                          onChange={() => { }}
                           className="w-4 h-4 text-accent border-slate-350 rounded focus:ring-accent cursor-pointer"
                         />
                         <div className="flex-1 text-right">

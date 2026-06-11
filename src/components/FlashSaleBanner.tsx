@@ -7,7 +7,7 @@ import { ShoppingBag, Timer, Flame } from "lucide-react";
 
 export default function FlashSaleBanner() {
   const { flashSale, products, addToCart } = useApp();
-  const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0, isOver: true });
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, isOver: true });
 
   const product = products.find((p) => p.id === flashSale?.productId);
 
@@ -17,15 +17,15 @@ export default function FlashSaleBanner() {
     const calculateTime = () => {
       const difference = +new Date(flashSale.endTime) - +new Date();
       if (difference <= 0) {
-        setTimeLeft({ hours: 0, minutes: 0, seconds: 0, isOver: true });
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, isOver: true });
         return;
       }
 
-      const hours = Math.floor(difference / (1000 * 60 * 60));
+      const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((difference / (1000 * 60 * 60)) % 24);
       const minutes = Math.floor((difference / 1000 / 60) % 60);
-      const seconds = Math.floor((difference / 1000) % 60);
 
-      setTimeLeft({ hours, minutes, seconds, isOver: false });
+      setTimeLeft({ days, hours, minutes, isOver: false });
     };
 
     calculateTime();
@@ -102,13 +102,21 @@ export default function FlashSaleBanner() {
 
       {/* Countdown Clock Column */}
       <div className="w-full lg:w-3/12 flex flex-col items-center justify-center gap-4 z-10 border-t lg:border-t-0 lg:border-r border-white/5 pt-6 lg:pt-0 lg:pr-6">
-        <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-350">
+        <div className="flex items-center gap-1.5 text-xs font-extrabold text-slate-355">
           <Timer className="w-4 h-4 text-red-400" />
           <span>الوقت المتبقي لانتهاء الصفقة:</span>
         </div>
         
         {/* Timer UI Blocks */}
         <div className="flex gap-2.5 font-mono">
+          {/* Days */}
+          <div className="flex flex-col items-center">
+            <div className="w-12 h-12 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center text-lg sm:text-xl font-black text-white shadow-md">
+              {String(timeLeft.days).padStart(2, "0")}
+            </div>
+            <span className="text-[9px] text-slate-500 font-bold mt-1">يوم</span>
+          </div>
+          <span className="text-lg font-black text-slate-650 self-center -mt-4">:</span>
           {/* Hours */}
           <div className="flex flex-col items-center">
             <div className="w-12 h-12 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center text-lg sm:text-xl font-black text-white shadow-md">
@@ -119,18 +127,10 @@ export default function FlashSaleBanner() {
           <span className="text-lg font-black text-slate-650 self-center -mt-4">:</span>
           {/* Minutes */}
           <div className="flex flex-col items-center">
-            <div className="w-12 h-12 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center text-lg sm:text-xl font-black text-white shadow-md">
+            <div className="w-12 h-12 bg-red-600/10 border border-red-500/20 rounded-xl flex items-center justify-center text-lg sm:text-xl font-black text-red-400 shadow-md animate-pulse">
               {String(timeLeft.minutes).padStart(2, "0")}
             </div>
             <span className="text-[9px] text-slate-500 font-bold mt-1">دقيقة</span>
-          </div>
-          <span className="text-lg font-black text-slate-650 self-center -mt-4">:</span>
-          {/* Seconds */}
-          <div className="flex flex-col items-center">
-            <div className="w-12 h-12 bg-red-600/10 border border-red-500/20 rounded-xl flex items-center justify-center text-lg sm:text-xl font-black text-red-400 shadow-md animate-pulse">
-              {String(timeLeft.seconds).padStart(2, "0")}
-            </div>
-            <span className="text-[9px] text-slate-500 font-bold mt-1">ثانية</span>
           </div>
         </div>
 

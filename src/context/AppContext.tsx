@@ -482,14 +482,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Cart Actions (LocalStorage only)
   const addToCart = (product: Product, selectedColor?: { name: string; hex: string; image?: string | null } | null) => {
     let updated: CartItem[];
-    const existing = cartItems.find((item) => 
-      item.product.id === product.id && 
+    const existing = cartItems.find((item) =>
+      item.product.id === product.id &&
       (!selectedColor || item.selectedColor?.name === selectedColor.name)
     );
     if (existing) {
       updated = cartItems.map((item) =>
-        item.product.id === product.id && 
-        (!selectedColor || item.selectedColor?.name === selectedColor.name)
+        item.product.id === product.id &&
+          (!selectedColor || item.selectedColor?.name === selectedColor.name)
           ? { ...item, quantity: item.quantity + 1 }
           : item
       );
@@ -501,7 +501,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const removeFromCart = (productId: string, selectedColorName?: string | null) => {
-    const updated = cartItems.filter((item) => 
+    const updated = cartItems.filter((item) =>
       !(item.product.id === productId && (!selectedColorName || item.selectedColor?.name === selectedColorName))
     );
     setCartItems(updated);

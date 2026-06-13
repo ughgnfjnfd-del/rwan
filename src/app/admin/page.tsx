@@ -255,7 +255,7 @@ export default function AdminPage() {
     try {
       await updateHeroSlides(updatedSlides);
       setIsSlideModalOpen(false);
-      
+
       // Clean up old slide image if it changed and was an uploaded custom image
       if (oldImageUrl && oldImageUrl !== customImageValue) {
         await deleteImageFromSupabase(oldImageUrl);
@@ -799,7 +799,7 @@ export default function AdminPage() {
           const fileExtension = color.file.name.split('.').pop() || 'jpg';
           const cleanName = color.file.name.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 20);
           const filePath = `color-${Date.now()}-${cleanName}.${fileExtension}`;
-          
+
           const { data, error: uploadError } = await supabase.storage
             .from("products")
             .upload(filePath, compressedBlob, {
@@ -1012,8 +1012,8 @@ export default function AdminPage() {
           <button
             onClick={() => setActiveTab("overview")}
             className={`w-full flex items-center gap-3 p-3.5 rounded-xl text-sm font-bold transition-all text-right cursor-pointer ${activeTab === "overview"
-                ? "bg-[#1a1a1a] text-white shadow-md"
-                : "hover:bg-slate-50 text-slate-600"
+              ? "bg-[#1a1a1a] text-white shadow-md"
+              : "hover:bg-slate-50 text-slate-600"
               }`}
           >
             <TrendingUp className="w-4.5 h-4.5" />
@@ -1023,8 +1023,8 @@ export default function AdminPage() {
           <button
             onClick={() => setActiveTab("products")}
             className={`w-full flex items-center gap-3 p-3.5 rounded-xl text-sm font-bold transition-all text-right cursor-pointer ${activeTab === "products"
-                ? "bg-[#1a1a1a] text-white shadow-md"
-                : "hover:bg-slate-50 text-slate-600"
+              ? "bg-[#1a1a1a] text-white shadow-md"
+              : "hover:bg-slate-50 text-slate-600"
               }`}
           >
             <ShoppingBag className="w-4.5 h-4.5" />
@@ -1034,8 +1034,8 @@ export default function AdminPage() {
           <button
             onClick={() => setActiveTab("repairs")}
             className={`w-full flex items-center gap-3 p-3.5 rounded-xl text-sm font-bold transition-all text-right cursor-pointer ${activeTab === "repairs"
-                ? "bg-[#1a1a1a] text-white shadow-md"
-                : "hover:bg-slate-50 text-slate-600"
+              ? "bg-[#1a1a1a] text-white shadow-md"
+              : "hover:bg-slate-50 text-slate-600"
               }`}
           >
             <Wrench className="w-4.5 h-4.5" />
@@ -1050,8 +1050,8 @@ export default function AdminPage() {
           <button
             onClick={() => setActiveTab("settings")}
             className={`w-full flex items-center gap-3 p-3.5 rounded-xl text-sm font-bold transition-all text-right cursor-pointer ${activeTab === "settings"
-                ? "bg-[#1a1a1a] text-white shadow-md"
-                : "hover:bg-slate-50 text-slate-600"
+              ? "bg-[#1a1a1a] text-white shadow-md"
+              : "hover:bg-slate-50 text-slate-600"
               }`}
           >
             <FileText className="w-4.5 h-4.5" />
@@ -1061,8 +1061,8 @@ export default function AdminPage() {
           <button
             onClick={() => setActiveTab("slides")}
             className={`w-full flex items-center gap-3 p-3.5 rounded-xl text-sm font-bold transition-all text-right cursor-pointer ${activeTab === "slides"
-                ? "bg-[#1a1a1a] text-white shadow-md"
-                : "hover:bg-slate-50 text-slate-600"
+              ? "bg-[#1a1a1a] text-white shadow-md"
+              : "hover:bg-slate-50 text-slate-600"
               }`}
           >
             <Star className="w-4.5 h-4.5" />
@@ -1072,8 +1072,8 @@ export default function AdminPage() {
           <button
             onClick={() => setActiveTab("bundles")}
             className={`w-full flex items-center gap-3 p-3.5 rounded-xl text-sm font-bold transition-all text-right cursor-pointer ${activeTab === "bundles"
-                ? "bg-[#1a1a1a] text-white shadow-md"
-                : "hover:bg-slate-50 text-slate-600"
+              ? "bg-[#1a1a1a] text-white shadow-md"
+              : "hover:bg-slate-50 text-slate-600"
               }`}
           >
             <ShoppingBag className="w-4.5 h-4.5" />
@@ -1169,12 +1169,12 @@ export default function AdminPage() {
                             <td className="p-3 text-slate-500 font-mono">{appt.date}</td>
                             <td className="p-3 text-left">
                               <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${appt.status === "pending"
-                                  ? "bg-amber-50 text-amber-600 border border-amber-100"
-                                  : appt.status === "in-progress"
-                                    ? "bg-blue-50 text-blue-600 border border-blue-100"
-                                    : appt.status === "completed"
-                                      ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
-                                      : "bg-rose-50 text-rose-600 border border-rose-100"
+                                ? "bg-amber-50 text-amber-600 border border-amber-100"
+                                : appt.status === "in-progress"
+                                  ? "bg-blue-50 text-blue-600 border border-blue-100"
+                                  : appt.status === "completed"
+                                    ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                                    : "bg-rose-50 text-rose-600 border border-rose-100"
                                 }`}>
                                 {appt.status === "pending" && "انتظار"}
                                 {appt.status === "in-progress" && "صيانة"}
@@ -1321,8 +1321,8 @@ export default function AdminPage() {
                       key={filter}
                       onClick={() => setRepairFilter(filter)}
                       className={`text-[10px] font-bold px-3 py-1.5 rounded-lg border transition-all cursor-pointer truncate ${repairFilter === filter
-                          ? "bg-[#1a1a1a] border-[#1a1a1a] text-white"
-                          : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                        ? "bg-[#1a1a1a] border-[#1a1a1a] text-white"
+                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
                         }`}
                     >
                       {filter === "all" && "الكل"}
@@ -1378,12 +1378,12 @@ export default function AdminPage() {
 
                           <td className="p-3">
                             <span className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-bold ${appt.status === "pending"
-                                ? "bg-amber-50 text-amber-600 border border-amber-100"
-                                : appt.status === "in-progress"
-                                  ? "bg-blue-50 text-blue-600 border border-blue-100"
-                                  : appt.status === "completed"
-                                    ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
-                                    : "bg-rose-50 text-rose-600 border border-rose-100"
+                              ? "bg-amber-50 text-amber-600 border border-amber-100"
+                              : appt.status === "in-progress"
+                                ? "bg-blue-50 text-blue-600 border border-blue-100"
+                                : appt.status === "completed"
+                                  ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                                  : "bg-rose-50 text-rose-600 border border-rose-100"
                               }`}>
                               {appt.status === "pending" && "قيد الانتظار"}
                               {appt.status === "in-progress" && "قيد الصيانة"}
@@ -2317,7 +2317,7 @@ export default function AdminPage() {
                     <option value="كفرات">كفرات</option>
                     <option value="سماعات">سماعات</option>
                     <option value="شواحن">شواحن</option>
-                    <option value="كيبلات">كيبلات</option>
+                    <option value="كابلات">كابلات</option>
                     <option value="ملحقات">ملحقات</option>
                   </select>
                 </div>
@@ -2520,7 +2520,7 @@ export default function AdminPage() {
                     إضافة لون جديد
                   </button>
                 </div>
-                
+
                 {productColors.length === 0 ? (
                   <p className="text-[10px] text-slate-400 text-center py-2">لا توجد ألوان مضافة لهذا المنتج. سيتم استخدام الصورة الأساسية فقط.</p>
                 ) : (

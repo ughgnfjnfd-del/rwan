@@ -7,6 +7,46 @@ interface PromoCarouselProps {
   onOpenRepairModal: () => void;
 }
 
+function BannerSharpImage({
+  src,
+  alt,
+  maxHeight,
+  maxUpscale = 1,
+  className = "",
+}: {
+  src: string;
+  alt: string;
+  maxHeight: number;
+  maxUpscale?: number;
+  className?: string;
+}) {
+  const [naturalSize, setNaturalSize] = useState<{ width: number; height: number } | null>(null);
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      decoding="async"
+      loading="eager"
+      onLoad={(event) => {
+        const image = event.currentTarget;
+        setNaturalSize({
+          width: image.naturalWidth,
+          height: image.naturalHeight,
+        });
+      }}
+      className={`block h-auto w-auto object-contain ${className}`}
+      style={{
+        maxWidth: naturalSize ? `min(100%, ${Math.round(naturalSize.width * maxUpscale)}px)` : "100%",
+        maxHeight: naturalSize ? `min(${maxHeight}px, ${Math.round(naturalSize.height * maxUpscale)}px)` : `${maxHeight}px`,
+        filter: "contrast(1.04) saturate(1.03)",
+        transform: "translateZ(0)",
+        backfaceVisibility: "hidden",
+      }}
+    />
+  );
+}
+
 export default function PromoCarousel({ onOpenRepairModal }: PromoCarouselProps) {
   const { heroSlides, products } = useApp();
   const [activeIndex, setActiveIndex] = useState(0);
@@ -71,6 +111,8 @@ export default function PromoCarousel({ onOpenRepairModal }: PromoCarouselProps)
   // Adjust activeIndex if slides count changed dynamically
   const safeActiveIndex = activeIndex >= heroSlides.length ? 0 : activeIndex;
   const activeSlide = heroSlides[safeActiveIndex];
+  const isCustomVisual = activeSlide.graphicType === "custom";
+  const isProductVisual = activeSlide.graphicType === "product";
 
   return (
     <section className="relative w-full rounded-[32px] overflow-hidden shadow-2xl border border-slate-200/50 select-none group/carousel">
@@ -106,14 +148,14 @@ export default function PromoCarousel({ onOpenRepairModal }: PromoCarouselProps)
       `}} />
 
       {/* Main Slide Panel */}
-      <div className={`w-full bg-gradient-to-br ${activeSlide.bgStyle} transition-all duration-700 ease-in-out min-h-[480px] sm:min-h-[520px] lg:min-h-[440px] px-6 py-10 sm:p-12 lg:p-14 flex flex-col lg:flex-row items-center justify-between gap-8 sm:gap-12 relative overflow-hidden`}>
+      <div className={`w-full bg-gradient-to-br ${activeSlide.bgStyle} transition-all duration-700 ease-in-out ${isCustomVisual ? "min-h-[560px] sm:min-h-[620px] lg:min-h-[560px] px-5 py-8 sm:p-10 lg:px-12 lg:py-10" : "min-h-[480px] sm:min-h-[520px] lg:min-h-[440px] px-6 py-10 sm:p-12 lg:p-14"} flex flex-col lg:flex-row items-center justify-between ${isCustomVisual ? "gap-5 sm:gap-7 lg:gap-6" : "gap-8 sm:gap-12"} relative overflow-hidden`}>
         
         {/* Glow ambient effects */}
         <div className={`absolute -top-1/2 -right-1/4 w-96 h-96 rounded-full blur-[100px] pointer-events-none opacity-40 transition-all duration-700 ${activeSlide.theme === 'dark' ? 'bg-sky-500' : 'bg-blue-300'}`}></div>
         <div className={`absolute -bottom-1/2 -left-1/4 w-96 h-96 rounded-full blur-[100px] pointer-events-none opacity-40 transition-all duration-700 ${activeSlide.theme === 'dark' ? 'bg-purple-600' : 'bg-yellow-200'}`}></div>
 
         {/* 1. Slide Text Information (RTL) */}
-        <div className="flex-1 w-full text-right space-y-4 sm:space-y-5 z-10 order-2 lg:order-2">
+        <div className={`${isCustomVisual ? "lg:w-[38%] lg:flex-none" : "flex-1"} w-full text-right space-y-4 sm:space-y-5 z-10 order-2 lg:order-2`}>
           
           {/* Badge */}
           <span className={`inline-flex items-center gap-1.5 px-3 py-1 font-extrabold text-[10px] sm:text-xs rounded-full border tracking-wide shadow-sm animate-pulse ${
@@ -126,7 +168,7 @@ export default function PromoCarousel({ onOpenRepairModal }: PromoCarouselProps)
 
           {/* Title Banner */}
           <div className="space-y-1 sm:space-y-2">
-            <h2 className={`text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-tight ${
+            <h2 className={`${isCustomVisual ? "text-3xl sm:text-4xl lg:text-5xl xl:text-6xl" : "text-3xl sm:text-4xl lg:text-5xl"} font-black tracking-tight leading-tight ${
               activeSlide.theme === 'dark' ? 'text-white' : 'text-slate-900'
             }`}>
               {activeSlide.title}
@@ -172,7 +214,7 @@ export default function PromoCarousel({ onOpenRepairModal }: PromoCarouselProps)
             )}
           </div>
         </div>        {/* 2. Slide Visual Showcase (LTL/Left) */}
-        <div className={`w-full ${activeSlide.graphicType === "custom" ? "lg:w-1/2" : "lg:w-5/12"} flex items-center justify-center min-h-[200px] sm:min-h-[260px] lg:min-h-0 z-10 order-1 lg:order-1 relative`}>
+        <div className={`w-full ${isCustomVisual ? "lg:w-[62%]" : "lg:w-5/12"} flex items-center justify-center ${isCustomVisual ? "min-h-[320px] sm:min-h-[430px] lg:min-h-[500px]" : "min-h-[200px] sm:min-h-[260px] lg:min-h-0"} z-10 order-1 lg:order-1 relative`}>
           
           {/* Laptop Mockup (MacBook Slide) */}
           {activeSlide.graphicType === "macbook" && (
@@ -318,20 +360,26 @@ export default function PromoCarousel({ onOpenRepairModal }: PromoCarouselProps)
           )}
 
           {/* Custom Uploaded Image */}
-          {activeSlide.graphicType === "custom" && (
-            <div className="relative w-full max-w-[380px] sm:max-w-[460px] lg:max-w-[520px] flex items-center justify-center animate-float-slow">
-              {/* Soft neon backglow for the custom image */}
-              <div className="absolute inset-0 bg-gradient-to-tr from-sky-400/20 via-indigo-500/10 to-pink-500/20 rounded-[2.5rem] blur-2xl opacity-60"></div>
+          {isCustomVisual && (
+            <div className="relative w-full max-w-[520px] sm:max-w-[720px] lg:max-w-[830px] flex items-center justify-center lg:-ml-8 xl:-ml-14">
+              {/* Apple-like product stage: big still image, soft depth, no motion */}
+              <div className="absolute inset-y-10 left-0 right-4 rounded-[3rem] bg-white/[0.08] blur-3xl opacity-70"></div>
+              <div className="absolute bottom-2 left-[10%] right-[4%] h-16 rounded-[100%] bg-black/30 blur-3xl opacity-45"></div>
+              <div className="absolute -right-6 top-8 h-20 w-48 rounded-full border border-white/10 bg-white/10 blur-sm"></div>
+              <div className="absolute -left-4 bottom-10 h-1 w-2/3 rounded-full bg-gradient-to-r from-transparent via-sky-300/70 to-transparent"></div>
               
               {activeSlide.customImageUrl ? (
-                <div className="relative p-2.5 bg-white/10 backdrop-blur-md rounded-3xl border border-white/20 shadow-2xl overflow-hidden hover:scale-[1.02] transition-transform duration-300">
-                  <img
+                <div className="relative flex items-center justify-center rounded-[2.25rem] border border-white/20 bg-white/[0.07] p-2.5 shadow-[0_35px_90px_rgba(0,0,0,0.34)] backdrop-blur-md overflow-hidden">
+                  <BannerSharpImage
                     src={activeSlide.customImageUrl}
                     alt={activeSlide.title}
-                    className="max-w-full max-h-[300px] sm:max-h-[350px] lg:max-h-[380px] object-contain rounded-2xl"
+                    maxHeight={520}
+                    maxUpscale={1.18}
+                    className="rounded-[1.65rem]"
                   />
                   {/* Glossy overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-white/10 pointer-events-none"></div>
+                  <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/4 to-white/12 pointer-events-none"></div>
+                  <div className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent"></div>
                 </div>
               ) : (
                 <div className="w-full h-[220px] bg-slate-200/50 rounded-3xl flex items-center justify-center text-slate-450 border border-dashed border-slate-300 text-xs">
@@ -342,12 +390,12 @@ export default function PromoCarousel({ onOpenRepairModal }: PromoCarouselProps)
           )}
 
           {/* Product Showcase */}
-          {activeSlide.graphicType === "product" && (
-            <div className="relative w-full max-w-[280px] aspect-[9/10] flex items-center justify-center">
+          {isProductVisual && (
+            <div className="relative w-full max-w-[430px] aspect-[9/10] flex items-center justify-center">
               {/* Backglow */}
               <div className="absolute w-44 h-44 bg-sky-500/20 rounded-full blur-2xl animate-pulse"></div>
               
-              <div className="animate-float-slow z-10 flex items-center justify-center">
+              <div className="z-10 flex items-center justify-center">
                 {(() => {
                   const product = products.find((p) => p.id === activeSlide.productId);
                   if (product) {
@@ -363,11 +411,13 @@ export default function PromoCarousel({ onOpenRepairModal }: PromoCarouselProps)
                     } else {
                       // Custom image upload from database
                       return (
-                        <div className="w-44 sm:w-52 h-56 sm:h-64 flex items-center justify-center p-2.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 shadow-2xl overflow-hidden hover:scale-[1.02] transition-transform duration-300">
-                          <img
+                        <div className="w-full max-w-[360px] sm:max-w-[430px] h-64 sm:h-80 flex items-center justify-center p-2.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 shadow-2xl overflow-hidden">
+                          <BannerSharpImage
                             src={product.image}
                             alt={product.name}
-                            className="max-w-full max-h-full object-contain rounded-xl"
+                            maxHeight={370}
+                            maxUpscale={1.12}
+                            className="rounded-xl"
                           />
                         </div>
                       );

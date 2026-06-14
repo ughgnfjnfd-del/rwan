@@ -29,7 +29,8 @@ export async function POST(request: Request) {
       text += `<b>📦 المنتجات المطلوبة:</b>\n`;
       items.forEach((item: any, i: number) => {
         const colorText = item.selectedColor ? ` (اللون: ${item.selectedColor.name})` : "";
-        text += `${i + 1}. <b>${item.product.name}${colorText}</b>\n`;
+        const portText = item.selectedPort ? ` (المنفذ: ${item.selectedPort})` : "";
+        text += `${i + 1}. <b>${item.product.name}${colorText}${portText}</b>\n`;
         text += `   الكمية: ${item.quantity} | السعر: ${(item.product.price * item.quantity).toLocaleString()} د.ع\n`;
       });
       

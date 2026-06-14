@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { useApp, Product, Appointment, SlideItem, MarqueeSettings, FlashSale, PromoPopUp, ProductBundle } from "@/context/AppContext";
+import { useApp, Product, Appointment, SlideItem, MarqueeSettings, FlashSale, PromoPopUp, ProductBundle, PremiumShowcase, DEFAULT_PREMIUM_SHOWCASE } from "@/context/AppContext";
 import { supabase, deleteImageFromSupabase } from "@/lib/supabase";
+import ProductMockup from "@/components/ProductMockup";
 import {
   Lock,
   User,
@@ -30,7 +31,8 @@ import {
   PlusCircle,
   Upload,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Sparkles
 } from "lucide-react";
 
 // Helper function to compress and resize images on client side
@@ -107,7 +109,9 @@ export default function AdminPage() {
     productBundles,
     updateProductBundles,
     promoPopUp,
-    updatePromoPopUp
+    updatePromoPopUp,
+    premiumShowcase,
+    updatePremiumShowcase
   } = useApp();
 
   // Authentication States
@@ -193,12 +197,13 @@ export default function AdminPage() {
 
     const oldSlide = heroSlides.find((s) => s.id === editingSlideId);
     const oldImageUrl = oldSlide?.customImageUrl;
-    let customImageValue = slideForm.customImageUrl || "";
+    let customImageValue = slideForm.graphicType === "custom" ? (slideForm.customImageUrl || "") : "";
+    let newlyUploadedSlideImageUrl = "";
 
     if (slideForm.graphicType === "custom" && selectedSlideFile) {
       setIsUploadingSlide(true);
       try {
-        const compressedBlob = await compressAndResizeImage(selectedSlideFile, 800, 800, 0.8);
+        const compressedBlob = await compressAndResizeImage(selectedSlideFile, 1600, 1600, 0.95);
         const fileExtension = selectedSlideFile.name.split('.').pop() || 'jpg';
         const cleanName = selectedSlideFile.name.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 20);
         const filePath = `slides/${Date.now()}-${cleanName}.${fileExtension}`;
@@ -218,6 +223,7 @@ export default function AdminPage() {
           .getPublicUrl(filePath);
 
         customImageValue = publicUrl;
+        newlyUploadedSlideImageUrl = publicUrl;
       } catch (error: any) {
         console.error("Error uploading slide image:", error);
         alert(`حدث خطأ أثناء رفع الصورة: ${error.message || error}`);
@@ -256,11 +262,14 @@ export default function AdminPage() {
       await updateHeroSlides(updatedSlides);
       setIsSlideModalOpen(false);
 
-      // Clean up old slide image if it changed and was an uploaded custom image
+      // Clean up the previous uploaded slide image when it is replaced, removed, or no longer used.
       if (oldImageUrl && oldImageUrl !== customImageValue) {
         await deleteImageFromSupabase(oldImageUrl);
       }
     } catch (err: any) {
+      if (newlyUploadedSlideImageUrl) {
+        await deleteImageFromSupabase(newlyUploadedSlideImageUrl);
+      }
       alert(`حدث خطأ أثناء حفظ الشريحة: ${err.message || err}`);
     }
   };
@@ -328,8 +337,8 @@ export default function AdminPage() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Tab State: "overview", "products", "repairs", "settings", "slides", "bundles"
-  const [activeTab, setActiveTab] = useState<"overview" | "products" | "repairs" | "settings" | "slides" | "bundles">("overview");
+  // Tab State: "overview", "products", "repairs", "settings", "flash", "slides", "premium", "bundles"
+  const [activeTab, setActiveTab] = useState<"overview" | "products" | "repairs" | "settings" | "flash" | "slides" | "premium" | "bundles">("overview");
 
   // Product CRUD States
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -352,6 +361,7 @@ export default function AdminPage() {
     isPopular: false,
     rating: 5,
     reviewsCount: 24,
+    ports: [] as string[],
   });
 
   const [productColors, setProductColors] = useState<Array<{ name: string; hex: string; image?: string | null; file?: File | null }>>([]);
@@ -444,6 +454,50 @@ export default function AdminPage() {
     }
   };
 
+  // Premium Showcase States
+  const [premiumShowcaseForm, setPremiumShowcaseForm] = useState<PremiumShowcase>(DEFAULT_PREMIUM_SHOWCASE);
+
+  const openPremiumShowcaseTab = () => {
+    setPremiumShowcaseForm({
+      ...DEFAULT_PREMIUM_SHOWCASE,
+      ...premiumShowcase,
+      productIds: Array.isArray(premiumShowcase.productIds) ? premiumShowcase.productIds : [],
+    });
+    setActiveTab("premium");
+  };
+
+  const handleTogglePremiumProduct = (productId: string) => {
+    setPremiumShowcaseForm((prev) => {
+      const isSelected = prev.productIds.includes(productId);
+      const productIds = isSelected
+        ? prev.productIds.filter((id) => id !== productId)
+        : [...prev.productIds, productId];
+
+      return {
+        ...prev,
+        heroProductId: isSelected && prev.heroProductId === productId ? "" : prev.heroProductId,
+        productIds,
+      };
+    });
+  };
+
+  const handleSavePremiumShowcase = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const selectedIds = premiumShowcaseForm.heroProductId
+        ? [premiumShowcaseForm.heroProductId, ...premiumShowcaseForm.productIds]
+        : premiumShowcaseForm.productIds;
+
+      await updatePremiumShowcase({
+        ...premiumShowcaseForm,
+        productIds: Array.from(new Set(selectedIds)),
+      });
+      alert("تم حفظ إعدادات العروض المميزة بنجاح!");
+    } catch (err) {
+      alert(`حدث خطأ أثناء حفظ العروض المميزة: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
   // Flash Sale States
   const [flashSaleForm, setFlashSaleForm] = useState<FlashSale>({
     isEnabled: false,
@@ -471,15 +525,24 @@ export default function AdminPage() {
 
   const handleSaveFlashSale = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!flashSaleForm.productId) {
-      alert("يرجى اختيار المنتج أولاً");
-      return;
+
+    if (flashSaleForm.isEnabled) {
+      if (!flashSaleForm.productId) {
+        alert("يرجى اختيار المنتج أولاً");
+        return;
+      }
+      if (!flashSaleForm.endTime || flashSaleForm.discountPrice <= 0 || flashSaleForm.initialStock <= 0) {
+        alert("يرجى إدخال سعر الصفقة، وقت الانتهاء، وكمية العرض بشكل صحيح");
+        return;
+      }
     }
+
     try {
       const isoEndTime = flashSaleForm.endTime ? new Date(flashSaleForm.endTime).toISOString() : "";
       await updateFlashSale({
         ...flashSaleForm,
-        endTime: isoEndTime
+        endTime: isoEndTime,
+        stockLimit: Math.min(Math.max(flashSaleForm.stockLimit || 0, 0), Math.max(flashSaleForm.initialStock || 0, 0)),
       });
       alert("تم حفظ إعدادات العرض الخاطف بنجاح! 🔥");
     } catch (err: any) {
@@ -684,6 +747,7 @@ export default function AdminPage() {
       isPopular: false,
       rating: 5,
       reviewsCount: 24,
+      ports: [],
     });
     setProductColors([]);
     setIsProductModalOpen(true);
@@ -712,6 +776,7 @@ export default function AdminPage() {
       isPopular: product.isPopular || false,
       rating: product.rating !== undefined && product.rating !== null ? product.rating : 5,
       reviewsCount: product.reviewsCount !== undefined && product.reviewsCount !== null ? product.reviewsCount : 24,
+      ports: product.ports || [],
     });
     setProductColors(product.colors || []);
     setIsProductModalOpen(true);
@@ -844,6 +909,7 @@ export default function AdminPage() {
       colors: finalColors,
       rating: productForm.rating,
       reviewsCount: productForm.reviewsCount,
+      ports: productForm.ports,
     };
 
     try {
@@ -873,6 +939,25 @@ export default function AdminPage() {
     prod.name.toLowerCase().includes(productSearch.toLowerCase()) ||
     prod.nameEn.toLowerCase().includes(productSearch.toLowerCase()) ||
     prod.category.toLowerCase().includes(productSearch.toLowerCase())
+  );
+
+  const premiumCandidateProducts = [...products].sort((a, b) => {
+    const aSavings = a.discountPrice && a.discountPrice > 0 ? a.price - a.discountPrice : 0;
+    const bSavings = b.discountPrice && b.discountPrice > 0 ? b.price - b.discountPrice : 0;
+    return bSavings - aSavings || Number(Boolean(b.isPopular)) - Number(Boolean(a.isPopular));
+  });
+  const selectedPremiumHero = products.find((product) => product.id === premiumShowcaseForm.heroProductId);
+  const selectedFlashProduct = products.find((product) => product.id === flashSaleForm.productId);
+  const selectedFlashImageIsPreset = selectedFlashProduct
+    ? ["iphone", "samsung", "cases", "headphones", "earbuds", "cable", "smartwatch", "powerbank", "screen-protector"].includes(selectedFlashProduct.image) || selectedFlashProduct.image.startsWith("charger-")
+    : false;
+  const flashPreviewPrice = flashSaleForm.discountPrice || selectedFlashProduct?.discountPrice || selectedFlashProduct?.price || 0;
+  const flashPreviewDiscount = selectedFlashProduct && flashPreviewPrice > 0
+    ? Math.max(0, Math.round((1 - (flashPreviewPrice / selectedFlashProduct.price)) * 100))
+    : 0;
+  const flashPreviewStockPercent = Math.max(
+    4,
+    Math.min(100, ((flashSaleForm.stockLimit || 0) / Math.max(flashSaleForm.initialStock || 1, 1)) * 100)
   );
 
   // Filtered Repairs List
@@ -1059,6 +1144,22 @@ export default function AdminPage() {
           </button>
 
           <button
+            onClick={() => setActiveTab("flash")}
+            className={`w-full flex items-center gap-3 p-3.5 rounded-xl text-sm font-bold transition-all text-right cursor-pointer ${activeTab === "flash"
+              ? "bg-[#1a1a1a] text-white shadow-md"
+              : "hover:bg-slate-50 text-slate-600"
+              }`}
+          >
+            <Flame className="w-4.5 h-4.5" />
+            <span>الصفقة الخاطفة</span>
+            {flashSale.isEnabled && (
+              <span className="mr-auto rounded-full bg-red-500 px-2 py-0.5 text-[9px] font-black text-white">
+                فعالة
+              </span>
+            )}
+          </button>
+
+          <button
             onClick={() => setActiveTab("slides")}
             className={`w-full flex items-center gap-3 p-3.5 rounded-xl text-sm font-bold transition-all text-right cursor-pointer ${activeTab === "slides"
               ? "bg-[#1a1a1a] text-white shadow-md"
@@ -1067,6 +1168,17 @@ export default function AdminPage() {
           >
             <Star className="w-4.5 h-4.5" />
             <span>الشرائح الإعلانية ({heroSlides.length})</span>
+          </button>
+
+          <button
+            onClick={openPremiumShowcaseTab}
+            className={`w-full flex items-center gap-3 p-3.5 rounded-xl text-sm font-bold transition-all text-right cursor-pointer ${activeTab === "premium"
+              ? "bg-[#1a1a1a] text-white shadow-md"
+              : "hover:bg-slate-50 text-slate-600"
+              }`}
+          >
+            <Sparkles className="w-4.5 h-4.5" />
+            <span>العروض المميزة ({premiumShowcase.productIds.length})</span>
           </button>
 
           <button
@@ -1920,113 +2032,197 @@ export default function AdminPage() {
                 </div>
               </form>
 
-              {/* --- Flash Sale Settings Section --- */}
-              <form onSubmit={handleSaveFlashSale} className="bg-slate-50/50 border border-slate-100 rounded-2xl p-5 space-y-4 text-right">
-                <div className="flex justify-between items-center border-b border-slate-200/60 pb-2">
-                  <h3 className="font-extrabold text-sm text-slate-800 flex items-center gap-2">
-                    <Flame className="w-4 h-4 text-red-500 fill-red-500" />
-                    صفقة اليوم الخاطفة الفائقة (Flash Sale Countdown)
-                  </h3>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="flashSaleEnabled"
-                      checked={flashSaleForm.isEnabled}
-                      onChange={(e) => setFlashSaleForm({ ...flashSaleForm, isEnabled: e.target.checked })}
-                      className="w-4 h-4 text-accent border-slate-350 rounded focus:ring-accent cursor-pointer"
-                    />
-                    <label htmlFor="flashSaleEnabled" className="text-xs font-bold text-slate-700 cursor-pointer select-none">
-                      تفعيل الصفقة الخاطفة بالصفحة الرئيسية
-                    </label>
-                  </div>
+            </div>
+          )}
+
+          {/* TAB 5: FLASH SALE MANAGEMENT */}
+          {activeTab === "flash" && (
+            <form onSubmit={handleSaveFlashSale} className="space-y-6 text-right" dir="rtl">
+              <div className="flex flex-col gap-4 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-extrabold text-[#1a1a1a]">إدارة الصفقة الخاطفة</h2>
+                  <p className="text-xs text-slate-400">تحكم بقسم “خصم استثنائي ومحدود” المعروض في الصفحة الرئيسية بتصميمه الجديد.</p>
                 </div>
 
-                {flashSaleForm.isEnabled && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
-                    {/* Select Product */}
+                <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-red-100 bg-red-50 px-4 py-2.5 text-xs font-bold text-red-700">
+                  <input
+                    type="checkbox"
+                    checked={flashSaleForm.isEnabled}
+                    onChange={(e) => setFlashSaleForm({ ...flashSaleForm, isEnabled: e.target.checked })}
+                    className="h-4 w-4 cursor-pointer rounded border-red-200 text-red-600 focus:ring-red-500"
+                  />
+                  تفعيل الصفقة بالصفحة الرئيسية
+                </label>
+              </div>
+
+              <div className="grid gap-5 xl:grid-cols-[1fr_0.92fr]">
+                <div className="space-y-4 rounded-3xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div className="space-y-1 md:col-span-2">
-                      <label className="text-xs font-semibold text-slate-700">المنتج المشمول في العرض الخاطف *</label>
+                      <label className="text-xs font-semibold text-slate-700">المنتج المشمول في الصفقة *</label>
                       <select
                         value={flashSaleForm.productId}
-                        onChange={(e) => setFlashSaleForm({ ...flashSaleForm, productId: e.target.value })}
-                        className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:border-accent cursor-pointer"
-                        required
+                        onChange={(e) => {
+                          const product = products.find((item) => item.id === e.target.value);
+                          setFlashSaleForm({
+                            ...flashSaleForm,
+                            productId: e.target.value,
+                            discountPrice: product?.discountPrice || flashSaleForm.discountPrice,
+                          });
+                        }}
+                        className="w-full cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs focus:border-accent focus:outline-none"
                       >
-                        <option value="">-- اختر المنتج من مخزنك --</option>
-                        {products.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name} ({p.price.toLocaleString()} د.ع)
+                        <option value="">اختر المنتج الذي يظهر بالصفقة</option>
+                        {products.map((product) => (
+                          <option key={product.id} value={product.id}>
+                            {product.name} - {product.price.toLocaleString()} د.ع
                           </option>
                         ))}
                       </select>
                     </div>
 
-                    {/* Discount Price */}
                     <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-700">سعر الصفقة المخفض (د.ع) *</label>
+                      <label className="text-xs font-semibold text-slate-700">سعر الصفقة الجديد (د.ع) *</label>
                       <input
                         type="number"
                         value={flashSaleForm.discountPrice || ""}
                         onChange={(e) => setFlashSaleForm({ ...flashSaleForm, discountPrice: parseInt(e.target.value) || 0 })}
-                        placeholder="سعر العرض الخاص..."
-                        className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:border-accent font-mono"
-                        required
+                        placeholder="مثال: 24000"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-mono text-xs focus:border-accent focus:outline-none"
                       />
                     </div>
 
-                    {/* End time */}
                     <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-700">وقت وتاريخ انتهاء الصفقة *</label>
+                      <label className="text-xs font-semibold text-slate-700">تاريخ ووقت انتهاء الصفقة *</label>
                       <input
                         type="datetime-local"
                         value={flashSaleForm.endTime}
                         onChange={(e) => setFlashSaleForm({ ...flashSaleForm, endTime: e.target.value })}
-                        className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:border-accent font-mono text-left"
-                        required
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left font-mono text-xs focus:border-accent focus:outline-none"
+                        dir="ltr"
                       />
                     </div>
 
-                    {/* Initial stock */}
                     <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-700">إجمالي كمية العرض المعروضة (Initial Stock) *</label>
+                      <label className="text-xs font-semibold text-slate-700">كمية العرض الكلية *</label>
                       <input
                         type="number"
+                        min={0}
                         value={flashSaleForm.initialStock || ""}
                         onChange={(e) => setFlashSaleForm({ ...flashSaleForm, initialStock: parseInt(e.target.value) || 0 })}
-                        placeholder="كمية البدء..."
-                        className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:border-accent font-mono"
-                        required
+                        placeholder="مثال: 10"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-mono text-xs focus:border-accent focus:outline-none"
                       />
                     </div>
 
-                    {/* Stock limit */}
                     <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-700">الكمية المتبقية حالياً (Remaining Stock) *</label>
+                      <label className="text-xs font-semibold text-slate-700">الكمية المتبقية الآن *</label>
                       <input
                         type="number"
+                        min={0}
                         value={flashSaleForm.stockLimit || ""}
                         onChange={(e) => setFlashSaleForm({ ...flashSaleForm, stockLimit: parseInt(e.target.value) || 0 })}
-                        placeholder="الكمية المتبقية..."
-                        className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:border-accent font-mono"
-                        required
+                        placeholder="مثال: 2"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-mono text-xs focus:border-accent focus:outline-none"
                       />
                     </div>
                   </div>
-                )}
 
-                <div className="flex justify-end pt-2 border-t border-slate-150">
-                  <button
-                    type="submit"
-                    className="bg-[#1a1a1a] hover:bg-slate-800 text-white font-bold text-[11px] px-6 py-2.5 rounded-xl transition-all shadow-sm cursor-pointer animate-fade-in"
-                  >
-                    حفظ إعدادات الصفقة الخاطفة
-                  </button>
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <div className="mb-2 flex items-center justify-between text-[11px] font-black">
+                      <span className="text-red-600">الكمية المتبقية: {flashSaleForm.stockLimit || 0}</span>
+                      <span className="text-slate-400">من أصل {flashSaleForm.initialStock || 0}</span>
+                    </div>
+                    <div className="h-3 overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-l from-red-600 via-orange-400 to-sky-400 transition-all duration-300"
+                        style={{ width: `${flashPreviewStockPercent}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row">
+                    <button
+                      type="button"
+                      onClick={() => setFlashSaleForm({
+                        isEnabled: false,
+                        productId: "",
+                        discountPrice: 0,
+                        endTime: "",
+                        stockLimit: 0,
+                        initialStock: 0,
+                      })}
+                      className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                    >
+                      تفريغ الإعدادات
+                    </button>
+                    <button
+                      type="submit"
+                      className="rounded-xl bg-[#1a1a1a] px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-slate-800 cursor-pointer"
+                    >
+                      حفظ الصفقة الخاطفة
+                    </button>
+                  </div>
                 </div>
-              </form>
-            </div>
+
+                <div className="overflow-hidden rounded-3xl border border-red-100 bg-[linear-gradient(135deg,#ffffff_0%,#fff6f6_45%,#eef8ff_100%)] p-4 shadow-sm">
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-white px-3 py-1.5 text-[10px] font-black text-red-600">
+                      <Flame className="h-3.5 w-3.5 fill-red-500 text-red-500" />
+                      معاينة التصميم الجديد
+                    </span>
+                    {flashSaleForm.isEnabled ? (
+                      <span className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-black text-emerald-700">فعال</span>
+                    ) : (
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black text-slate-500">متوقف</span>
+                    )}
+                  </div>
+
+                  {selectedFlashProduct ? (
+                    <div className="space-y-4">
+                      <div className="relative flex h-64 items-center justify-center rounded-[28px] border border-white bg-white/85 shadow-inner">
+                        <div className="absolute bottom-5 h-12 w-[74%] rounded-[100%] bg-slate-300/40 blur-xl" />
+                        <div className="absolute inset-x-8 bottom-6 h-2 rounded-full bg-gradient-to-l from-red-500 via-sky-400 to-amber-300" />
+                        {selectedFlashImageIsPreset ? (
+                          <div className="relative z-10 scale-[2]">
+                            <ProductMockup image={selectedFlashProduct.image} name={selectedFlashProduct.name} sizeClass="w-24 aspect-[9/18]" />
+                          </div>
+                        ) : (
+                          <img
+                            src={selectedFlashProduct.image}
+                            alt={selectedFlashProduct.name}
+                            className="relative z-10 max-h-[88%] max-w-[88%] rounded-2xl object-contain drop-shadow-[0_22px_32px_rgba(15,23,42,0.18)]"
+                          />
+                        )}
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <div className="mb-2 flex flex-wrap items-center gap-2">
+                          <span className="rounded-full bg-slate-950 px-3 py-1 text-[10px] font-black text-white">{selectedFlashProduct.category}</span>
+                          <span className="rounded-full bg-red-50 px-3 py-1 text-[10px] font-black text-red-600">خصم {flashPreviewDiscount}%</span>
+                        </div>
+                        <h3 className="truncate text-lg font-black text-slate-950">{selectedFlashProduct.name}</h3>
+                        <div className="mt-3 flex items-end gap-2">
+                          <span className="font-mono text-xs font-black text-slate-400 line-through">
+                            {selectedFlashProduct.price.toLocaleString()} د.ع
+                          </span>
+                          <strong className="font-mono text-2xl font-black text-slate-950">
+                            {flashPreviewPrice.toLocaleString()} د.ع
+                          </strong>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex h-[420px] items-center justify-center rounded-3xl border border-dashed border-red-200 bg-white/70 text-center text-xs font-bold text-slate-400">
+                      اختر منتجاً حتى تظهر معاينة الصفقة الجديدة هنا.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </form>
           )}
 
-          {/* TAB 5: BANNER SLIDES MANAGEMENT */}
+          {/* TAB 6: BANNER SLIDES MANAGEMENT */}
           {activeTab === "slides" && (
             <div className="space-y-6 text-right" dir="rtl">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-4">
@@ -2178,7 +2374,212 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* TAB 6: PRODUCT BUNDLES MANAGEMENT */}
+          {/* TAB 6: PREMIUM SHOWCASE MANAGEMENT */}
+          {activeTab === "premium" && (
+            <form onSubmit={handleSavePremiumShowcase} className="space-y-6 text-right" dir="rtl">
+              <div className="flex flex-col gap-4 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-extrabold text-[#1a1a1a]">إدارة واجهة العروض المميزة</h2>
+                  <p className="text-xs text-slate-400">تحكم بالمنتج الرئيسي والمنتجات المختارة في قسم العرض الاحترافي بالصفحة الرئيسية.</p>
+                </div>
+
+                <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={premiumShowcaseForm.isEnabled}
+                    onChange={(e) => setPremiumShowcaseForm({ ...premiumShowcaseForm, isEnabled: e.target.checked })}
+                    className="h-4 w-4 cursor-pointer rounded border-slate-300 text-accent focus:ring-accent"
+                  />
+                  تفعيل القسم
+                </label>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-slate-700">الشارة الصغيرة</label>
+                  <input
+                    type="text"
+                    value={premiumShowcaseForm.badge}
+                    onChange={(e) => setPremiumShowcaseForm({ ...premiumShowcaseForm, badge: e.target.value })}
+                    placeholder="مثال: العروض الأقوى"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs focus:border-accent focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-slate-700">عنوان القسم</label>
+                  <input
+                    type="text"
+                    value={premiumShowcaseForm.title}
+                    onChange={(e) => setPremiumShowcaseForm({ ...premiumShowcaseForm, title: e.target.value })}
+                    placeholder="مثال: مختارات الروان المميزة"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs focus:border-accent focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-2 lg:col-span-2">
+                  <label className="text-xs font-semibold text-slate-700">الوصف المختصر</label>
+                  <textarea
+                    value={premiumShowcaseForm.subtitle}
+                    onChange={(e) => setPremiumShowcaseForm({ ...premiumShowcaseForm, subtitle: e.target.value })}
+                    rows={3}
+                    placeholder="اكتب وصف تسويقي قصير يظهر تحت العنوان..."
+                    className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-6 focus:border-accent focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-slate-700">نص زر العرض</label>
+                  <input
+                    type="text"
+                    value={premiumShowcaseForm.ctaText}
+                    onChange={(e) => setPremiumShowcaseForm({ ...premiumShowcaseForm, ctaText: e.target.value })}
+                    placeholder="شاهد العرض"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs focus:border-accent focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-slate-700">ستايل العرض</label>
+                  <select
+                    value={premiumShowcaseForm.theme}
+                    onChange={(e) => setPremiumShowcaseForm({ ...premiumShowcaseForm, theme: e.target.value as PremiumShowcase["theme"] })}
+                    className="w-full cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs focus:border-accent focus:outline-none"
+                  >
+                    <option value="titanium">Titanium Studio - فاتح وراقي</option>
+                    <option value="aqua">Aqua Clean - سماوي ونظيف</option>
+                    <option value="blush">Blush Offer - عرض ناعم</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2 lg:col-span-2">
+                  <label className="text-xs font-semibold text-slate-700">أول منتج يبدأ منه الدوران</label>
+                  <select
+                    value={premiumShowcaseForm.heroProductId}
+                    onChange={(e) => {
+                      const nextHeroProductId = e.target.value;
+                      setPremiumShowcaseForm((prev) => ({
+                        ...prev,
+                        heroProductId: nextHeroProductId,
+                        productIds: nextHeroProductId && !prev.productIds.includes(nextHeroProductId)
+                          ? [nextHeroProductId, ...prev.productIds]
+                          : prev.productIds,
+                      }));
+                    }}
+                    className="w-full cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs focus:border-accent focus:outline-none"
+                  >
+                    <option value="">اختيار تلقائي من المنتجات المحددة</option>
+                    {products.map((product) => (
+                      <option key={product.id} value={product.id}>
+                        {product.name} - {(product.discountPrice || product.price).toLocaleString()} د.ع
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-slate-200 bg-gradient-to-l from-slate-50 via-white to-sky-50 p-5">
+                <div className="grid gap-4 lg:grid-cols-[1fr_260px] lg:items-center">
+                  <div className="space-y-2">
+                    <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] font-black text-slate-700">
+                      <Sparkles className="h-3.5 w-3.5 text-accent" />
+                      {premiumShowcaseForm.badge || "العروض الأقوى"}
+                    </span>
+                    <h3 className="text-2xl font-black text-slate-950">{premiumShowcaseForm.title || "مختارات الروان المميزة"}</h3>
+                    <p className="text-xs font-medium leading-6 text-slate-500">{premiumShowcaseForm.subtitle || "سيظهر هنا وصف القسم في الصفحة الرئيسية."}</p>
+                  </div>
+
+                  <div className="rounded-2xl border border-white bg-white/80 p-4 shadow-sm">
+                    <span className="block text-[10px] font-black text-slate-400">يبدأ العرض من</span>
+                    <strong className="mt-1 block truncate text-sm font-extrabold text-slate-900">
+                      {selectedPremiumHero?.name || "سيتم اختياره تلقائياً"}
+                    </strong>
+                    <span className="mt-2 block text-[10px] font-bold text-slate-400">
+                      منتجات الدوران المختارة: {premiumShowcaseForm.productIds.length}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-extrabold text-slate-900">اختر منتجات الدوران داخل القسم</h3>
+                    <p className="text-[11px] text-slate-400">كل منتج تختاره يصعد للواجهة الرئيسية بالتتابع، وإذا تركتها فارغة يعرض الموقع أقوى المنتجات المخفضة.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPremiumShowcaseForm({ ...premiumShowcaseForm, productIds: [] })}
+                    className="w-fit rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-bold text-slate-500 hover:bg-slate-50 cursor-pointer"
+                  >
+                    مسح الاختيارات
+                  </button>
+                </div>
+
+                {premiumCandidateProducts.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-slate-200 p-10 text-center text-xs text-slate-400">
+                    لا توجد منتجات حالياً.
+                  </div>
+                ) : (
+                  <div className="grid max-h-[360px] gap-3 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-3 md:grid-cols-2">
+                    {premiumCandidateProducts.map((product) => {
+                      const isSelected = premiumShowcaseForm.productIds.includes(product.id);
+                      const hasDiscount = Boolean(product.discountPrice && product.discountPrice > 0 && product.discountPrice < product.price);
+                      const discountPercent = hasDiscount ? Math.round((1 - ((product.discountPrice || product.price) / product.price)) * 100) : 0;
+
+                      return (
+                        <button
+                          key={product.id}
+                          type="button"
+                          onClick={() => handleTogglePremiumProduct(product.id)}
+                          className={`flex items-center gap-3 rounded-xl border p-3 text-right transition-all cursor-pointer ${isSelected
+                            ? "border-accent bg-white shadow-sm ring-1 ring-accent/20"
+                            : "border-slate-200 bg-white hover:border-slate-300"
+                            }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            readOnly
+                            className="h-4 w-4 flex-shrink-0 rounded border-slate-300 text-accent"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <span className="block truncate text-xs font-extrabold text-slate-900">{product.name}</span>
+                            <span className="mt-1 block truncate font-mono text-[10px] font-bold text-slate-400">
+                              {(product.discountPrice || product.price).toLocaleString()} د.ع | {product.category}
+                            </span>
+                          </div>
+                          {hasDiscount && (
+                            <span className="rounded-full bg-rose-50 px-2 py-1 text-[10px] font-black text-rose-600">
+                              خصم {discountPercent}%
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => setPremiumShowcaseForm(DEFAULT_PREMIUM_SHOWCASE)}
+                  className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                >
+                  إرجاع الافتراضي
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-xl bg-[#1a1a1a] px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-slate-800 cursor-pointer"
+                >
+                  حفظ واجهة العروض المميزة
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* TAB 7: PRODUCT BUNDLES MANAGEMENT */}
           {activeTab === "bundles" && (
             <div className="space-y-6 text-right" dir="rtl">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-4">
@@ -2505,6 +2906,45 @@ export default function AdminPage() {
                     required
                   />
                 </div>
+              </div>
+
+              {/* Ports Selection Section */}
+              <div className="space-y-2.5 border border-slate-200 rounded-xl p-3 bg-slate-50">
+                <label className="text-xs font-bold text-slate-700 block">المنافذ المتوفرة للمنتج (Charging Ports)</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { key: "مايكرو (Micro USB)", label: "مايكرو" },
+                    { key: "تايب سي (Type-C)", label: "تايب سي" },
+                    { key: "لايتنينغ (Lightning)", label: "لايتنينغ" }
+                  ].map((portItem) => {
+                    const isChecked = productForm.ports?.includes(portItem.key) || false;
+                    return (
+                      <label
+                        key={portItem.key}
+                        className={`flex items-center justify-center gap-1.5 p-2 rounded-lg border text-[11px] font-bold cursor-pointer select-none transition-all duration-200 ${
+                          isChecked
+                            ? "bg-[#1a1a1a] border-[#1a1a1a] text-white shadow-xs"
+                            : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            const currentPorts = productForm.ports || [];
+                            const updatedPorts = e.target.checked
+                              ? [...currentPorts, portItem.key]
+                              : currentPorts.filter((p) => p !== portItem.key);
+                            setProductForm({ ...productForm, ports: updatedPorts });
+                          }}
+                          className="hidden"
+                        />
+                        <span>{portItem.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                <p className="text-[9px] text-slate-400">حدد المنافذ إذا كان المنتج يحتوي على أكثر من خيار للعميل (مثل الشواحن أو الكيبلات أو السماعات).</p>
               </div>
 
               {/* Colors Selection Section */}

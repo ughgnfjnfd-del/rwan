@@ -42,6 +42,7 @@ import MarqueeTicker from "@/components/MarqueeTicker";
 import FlashSaleBanner from "@/components/FlashSaleBanner";
 import BundlesSection from "@/components/BundlesSection";
 import PromoPopUp from "@/components/PromoPopUp";
+import PremiumShowcaseSection from "@/components/PremiumShowcaseSection";
 
 const getProductHighlights = (product: Product) => {
   if (product.image.startsWith("charger-")) {
@@ -98,7 +99,11 @@ interface ProductDetailModalProps {
   product: Product;
   isOpen: boolean;
   onClose: () => void;
-  onAddToCart: (product: Product, selectedColor?: { name: string; hex: string; image?: string | null } | null) => void;
+  onAddToCart: (
+    product: Product,
+    selectedColor?: { name: string; hex: string; image?: string | null } | null,
+    selectedPort?: string | null
+  ) => void;
   allProducts: Product[];
   onSelectProduct: (product: Product) => void;
 }
@@ -107,6 +112,9 @@ function ProductDetailModal({ product, isOpen, onClose, onAddToCart, allProducts
   const [qty, setQty] = useState(1);
   const [selectedColor, setSelectedColor] = useState<{ name: string; hex: string; image?: string | null } | null>(
     () => product.colors?.[0] || null
+  );
+  const [selectedPort, setSelectedPort] = useState<string | null>(
+    () => product.ports?.[0] || null
   );
 
   // Lock body scroll when modal is open
@@ -317,6 +325,39 @@ function ProductDetailModal({ product, isOpen, onClose, onAddToCart, allProducts
               </div>
             </div>
           )}
+          {product.ports && product.ports.length > 0 && (
+            <div className="space-y-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <span className="inline-flex items-center gap-2 text-xs font-black text-slate-800">
+                  <Cpu className="h-4 w-4 text-slate-500" />
+                  اختر نوع المنفذ (Port Type)
+                </span>
+                <span className="rounded-lg bg-sky-50 border border-sky-100 text-sky-600 px-3 py-1 text-[10px] font-extrabold">
+                  {selectedPort || "غير محدد"}
+                </span>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {product.ports.map((port, idx) => {
+                  const isSelected = selectedPort === port;
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => setSelectedPort(port)}
+                      type="button"
+                      className={`relative px-4 py-2 text-xs font-bold rounded-xl border transition-all duration-200 active:scale-95 cursor-pointer ${
+                        isSelected
+                          ? "bg-[#1a1a1a] border-[#1a1a1a] text-white shadow-md scale-[1.02]"
+                          : "bg-slate-50/50 border-slate-200 text-slate-650 hover:bg-slate-50 hover:border-slate-350"
+                      }`}
+                    >
+                      {port}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="space-y-2">
@@ -382,7 +423,7 @@ function ProductDetailModal({ product, isOpen, onClose, onAddToCart, allProducts
             <button
               onClick={() => {
                 for (let i = 0; i < qty; i++) {
-                  onAddToCart(product, selectedColor);
+                  onAddToCart(product, selectedColor, selectedPort);
                 }
                 onClose();
               }}
@@ -451,18 +492,23 @@ export default function Home() {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
 
   // Cart Handlers
-  const handleAddToCart = (product: Product, selectedColor?: { name: string; hex: string; image?: string | null } | null) => {
+  const handleAddToCart = (
+    product: Product,
+    selectedColor?: { name: string; hex: string; image?: string | null } | null,
+    selectedPort?: string | null
+  ) => {
     const color = selectedColor !== undefined ? selectedColor : (product.colors && product.colors.length > 0 ? product.colors[0] : null);
-    addToCart(product, color);
+    const port = selectedPort !== undefined ? selectedPort : (product.ports && product.ports.length > 0 ? product.ports[0] : null);
+    addToCart(product, color, port);
     setIsCartOpen(true);
   };
 
-  const handleUpdateQuantity = (productId: string, quantity: number, selectedColorName?: string | null) => {
-    updateCartQuantity(productId, quantity, selectedColorName);
+  const handleUpdateQuantity = (productId: string, quantity: number, selectedColorName?: string | null, selectedPort?: string | null) => {
+    updateCartQuantity(productId, quantity, selectedColorName, selectedPort);
   };
 
-  const handleRemoveItem = (productId: string, selectedColorName?: string | null) => {
-    removeFromCart(productId, selectedColorName);
+  const handleRemoveItem = (productId: string, selectedColorName?: string | null, selectedPort?: string | null) => {
+    removeFromCart(productId, selectedColorName, selectedPort);
   };
 
   const handleCheckout = () => {
@@ -855,98 +901,10 @@ export default function Home() {
         </section>
 
 
-        {/* Special Offers Section */}
-        {products.some(p => p.discountPrice && p.discountPrice > 0) && (
-          <section className="bg-gradient-to-l from-rose-50/50 via-slate-50 to-blue-50/10 border border-rose-100 rounded-3xl p-6 space-y-6 relative overflow-hidden">
-            {/* Background design elements */}
-            <div className="absolute left-[-20px] top-[-20px] w-36 h-36 bg-rose-500/5 rounded-full blur-2xl pointer-events-none"></div>
-
-            <div className="flex items-center justify-between border-b border-rose-100 pb-3 text-right">
-              <div className="space-y-1">
-                <span className="inline-flex items-center gap-1 bg-rose-100 text-rose-600 font-extrabold text-[10px] px-2.5 py-0.5 rounded-full uppercase animate-pulse">
-                  🔥 عروض محدودة
-                </span>
-                <h2 className="text-xl font-extrabold text-[#1a1a1a]">العروض المميزة والتخفيضات</h2>
-                <p className="text-xs text-slate-400">احصل على أقوى العروض الحصرية والخصومات لفترة محدودة</p>
-              </div>
-            </div>
-
-            {/* Horizontal scroll grid */}
-            <div className="flex gap-4 overflow-x-auto pb-4 pt-1 pr-1 scrollbar-thin scrollbar-thumb-slate-200">
-              {products
-                .filter(p => p.discountPrice && p.discountPrice > 0)
-                .map((product) => {
-                  const discountPercent = Math.round((1 - (product.discountPrice! / product.price)) * 100);
-                  return (
-                    <div
-                      key={product.id}
-                      onClick={() => setSelectedProduct(product)}
-                      className="bg-white border border-card-border rounded-2xl overflow-hidden hover:shadow-md hover:border-rose-200 transition-all duration-300 flex flex-col group cursor-pointer w-48 sm:w-56 flex-shrink-0"
-                    >
-                      {/* Image Preview */}
-                      <div className="aspect-square bg-slate-50/50 p-4 flex items-center justify-center relative overflow-hidden border-b border-card-border">
-                        {/* Wishlist toggle */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleWishlist(product.id);
-                          }}
-                          className="absolute top-2.5 left-2.5 bg-white p-1.5 rounded-full shadow-sm hover:scale-105 border border-slate-100 text-slate-400 hover:text-rose-500 transition-all cursor-pointer z-10"
-                        >
-                          <Heart className={`w-3 h-3 sm:w-3.5 sm:h-3.5 ${wishlist.includes(product.id) ? "fill-rose-500 text-rose-500" : ""}`} />
-                        </button>
-
-                        {/* Discount Badge */}
-                        <span className="absolute top-2.5 right-2.5 bg-rose-600 text-white text-[8px] sm:text-[9px] font-extrabold px-2 py-0.5 rounded-full shadow-sm z-10">
-                          خصم {discountPercent}%
-                        </span>
-
-                        <ProductMockup image={product.image} name={product.name} sizeClass="w-20 aspect-[9/18]" />
-                      </div>
-
-                      {/* Info */}
-                      <div className="p-3 sm:p-4 flex-1 flex flex-col justify-between text-right space-y-2">
-                        <div>
-                          <div className="flex justify-between items-center text-[9px] sm:text-[10px]">
-                            <span className="text-slate-400 font-medium truncate max-w-[80px]" title={product.nameEn}>
-                              {product.nameEn}
-                            </span>
-                            <span className="bg-rose-50 text-rose-600 border border-rose-100 font-extrabold text-[8px] px-1.5 py-0.5 rounded">
-                              عرض خاص
-                            </span>
-                          </div>
-                          <h3 className="font-extrabold text-xs text-slate-800 group-hover:text-accent transition-colors duration-200 leading-snug line-clamp-2 mt-1 min-h-[2.4rem]">
-                            {product.name}
-                          </h3>
-                        </div>
-
-                        <div className="flex items-center justify-between pt-1.5 border-t border-slate-50">
-                          <div className="flex flex-col text-right">
-                            <span className="text-[9px] text-slate-400 line-through font-mono">
-                              {product.price.toLocaleString()} د.ع
-                            </span>
-                            <span className="font-extrabold text-xs sm:text-sm text-rose-650 font-mono leading-none">
-                              {product.discountPrice!.toLocaleString()} د.ع
-                            </span>
-                          </div>
-
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleAddToCart(product);
-                            }}
-                            className="bg-rose-600 hover:bg-rose-700 text-white text-[10px] sm:text-xs font-bold px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
-                          >
-                            <ShoppingBag className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-          </section>
-        )}
+        <PremiumShowcaseSection
+          onSelectProduct={setSelectedProduct}
+          onAddToCart={handleAddToCart}
+        />
 
         {/* Bundles Lookbook Section */}
         <BundlesSection />
@@ -1454,8 +1412,8 @@ export default function Home() {
           product={selectedProduct}
           isOpen={!!selectedProduct}
           onClose={() => setSelectedProduct(null)}
-          onAddToCart={(prod, color) => {
-            handleAddToCart(prod, color);
+          onAddToCart={(prod, color, port) => {
+            handleAddToCart(prod, color, port);
           }}
           allProducts={products}
           onSelectProduct={(prod) => setSelectedProduct(prod)}

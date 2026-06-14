@@ -18,6 +18,7 @@ export interface Product {
   colors?: Array<{ name: string; hex: string; image?: string | null }> | null;
   rating?: number | null;
   reviewsCount?: number | null;
+  ports?: string[] | null;
 }
 
 // Database Helpers & Mappers
@@ -35,6 +36,7 @@ const mapDBProduct = (dbProd: any): Product => ({
   colors: dbProd.colors || null,
   rating: dbProd.rating !== undefined && dbProd.rating !== null ? Number(dbProd.rating) : 5,
   reviewsCount: dbProd.reviews_count !== undefined && dbProd.reviews_count !== null ? Number(dbProd.reviews_count) : 24,
+  ports: dbProd.ports || null,
 });
 
 const mapLocalProductToDB = (prod: Partial<Product>) => {
@@ -54,6 +56,7 @@ const mapLocalProductToDB = (prod: Partial<Product>) => {
   if (prod.colors !== undefined) dbProd.colors = prod.colors;
   if (prod.rating !== undefined) dbProd.rating = prod.rating;
   if (prod.reviewsCount !== undefined) dbProd.reviews_count = prod.reviewsCount;
+  if (prod.ports !== undefined) dbProd.ports = prod.ports;
   return dbProd;
 };
 
@@ -89,6 +92,7 @@ export interface CartItem {
   product: Product;
   quantity: number;
   selectedColor?: { name: string; hex: string; image?: string | null } | null;
+  selectedPort?: string | null;
 }
 
 export interface Appointment {
@@ -171,6 +175,28 @@ export interface PromoPopUp {
   btnLink: string;
 }
 
+export interface PremiumShowcase {
+  isEnabled: boolean;
+  badge: string;
+  title: string;
+  subtitle: string;
+  heroProductId: string;
+  productIds: string[];
+  ctaText: string;
+  theme: "titanium" | "aqua" | "blush";
+}
+
+export const DEFAULT_PREMIUM_SHOWCASE: PremiumShowcase = {
+  isEnabled: true,
+  badge: "العروض الأقوى",
+  title: "مختارات الروان المميزة",
+  subtitle: "منتجات مختارة بعروض قوية وتجربة عرض مرتبة مثل واجهات المتاجر العالمية.",
+  heroProductId: "",
+  productIds: [],
+  ctaText: "شاهد العرض",
+  theme: "titanium",
+};
+
 interface AppContextType {
   products: Product[];
   appointments: Appointment[];
@@ -182,15 +208,16 @@ interface AppContextType {
   flashSale: FlashSale;
   productBundles: ProductBundle[];
   promoPopUp: PromoPopUp;
+  premiumShowcase: PremiumShowcase;
   addProduct: (product: Omit<Product, "id">) => void;
   updateProduct: (id: string, product: Partial<Product>) => void;
   deleteProduct: (id: string) => void;
   addAppointment: (appointment: Omit<Appointment, "id" | "status" | "createdAt">) => void;
   updateAppointmentStatus: (id: string, status: Appointment["status"]) => void;
   deleteAppointment: (id: string) => void;
-  addToCart: (product: Product, selectedColor?: { name: string; hex: string; image?: string | null } | null) => void;
-  removeFromCart: (productId: string, selectedColorName?: string | null) => void;
-  updateCartQuantity: (productId: string, quantity: number, selectedColorName?: string | null) => void;
+  addToCart: (product: Product, selectedColor?: { name: string; hex: string; image?: string | null } | null, selectedPort?: string | null) => void;
+  removeFromCart: (productId: string, selectedColorName?: string | null, selectedPort?: string | null) => void;
+  updateCartQuantity: (productId: string, quantity: number, selectedColorName?: string | null, selectedPort?: string | null) => void;
   clearCart: () => void;
   toggleWishlist: (productId: string) => void;
   updateSiteSettings: (settings: Partial<SiteSettings>) => Promise<void>;
@@ -199,6 +226,7 @@ interface AppContextType {
   updateFlashSale: (sale: FlashSale) => Promise<void>;
   updateProductBundles: (bundles: ProductBundle[]) => Promise<void>;
   updatePromoPopUp: (popup: PromoPopUp) => Promise<void>;
+  updatePremiumShowcase: (settings: PremiumShowcase) => Promise<void>;
   addBundleToCart: (productIds: string[]) => void;
   isInitialized: boolean;
 }
@@ -247,6 +275,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     initialStock: 10
   });
   const [productBundles, setProductBundles] = useState<ProductBundle[]>([]);
+  const [premiumShowcase, setPremiumShowcase] = useState<PremiumShowcase>(DEFAULT_PREMIUM_SHOWCASE);
   const [promoPopUp, setPromoPopUp] = useState<PromoPopUp>({
     isEnabled: false,
     title: "مرحباً بك في مركز الروان!",
@@ -308,11 +337,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const flashSaleObj = settingsData.find((s: any) => s.key === "flash_sale")?.value;
           const bundlesObj = settingsData.find((s: any) => s.key === "product_bundles")?.value;
           const promoPopUpObj = settingsData.find((s: any) => s.key === "promo_popup")?.value;
+          const premiumShowcaseObj = settingsData.find((s: { key: string; value: unknown }) => s.key === "premium_showcase")?.value as Partial<PremiumShowcase> | undefined;
 
           if (marqueeObj) setMarqueeSettings(marqueeObj);
           if (flashSaleObj) setFlashSale(flashSaleObj);
           if (Array.isArray(bundlesObj)) setProductBundles(bundlesObj);
           if (promoPopUpObj) setPromoPopUp(promoPopUpObj);
+          if (premiumShowcaseObj) {
+            const premiumTheme = premiumShowcaseObj.theme;
+            const theme: PremiumShowcase["theme"] = premiumTheme === "titanium" || premiumTheme === "aqua" || premiumTheme === "blush"
+              ? premiumTheme
+              : DEFAULT_PREMIUM_SHOWCASE.theme;
+
+            setPremiumShowcase({
+              ...DEFAULT_PREMIUM_SHOWCASE,
+              ...premiumShowcaseObj,
+              heroProductId: typeof premiumShowcaseObj.heroProductId === "string" ? premiumShowcaseObj.heroProductId : "",
+              productIds: Array.isArray(premiumShowcaseObj.productIds) ? premiumShowcaseObj.productIds : [],
+              theme,
+            });
+          }
         } else {
           setHeroSlides([]);
         }
@@ -480,41 +524,52 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Cart Actions (LocalStorage only)
-  const addToCart = (product: Product, selectedColor?: { name: string; hex: string; image?: string | null } | null) => {
+  const addToCart = (
+    product: Product,
+    selectedColor?: { name: string; hex: string; image?: string | null } | null,
+    selectedPort?: string | null
+  ) => {
     let updated: CartItem[];
     const existing = cartItems.find((item) =>
       item.product.id === product.id &&
-      (!selectedColor || item.selectedColor?.name === selectedColor.name)
+      (!selectedColor || item.selectedColor?.name === selectedColor.name) &&
+      (!selectedPort || item.selectedPort === selectedPort)
     );
     if (existing) {
       updated = cartItems.map((item) =>
         item.product.id === product.id &&
-          (!selectedColor || item.selectedColor?.name === selectedColor.name)
+        (!selectedColor || item.selectedColor?.name === selectedColor.name) &&
+        (!selectedPort || item.selectedPort === selectedPort)
           ? { ...item, quantity: item.quantity + 1 }
           : item
       );
     } else {
-      updated = [...cartItems, { product, quantity: 1, selectedColor: selectedColor || null }];
+      updated = [...cartItems, { product, quantity: 1, selectedColor: selectedColor || null, selectedPort: selectedPort || null }];
     }
     setCartItems(updated);
     saveCartToStorage(updated);
   };
 
-  const removeFromCart = (productId: string, selectedColorName?: string | null) => {
+  const removeFromCart = (productId: string, selectedColorName?: string | null, selectedPort?: string | null) => {
     const updated = cartItems.filter((item) =>
-      !(item.product.id === productId && (!selectedColorName || item.selectedColor?.name === selectedColorName))
+      !(item.product.id === productId &&
+        (!selectedColorName || item.selectedColor?.name === selectedColorName) &&
+        (!selectedPort || item.selectedPort === selectedPort)
+      )
     );
     setCartItems(updated);
     saveCartToStorage(updated);
   };
 
-  const updateCartQuantity = (productId: string, quantity: number, selectedColorName?: string | null) => {
+  const updateCartQuantity = (productId: string, quantity: number, selectedColorName?: string | null, selectedPort?: string | null) => {
     if (quantity <= 0) {
-      removeFromCart(productId, selectedColorName);
+      removeFromCart(productId, selectedColorName, selectedPort);
       return;
     }
     const updated = cartItems.map((item) =>
-      item.product.id === productId && (!selectedColorName || item.selectedColor?.name === selectedColorName)
+      item.product.id === productId &&
+      (!selectedColorName || item.selectedColor?.name === selectedColorName) &&
+      (!selectedPort || item.selectedPort === selectedPort)
         ? { ...item, quantity }
         : item
     );
@@ -625,6 +680,39 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (error) console.error("Error updating promo popup settings in Supabase", error);
   };
 
+  const updatePremiumShowcase = async (settings: PremiumShowcase) => {
+    const normalizedSettings: PremiumShowcase = {
+      ...DEFAULT_PREMIUM_SHOWCASE,
+      ...settings,
+      heroProductId: settings.heroProductId || "",
+      productIds: Array.from(new Set((settings.productIds || []).filter(Boolean))),
+    };
+
+    setPremiumShowcase(normalizedSettings);
+
+    const { data: updatedRows, error: updateError } = await supabase
+      .from("site_settings")
+      .update({ value: normalizedSettings })
+      .eq("key", "premium_showcase")
+      .select("key");
+
+    if (updateError) {
+      console.error("Error updating premium showcase settings in Supabase", updateError);
+      throw updateError;
+    }
+
+    if (!updatedRows || updatedRows.length === 0) {
+      const { error: insertError } = await supabase
+        .from("site_settings")
+        .insert({ key: "premium_showcase", value: normalizedSettings });
+
+      if (insertError) {
+        console.error("Error inserting premium showcase settings in Supabase", insertError);
+        throw insertError;
+      }
+    }
+  };
+
   const addBundleToCart = (productIds: string[]) => {
     let newCartItems = [...cartItems];
 
@@ -659,6 +747,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         flashSale,
         productBundles,
         promoPopUp,
+        premiumShowcase,
         addProduct,
         updateProduct,
         deleteProduct,
@@ -677,6 +766,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         updateFlashSale,
         updateProductBundles,
         updatePromoPopUp,
+        updatePremiumShowcase,
         addBundleToCart,
         isInitialized,
       }}

@@ -9,8 +9,8 @@ interface CartDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   items: CartItem[];
-  onUpdateQuantity: (productId: string, quantity: number, selectedColorName?: string | null) => void;
-  onRemoveItem: (productId: string, selectedColorName?: string | null) => void;
+  onUpdateQuantity: (productId: string, quantity: number, selectedColorName?: string | null, selectedPort?: string | null) => void;
+  onRemoveItem: (productId: string, selectedColorName?: string | null, selectedPort?: string | null) => void;
   onCheckout: () => void;
   shippingFee?: string;
 }
@@ -95,7 +95,7 @@ export default function CartDrawer({
           ) : (
             items.map((item) => (
               <div
-                key={`${item.product.id}-${item.selectedColor?.name || "default"}`}
+                key={`${item.product.id}-${item.selectedColor?.name || "default"}-${item.selectedPort || "default"}`}
                 className="flex gap-4 p-3 border border-card-border rounded-xl hover:shadow-sm transition-shadow duration-200"
               >
                 {/* Product Image */}
@@ -113,7 +113,7 @@ export default function CartDrawer({
                     <h4 className="font-bold text-sm text-[#1a1a1a] truncate">
                       {item.product.name}
                     </h4>
-                    <div className="flex items-center gap-2 mt-0.5">
+                    <div className="flex flex-wrap items-center gap-2 mt-0.5">
                       <span className="text-[10px] text-slate-400 uppercase">
                         {item.product.category}
                       </span>
@@ -123,9 +123,14 @@ export default function CartDrawer({
                             className="w-2.5 h-2.5 rounded-full border border-black/10 shadow-xs block"
                             style={{ backgroundColor: item.selectedColor.hex }}
                           />
-                          <span className="text-[9px] font-bold text-slate-600">
+                          <span className="text-[9px] font-bold text-slate-605">
                             {item.selectedColor.name}
                           </span>
+                        </div>
+                      )}
+                      {item.selectedPort && (
+                        <div className="flex items-center gap-1 bg-sky-50 border border-sky-100 text-sky-600 px-1.5 py-0.5 rounded-full text-[9px] font-bold">
+                          {item.selectedPort}
                         </div>
                       )}
                     </div>
@@ -136,7 +141,7 @@ export default function CartDrawer({
                     <div className="flex items-center border border-slate-200 rounded-lg bg-slate-50/50">
                       <button
                         onClick={() =>
-                          onUpdateQuantity(item.product.id, item.quantity - 1, item.selectedColor?.name)
+                          onUpdateQuantity(item.product.id, item.quantity - 1, item.selectedColor?.name, item.selectedPort)
                         }
                         className="p-1 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-r-lg transition-colors cursor-pointer"
                       >
@@ -147,7 +152,7 @@ export default function CartDrawer({
                       </span>
                       <button
                         onClick={() =>
-                          onUpdateQuantity(item.product.id, item.quantity + 1, item.selectedColor?.name)
+                          onUpdateQuantity(item.product.id, item.quantity + 1, item.selectedColor?.name, item.selectedPort)
                         }
                         className="p-1 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-l-lg transition-colors cursor-pointer"
                       >
@@ -160,7 +165,7 @@ export default function CartDrawer({
                         {((item.product.discountPrice || item.product.price) * item.quantity).toLocaleString()} د.ع
                       </span>
                       <button
-                        onClick={() => onRemoveItem(item.product.id, item.selectedColor?.name)}
+                        onClick={() => onRemoveItem(item.product.id, item.selectedColor?.name, item.selectedPort)}
                         className="text-slate-400 hover:text-rose-500 p-1 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
                       >
                         <Trash2 className="w-4 h-4" />

@@ -8,7 +8,7 @@ if (typeof window !== 'undefined') {
       if (arg && typeof arg === 'object') {
         try {
           return arg.message || JSON.stringify(arg);
-        } catch (_) {
+        } catch {
           return String(arg);
         }
       }

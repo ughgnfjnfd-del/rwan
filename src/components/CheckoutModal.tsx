@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, User, Phone, MapPin, AlertCircle, CheckCircle2, ShoppingBag } from "lucide-react";
-import { CartItem } from "@/context/AppContext";
+import { X, User, Phone, MapPin, AlertCircle, CheckCircle2, ShoppingBag, TicketPercent } from "lucide-react";
+import { CartItem, AppliedCoupon } from "@/context/AppContext";
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -10,9 +10,11 @@ interface CheckoutModalProps {
   cartItems: CartItem[];
   onSubmit: (customer: { name: string; phone: string; address: string }) => Promise<boolean>;
   shippingFee: string;
+  appliedCoupon?: AppliedCoupon | null;
+  couponDiscount?: number;
 }
 
-export default function CheckoutModal({ isOpen, onClose, cartItems, onSubmit, shippingFee }: CheckoutModalProps) {
+export default function CheckoutModal({ isOpen, onClose, cartItems, onSubmit, shippingFee, appliedCoupon = null, couponDiscount = 0 }: CheckoutModalProps) {
   const [step, setStep] = useState(1); // 1: Form, 2: Success
   const [formData, setFormData] = useState({
     name: "",
@@ -37,7 +39,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onSubmit, sh
         (sum, item) => sum + (item.product.discountPrice || item.product.price) * item.quantity,
         0
       );
-      setSavedTotalPrice(subTotal + numericShipping);
+      setSavedTotalPrice(Math.max(0, subTotal - couponDiscount) + numericShipping);
     } else {
       document.body.style.overflow = "unset";
     }
@@ -134,6 +136,15 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onSubmit, sh
                   ))}
                 </div>
                 <div className="border-t border-dashed border-slate-200 pt-2 mt-2 space-y-1">
+                  {appliedCoupon && couponDiscount > 0 && (
+                    <div className="flex justify-between rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-emerald-700">
+                      <span className="inline-flex items-center gap-1.5">
+                        <TicketPercent className="h-3.5 w-3.5" />
+                        خصم {appliedCoupon.code}
+                      </span>
+                      <span className="font-semibold">-{couponDiscount.toLocaleString()} د.ع</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-slate-500">
                     <span>أجور التوصيل:</span>
                     <span className={numericShipping === 0 ? "text-emerald-600 font-semibold" : "text-slate-600 font-semibold"}>

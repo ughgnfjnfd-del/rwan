@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
-import { ChevronLeft, ChevronRight, Shield, Wrench, Smartphone, Star, Headphones } from "lucide-react";
-import { useApp, SlideItem } from "@/context/AppContext";
+import { ChevronLeft, ChevronRight, Wrench, Headphones } from "lucide-react";
+import { useApp } from "@/context/AppContext";
 import ProductMockup from "@/components/ProductMockup";
 
 interface PromoCarouselProps {
@@ -438,7 +438,7 @@ export default function PromoCarousel({ onOpenRepairModal }: PromoCarouselProps)
         {/* 3. Slider Navigation Controls (Left/Right Arrows) */}
         <button
           onClick={prevSlide}
-          className={`absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 p-2 rounded-full backdrop-blur-md border border-white/10 opacity-0 group-hover/carousel:opacity-100 transition-opacity duration-300 z-30 cursor-pointer ${
+          className={`absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 p-2 rounded-full backdrop-blur-md border border-white/10 opacity-100 md:opacity-0 md:group-hover/carousel:opacity-100 transition-opacity duration-300 z-30 cursor-pointer ${
             activeSlide.theme === 'dark' 
               ? 'bg-slate-900/40 text-white hover:bg-slate-900/60' 
               : 'bg-white/40 text-slate-800 hover:bg-white/60'
@@ -449,7 +449,7 @@ export default function PromoCarousel({ onOpenRepairModal }: PromoCarouselProps)
         </button>
         <button
           onClick={nextSlide}
-          className={`absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 p-2 rounded-full backdrop-blur-md border border-white/10 opacity-0 group-hover/carousel:opacity-100 transition-opacity duration-300 z-30 cursor-pointer ${
+          className={`absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 p-2 rounded-full backdrop-blur-md border border-white/10 opacity-100 md:opacity-0 md:group-hover/carousel:opacity-100 transition-opacity duration-300 z-30 cursor-pointer ${
             activeSlide.theme === 'dark' 
               ? 'bg-slate-900/40 text-white hover:bg-slate-900/60' 
               : 'bg-white/40 text-slate-800 hover:bg-white/60'

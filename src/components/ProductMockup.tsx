@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Cpu, Headphones } from "lucide-react";
+
 
 export interface ProductMockupProps {
   image: string;

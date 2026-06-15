@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     let text = "";
 
     if (type === "order") {
-      const { customer, items, total } = payload;
+      const { customer, items, total, couponCode, couponDiscount, finalTotal } = payload;
       text = `<b>🛍️ طلب شراء جديد من المتجر!</b>\n\n`;
       text += `<b>👤 معلومات العميل:</b>\n`;
       text += `• الاسم: ${customer.name}\n`;
@@ -34,7 +34,11 @@ export async function POST(request: Request) {
         text += `   الكمية: ${item.quantity} | السعر: ${(item.product.price * item.quantity).toLocaleString()} د.ع\n`;
       });
       
-      text += `\n💵 <b>إجمالي الطلب:</b> <u>${total.toLocaleString()} د.ع</u>\n`;
+      if (couponCode && couponDiscount > 0) {
+        text += `\n🏷️ <b>كود الخصم المستخدم:</b> <code>${couponCode}</code> (-${couponDiscount.toLocaleString()} د.ع)\n`;
+      }
+      
+      text += `\n💵 <b>إجمالي الطلب:</b> <u>${(finalTotal !== undefined ? finalTotal : total).toLocaleString()} د.ع</u>\n`;
       text += `📅 التاريخ: ${new Date().toLocaleString('ar-IQ', { timeZone: 'Asia/Baghdad' })}`;
     } else if (type === "booking") {
       const { name, phone, device, issueType, details, date, timeSlot } = payload;

@@ -4,14 +4,12 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   BadgeCheck,
-  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Eye,
   ShieldCheck,
   ShoppingBag,
   Sparkles,
-  Star,
-  Tag,
-  Zap,
 } from "lucide-react";
 import { Product, useApp } from "@/context/AppContext";
 import ProductMockup from "@/components/ProductMockup";
@@ -145,7 +143,7 @@ export default function PremiumShowcaseSection({ onSelectProduct, onAddToCart }:
   }, [premiumShowcase.heroProductId, premiumShowcase.productIds, products]);
 
   const rotationProducts = showcaseData?.rotationProducts || [];
-  const discountedProducts = showcaseData?.discountedProducts || [];
+
 
   useEffect(() => {
     if (!premiumShowcase.isEnabled || rotationProducts.length <= 1) return;
@@ -167,7 +165,7 @@ export default function PremiumShowcaseSection({ onSelectProduct, onAddToCart }:
   const theme = themeStyles[premiumShowcase.theme] || themeStyles.titanium;
   const heroPrice = getCurrentPrice(heroProduct);
   const heroDiscount = getDiscountPercent(heroProduct);
-  const heroSaving = getSaving(heroProduct);
+
 
   return (
     <section
@@ -197,29 +195,7 @@ export default function PremiumShowcaseSection({ onSelectProduct, onAddToCart }:
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2 sm:max-w-xl">
-            <div className="rounded-2xl border border-white bg-white/75 p-3 shadow-sm backdrop-blur-md">
-              <Tag className={`mb-2 h-4 w-4 ${theme.highlight}`} />
-              <span className="block text-[10px] font-black text-slate-400">أقوى خصم</span>
-              <strong className="mt-1 block font-mono text-base font-black text-slate-950">
-                {heroDiscount > 0 ? `${heroDiscount}%` : "مميز"}
-              </strong>
-            </div>
-            <div className="rounded-2xl border border-white bg-white/75 p-3 shadow-sm backdrop-blur-md">
-              <Zap className={`mb-2 h-4 w-4 ${theme.highlight}`} />
-              <span className="block text-[10px] font-black text-slate-400">وفر</span>
-              <strong className="mt-1 block font-mono text-sm font-black text-slate-950">
-                {heroSaving > 0 ? `${heroSaving.toLocaleString()} د.ع` : "عرض خاص"}
-              </strong>
-            </div>
-            <div className="rounded-2xl border border-white bg-white/75 p-3 shadow-sm backdrop-blur-md">
-              <Star className={`mb-2 h-4 w-4 fill-current ${theme.highlight}`} />
-              <span className="block text-[10px] font-black text-slate-400">مختارة</span>
-              <strong className="mt-1 block font-mono text-base font-black text-slate-950">
-                {rotationProducts.length || discountedProducts.length || 1}
-              </strong>
-            </div>
-          </div>
+
 
           <div className="flex flex-col gap-3 sm:flex-row">
             <button
@@ -240,14 +216,7 @@ export default function PremiumShowcaseSection({ onSelectProduct, onAddToCart }:
             </button>
           </div>
 
-          <div className="grid gap-2 sm:max-w-xl sm:grid-cols-3">
-            {["أصلي ومضمون", "سعر أقوى", "جاهز للتوصيل"].map((item) => (
-              <div key={item} className="flex items-center gap-2 rounded-2xl border border-slate-200/70 bg-white/65 px-3 py-2.5 text-xs font-black text-slate-700 shadow-sm backdrop-blur-md">
-                <CheckCircle2 className={`h-4 w-4 flex-shrink-0 ${theme.highlight}`} />
-                <span>{item}</span>
-              </div>
-            ))}
-          </div>
+
         </div>
 
         <div className="order-1 lg:order-2">
@@ -268,6 +237,34 @@ export default function PremiumShowcaseSection({ onSelectProduct, onAddToCart }:
                 eager
               />
             </div>
+
+            {/* Navigation Arrows inside Product Card */}
+            {rotationProducts.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveIndex((curr) => (curr - 1 + rotationProducts.length) % rotationProducts.length);
+                  }}
+                  className="absolute left-3 sm:left-4 top-[40%] -translate-y-1/2 p-2 rounded-full backdrop-blur-md border border-slate-200 bg-white/90 shadow-md hover:bg-white hover:scale-105 active:scale-95 z-25 cursor-pointer text-slate-700 transition-all"
+                  aria-label="السابق"
+                >
+                  <ChevronLeft className="w-4.5 h-4.5 sm:w-5 h-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveIndex((curr) => (curr + 1) % rotationProducts.length);
+                  }}
+                  className="absolute right-3 sm:right-4 top-[40%] -translate-y-1/2 p-2 rounded-full backdrop-blur-md border border-slate-200 bg-white/90 shadow-md hover:bg-white hover:scale-105 active:scale-95 z-25 cursor-pointer text-slate-700 transition-all"
+                  aria-label="التالي"
+                >
+                  <ChevronRight className="w-4.5 h-4.5 sm:w-5 h-5" />
+                </button>
+              </>
+            )}
 
             <div className="relative z-10 mt-3 flex flex-col gap-3 rounded-3xl border border-slate-200 bg-white/90 p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">

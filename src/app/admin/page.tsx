@@ -33,7 +33,11 @@ import {
   Upload,
   ArrowUp,
   ArrowDown,
-  Sparkles
+  Sparkles,
+  TicketPercent,
+  Gift,
+  BarChart2,
+  Copy
 } from "lucide-react";
 
 // Helper function to compress and resize images on client side
@@ -112,7 +116,10 @@ export default function AdminPage() {
     promoPopUp,
     updatePromoPopUp,
     premiumShowcase,
-    updatePremiumShowcase
+    updatePremiumShowcase,
+    couponCampaigns,
+    couponCodes,
+    updateCoupons,
   } = useApp();
 
   // Authentication States
@@ -338,8 +345,120 @@ export default function AdminPage() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Tab State: "overview", "products", "repairs", "settings", "flash", "slides", "premium", "bundles"
-  const [activeTab, setActiveTab] = useState<"overview" | "products" | "repairs" | "settings" | "flash" | "slides" | "premium" | "bundles">("overview");
+  // Tab State: "overview", "products", "repairs", "settings", "flash", "slides", "premium", "bundles", "coupons"
+  const [activeTab, setActiveTab] = useState<"overview" | "products" | "repairs" | "settings" | "flash" | "slides" | "premium" | "bundles" | "coupons">("overview");
+
+  // Coupon/Campaign Management States
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
+  const [isCampaignModalOpen, setIsCampaignModalOpen] = useState(false);
+  const [editingCampaignId, setEditingCampaignId] = useState<string | null>(null);
+  const [campaignForm, setCampaignForm] = useState({
+    name: "",
+    description: "",
+    source: "qr",
+    medium: "print",
+    campaign: "promo_2026",
+    isActive: true,
+    startsAt: "",
+    endsAt: "",
+    landingTitle: "مبروك! حصلت على هدية خاصة",
+    landingSubtitle: "عرض خاص وموثق لزبائن مركز الروان المميزين.",
+    qrNote: "امسح الرمز للحصول على العرض الفوري",
+  });
+
+  const [isCodeModalOpen, setIsCodeModalOpen] = useState(false);
+  const [codeForm, setCodeForm] = useState({
+    code: "",
+    discountType: "fixed" as "fixed" | "percent",
+    discountValue: 0,
+    appliesTo: "both" as "store" | "repair" | "both",
+    minOrderAmount: 0,
+    maxUses: 1,
+    isActive: true,
+    expiresAt: "",
+  });
+
+  const generateRandomCode = (prefix = "RWAN") => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let code = "";
+    for (let i = 0; i < 4; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return `${prefix}-${code}`;
+  };
+
+  const handleSaveCampaign = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!campaignForm.name) {
+      alert("يرجى كتابة اسم الحملة");
+      return;
+    }
+
+    const campaignId = editingCampaignId || `camp-${Date.now()}`;
+    const newCampaignData = {
+      id: campaignId,
+      name: campaignForm.name,
+      description: campaignForm.description,
+      source: campaignForm.source,
+      medium: campaignForm.medium,
+      campaign: campaignForm.campaign,
+      isActive: campaignForm.isActive,
+      startsAt: campaignForm.startsAt ? new Date(campaignForm.startsAt).toISOString() : "",
+      endsAt: campaignForm.endsAt ? new Date(campaignForm.endsAt).toISOString() : "",
+      landingTitle: campaignForm.landingTitle,
+      landingSubtitle: campaignForm.landingSubtitle,
+      qrNote: campaignForm.qrNote,
+      createdAt: editingCampaignId 
+        ? (couponCampaigns.find(c => c.id === editingCampaignId)?.createdAt || new Date().toISOString())
+        : new Date().toISOString(),
+    };
+
+    let nextCampaigns;
+    if (editingCampaignId) {
+      nextCampaigns = couponCampaigns.map(c => c.id === editingCampaignId ? newCampaignData : c);
+    } else {
+      nextCampaigns = [...couponCampaigns, newCampaignData];
+    }
+
+    updateCoupons(nextCampaigns, couponCodes);
+    setIsCampaignModalOpen(false);
+    setSelectedCampaignId(campaignId);
+  };
+
+  const handleSaveCode = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!codeForm.code || codeForm.discountValue <= 0) {
+      alert("يرجى كتابة الكود وقيمة الخصم بشكل صحيح");
+      return;
+    }
+
+    const cleanCode = codeForm.code.trim().toUpperCase();
+    const isDuplicate = couponCodes.some(c => c.code.toUpperCase() === cleanCode);
+    if (isDuplicate) {
+      alert(`الرمز "${cleanCode}" موجود بالفعل. يرجى اختيار رمز فريد.`);
+      return;
+    }
+
+    const newCodeData = {
+      id: `code-${Date.now()}`,
+      campaignId: selectedCampaignId!,
+      code: cleanCode,
+      discountType: codeForm.discountType,
+      discountValue: codeForm.discountValue,
+      appliesTo: codeForm.appliesTo,
+      minOrderAmount: codeForm.minOrderAmount,
+      maxUses: codeForm.maxUses,
+      usedCount: 0,
+      scanCount: 0,
+      isActive: codeForm.isActive,
+      expiresAt: codeForm.expiresAt ? new Date(codeForm.expiresAt).toISOString() : "",
+      createdAt: new Date().toISOString(),
+    };
+
+    const nextCodes = [...couponCodes, newCodeData];
+    updateCoupons(couponCampaigns, nextCodes);
+    setIsCodeModalOpen(false);
+  };
 
   // Product CRUD States
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -632,13 +751,6 @@ export default function AdminPage() {
     }
   };
 
-  const handleToggleProductInBundle = (pid: string) => {
-    const isSelected = bundleForm.productIds.includes(pid);
-    const updatedIds = isSelected
-      ? bundleForm.productIds.filter((id) => id !== pid)
-      : [...bundleForm.productIds, pid];
-    setBundleForm({ ...bundleForm, productIds: updatedIds });
-  };
 
   // Sync settingsForm state when siteSettings loads
   useEffect(() => {
@@ -804,7 +916,7 @@ export default function AdminPage() {
           const filePath = `${Date.now()}-${cleanName}.${fileExtension}`;
 
           // Upload to Supabase Storage
-          const { data, error: uploadError } = await supabase.storage
+          const { error: uploadError } = await supabase.storage
             .from("products")
             .upload(filePath, compressedBlob, {
               contentType: `image/${fileExtension === 'png' ? 'png' : 'jpeg'}`,
@@ -856,7 +968,7 @@ export default function AdminPage() {
           const cleanName = color.file.name.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 20);
           const filePath = `color-${Date.now()}-${cleanName}.${fileExtension}`;
 
-          const { data, error: uploadError } = await supabase.storage
+          const { error: uploadError } = await supabase.storage
             .from("products")
             .upload(filePath, compressedBlob, {
               contentType: `image/${fileExtension === 'png' ? 'png' : 'jpeg'}`,
@@ -1179,6 +1291,17 @@ export default function AdminPage() {
           >
             <ShoppingBag className="w-4.5 h-4.5" />
             <span>حزم التوفير ({productBundles.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("coupons")}
+            className={`w-full flex items-center gap-3 p-3.5 rounded-xl text-sm font-bold transition-all text-right cursor-pointer ${activeTab === "coupons"
+              ? "bg-[#1a1a1a] text-white shadow-md"
+              : "hover:bg-slate-50 text-slate-600"
+              }`}
+          >
+            <TicketPercent className="w-4.5 h-4.5" />
+            <span>كوبونات وحملات الخصم ({couponCampaigns.length})</span>
           </button>
         </aside>
 
@@ -2629,6 +2752,307 @@ export default function AdminPage() {
             </div>
           )}
 
+          {/* TAB 8: COUPONS & MARKETING CAMPAIGNS */}
+          {activeTab === "coupons" && (
+            <div className="space-y-6 text-right" dir="rtl">
+              
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-4">
+                <div>
+                  <h2 className="text-xl font-extrabold text-[#1a1a1a]">حملات التسويق والكوبونات</h2>
+                  <p className="text-xs text-slate-400">تتبع الزيارات من بطاقات الـ QR وحملات فيسبوك/تيك توك، وإنشاء خصومات مخصصة للمتجر أو الصيانة</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingCampaignId(null);
+                    setCampaignForm({
+                      name: "",
+                      description: "",
+                      source: "qr",
+                      medium: "print",
+                      campaign: "promo_2026",
+                      isActive: true,
+                      startsAt: "",
+                      endsAt: "",
+                      landingTitle: "مبروك! حصلت على هدية خاصة",
+                      landingSubtitle: "عرض خاص وموثق لزبائن مركز الروان المميزين.",
+                      qrNote: "امسح الرمز للحصول على العرض الفوري",
+                    });
+                    setIsCampaignModalOpen(true);
+                  }}
+                  className="bg-[#1a1a1a] hover:bg-slate-800 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  إنشاء حملة تسويقية جديدة
+                </button>
+              </div>
+
+              {/* Top Stats Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl">
+                  <span className="block text-[10px] font-bold text-slate-400">إجمالي الحملات</span>
+                  <strong className="text-xl font-mono font-black text-slate-800">{couponCampaigns.length}</strong>
+                </div>
+                <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl">
+                  <span className="block text-[10px] font-bold text-slate-400">رموز الخصم الفعالة</span>
+                  <strong className="text-xl font-mono font-black text-slate-800">
+                    {couponCodes.filter(c => c.isActive).length}
+                  </strong>
+                </div>
+                <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl">
+                  <span className="block text-[10px] font-bold text-slate-400">إجمالي مسحات QR</span>
+                  <strong className="text-xl font-mono font-black text-slate-800">
+                    {couponCodes.reduce((acc, c) => acc + (c.scanCount || 0), 0)}
+                  </strong>
+                </div>
+                <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl">
+                  <span className="block text-[10px] font-bold text-slate-400">مرات الاستخدام الناجحة</span>
+                  <strong className="text-xl font-mono font-black text-slate-800">
+                    {couponCodes.reduce((acc, c) => acc + (c.usedCount || 0), 0)}
+                  </strong>
+                </div>
+              </div>
+
+              {/* Content Split */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                
+                {/* Campaigns List Column */}
+                <div className="lg:col-span-5 space-y-4">
+                  <h3 className="font-extrabold text-sm text-slate-850">قائمة الحملات التسويقية</h3>
+                  
+                  {couponCampaigns.length === 0 ? (
+                    <div className="p-8 border border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-450">
+                      لا توجد حملات تسويقية مضافة حالياً.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {couponCampaigns.map((cam) => {
+                        const isSelected = selectedCampaignId === cam.id;
+                        const camCodes = couponCodes.filter(c => c.campaignId === cam.id);
+                        return (
+                          <div
+                            key={cam.id}
+                            onClick={() => setSelectedCampaignId(cam.id)}
+                            className={`p-4 rounded-xl border transition-all cursor-pointer text-right space-y-2 relative group ${
+                              isSelected
+                                ? "bg-slate-900 border-slate-900 text-white shadow-md"
+                                : "bg-white border-slate-200 hover:border-slate-350"
+                            }`}
+                          >
+                            <div className="flex justify-between items-start">
+                              <h4 className="font-black text-xs sm:text-sm">{cam.name}</h4>
+                              <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                                cam.isActive
+                                  ? isSelected ? "bg-emerald-500/20 text-emerald-300" : "bg-emerald-50 text-emerald-600"
+                                  : isSelected ? "bg-white/10 text-white/50" : "bg-slate-150 text-slate-400"
+                              }`}>
+                                {cam.isActive ? "نشط" : "متوقف"}
+                              </span>
+                            </div>
+                            <p className={`text-[11px] leading-relaxed line-clamp-2 ${
+                              isSelected ? "text-slate-300" : "text-slate-500"
+                            }`}>
+                              {cam.description || "لا يوجد وصف للحملة."}
+                            </p>
+                            <div className="flex justify-between items-center text-[10px] border-t pt-2 mt-2 border-slate-150/10">
+                              <span className={isSelected ? "text-slate-400" : "text-slate-500"}>
+                                الرموز: {camCodes.length} | مسحات: {camCodes.reduce((acc, c) => acc + (c.scanCount || 0), 0)}
+                              </span>
+                              
+                              {/* Edit / Delete Buttons */}
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingCampaignId(cam.id);
+                                    setCampaignForm({
+                                      name: cam.name,
+                                      description: cam.description,
+                                      source: cam.source,
+                                      medium: cam.medium,
+                                      campaign: cam.campaign,
+                                      isActive: cam.isActive,
+                                      startsAt: cam.startsAt ? new Date(cam.startsAt).toISOString().slice(0, 16) : "",
+                                      endsAt: cam.endsAt ? new Date(cam.endsAt).toISOString().slice(0, 16) : "",
+                                      landingTitle: cam.landingTitle,
+                                      landingSubtitle: cam.landingSubtitle,
+                                      qrNote: cam.qrNote,
+                                    });
+                                    setIsCampaignModalOpen(true);
+                                  }}
+                                  className={`p-1 rounded hover:bg-white/10 ${
+                                    isSelected ? "text-white" : "text-slate-500"
+                                  }`}
+                                  title="تعديل الحملة"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (confirm(`هل أنت متأكد من حذف الحملة "${cam.name}"؟ سيتم حذف جميع الأكواد المرتبطة بها.`)) {
+                                      const nextCampaigns = couponCampaigns.filter(c => c.id !== cam.id);
+                                      const nextCodes = couponCodes.filter(c => c.campaignId !== cam.id);
+                                      updateCoupons(nextCampaigns, nextCodes);
+                                      if (selectedCampaignId === cam.id) {
+                                        setSelectedCampaignId(null);
+                                      }
+                                    }
+                                  }}
+                                  className={`p-1 rounded hover:bg-rose-500/10 ${
+                                    isSelected ? "text-rose-300" : "text-rose-500"
+                                  }`}
+                                  title="حذف الحملة"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Codes List Column */}
+                <div className="lg:col-span-7 space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-extrabold text-sm text-slate-850">
+                      {selectedCampaignId 
+                        ? `رموز الخصم للحملة: ${couponCampaigns.find(c => c.id === selectedCampaignId)?.name}` 
+                        : "اختر حملة تسويقية لعرض وإدارة الأكواد"}
+                    </h3>
+                    {selectedCampaignId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCodeForm({
+                            code: generateRandomCode(),
+                            discountType: "fixed",
+                            discountValue: 5000,
+                            appliesTo: "both",
+                            minOrderAmount: 0,
+                            maxUses: 1,
+                            isActive: true,
+                            expiresAt: "",
+                          });
+                          setIsCodeModalOpen(true);
+                        }}
+                        className="bg-accent hover:bg-accent-hover text-white text-[11px] font-bold px-3.5 py-2 rounded-xl transition-all shadow-sm flex items-center gap-1 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        إضافة رمز خصم جديد
+                      </button>
+                    )}
+                  </div>
+
+                  {!selectedCampaignId ? (
+                    <div className="p-16 border border-dashed border-slate-200 bg-slate-50/50 rounded-2xl text-center text-xs text-slate-400">
+                      يرجى تحديد إحدى الحملات من القائمة اليمنى لعرض أكواد الخصم التابعة لها.
+                    </div>
+                  ) : (
+                    (() => {
+                      const selectedCamCodes = couponCodes.filter(c => c.campaignId === selectedCampaignId);
+                      const selectedCam = couponCampaigns.find(c => c.id === selectedCampaignId)!;
+                      return (
+                        <div className="space-y-4">
+                          
+                          {/* QR / UTM Info Quick Card */}
+                          <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl text-xs space-y-2 leading-relaxed">
+                            <div className="font-bold text-slate-700">تتبع UTM لروابط الحملة:</div>
+                            <div className="font-mono text-slate-500 bg-white border px-3 py-1.5 rounded-lg select-all text-left truncate" dir="ltr">
+                              {`${window.location.origin}/promo/` + `{الرمز}?utm_source=${selectedCam.source}&utm_medium=${selectedCam.medium}&utm_campaign=${selectedCam.campaign}`}
+                            </div>
+                            <div className="text-[10px] text-slate-400">
+                              عند طباعة الكروت أو نشر الإعلانات، استخدم رابط صفحة الهبوط هذا. مسح الـ QR سيفتح صفحة هدية مميزة ويملأ الكوبون تلقائياً بالسلة وبالصيانة.
+                            </div>
+                          </div>
+
+                          {selectedCamCodes.length === 0 ? (
+                            <div className="p-12 border border-dashed border-slate-200 bg-white rounded-2xl text-center text-xs text-slate-400">
+                              لا توجد رموز خصم مضافة لهذه الحملة بعد. اضغط على الزر أعلاه لإضافة كود.
+                            </div>
+                          ) : (
+                            <div className="overflow-x-auto border border-card-border rounded-xl">
+                              <table className="w-full text-xs text-right">
+                                <thead className="bg-slate-50 text-slate-500 font-bold border-b border-card-border">
+                                  <tr>
+                                    <th className="p-3">الرمز</th>
+                                    <th className="p-3">الخصم</th>
+                                    <th className="p-3">يطبق على</th>
+                                    <th className="p-3">الاستخدام / المسح</th>
+                                    <th className="p-3">حالة الكود</th>
+                                    <th className="p-3 text-left">إجراءات</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 bg-white">
+                                  {selectedCamCodes.map((c) => (
+                                    <tr key={c.id} className="hover:bg-slate-50/50">
+                                      <td className="p-3 font-mono font-black text-slate-900 tracking-wider">
+                                        {c.code}
+                                      </td>
+                                      <td className="p-3 font-bold text-slate-700">
+                                        {c.discountType === "percent" ? `${c.discountValue}%` : `${c.discountValue.toLocaleString()} د.ع`}
+                                      </td>
+                                      <td className="p-3 text-slate-500">
+                                        {c.appliesTo === "store" ? "المتجر" : c.appliesTo === "repair" ? "الصيانة" : "الاثنين"}
+                                      </td>
+                                      <td className="p-3 text-slate-650 font-mono">
+                                        استخدام: {c.usedCount || 0} / {c.maxUses > 0 ? c.maxUses : "∞"} | مسح: {c.scanCount || 0}
+                                      </td>
+                                      <td className="p-3">
+                                        <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                                          c.isActive ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : "bg-rose-50 text-rose-600 border border-rose-100"
+                                        }`}>
+                                          {c.isActive ? "فعال" : "متوقف"}
+                                        </span>
+                                      </td>
+                                      <td className="p-3 text-left flex justify-end gap-2 items-center">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const fullPromoLink = `${window.location.origin}/promo/${c.code}?utm_source=${selectedCam.source}&utm_medium=${selectedCam.medium}&utm_campaign=${selectedCam.campaign}`;
+                                            navigator.clipboard.writeText(fullPromoLink);
+                                            alert(`تم نسخ رابط تفعيل الكوبون للرمز ${c.code} بنجاح! يمكن استخدامه لإنشاء كود الـ QR.`);
+                                          }}
+                                          className="p-1.5 text-slate-500 hover:text-sky-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                                          title="نسخ الرابط لتوليد QR"
+                                        >
+                                          <Copy className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            if (confirm(`هل أنت متأكد من حذف الرمز "${c.code}"؟`)) {
+                                              const nextCodes = couponCodes.filter(item => item.id !== c.id);
+                                              updateCoupons(couponCampaigns, nextCodes);
+                                            }
+                                          }}
+                                          className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                          title="حذف الرمز"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
         </section>
 
       </main>
@@ -3356,36 +3780,36 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* --- ADD/EDIT BUNDLE MODAL (CMS MANAGER) --- */}
-      {isBundleModalOpen && (
+      {/* --- ADD/EDIT CAMPAIGN MODAL (CMS) --- */}
+      {isCampaignModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setIsBundleModalOpen(false)} />
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setIsCampaignModalOpen(false)} />
 
           <div className="relative z-50 w-full max-w-md bg-white rounded-2xl border border-card-border p-6 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden gap-4" dir="rtl">
 
             <div className="flex justify-between items-center border-b border-slate-100 pb-3 flex-shrink-0">
               <h3 className="font-extrabold text-base text-slate-800">
-                {editingBundleId ? "تعديل بيانات الحزمة الترويجية" : "إنشاء حزمة توفير جديدة"}
+                {editingCampaignId ? "تعديل تفاصيل الحملة التسويقية" : "إنشاء حملة تسويقية جديدة"}
               </h3>
               <button
                 type="button"
-                onClick={() => setIsBundleModalOpen(false)}
+                onClick={() => setIsCampaignModalOpen(false)}
                 className="p-1 rounded-full hover:bg-slate-100 text-slate-400 cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleSaveBundle} className="space-y-4 text-right overflow-y-auto flex-1 pl-1 pr-1 py-1">
-
-              {/* Bundle Title */}
+            <form onSubmit={handleSaveCampaign} className="space-y-4 text-right overflow-y-auto flex-1 pl-1 pr-1 py-1 animate-fade-in">
+              
+              {/* Name */}
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700">اسم الحزمة الترويجية *</label>
+                <label className="text-xs font-semibold text-slate-700">اسم الحملة *</label>
                 <input
                   type="text"
-                  value={bundleForm.title}
-                  onChange={(e) => setBundleForm({ ...bundleForm, title: e.target.value })}
-                  placeholder="مثال: حزمة الحماية الشاملة"
+                  value={campaignForm.name}
+                  onChange={(e) => setCampaignForm({ ...campaignForm, name: e.target.value })}
+                  placeholder="مثال: حملة افتتاح المتجر"
                   className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:border-accent"
                   required
                 />
@@ -3393,79 +3817,280 @@ export default function AdminPage() {
 
               {/* Description */}
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700">وصف الحزمة ومميزاتها *</label>
+                <label className="text-xs font-semibold text-slate-700">الوصف التسويقي للحملة</label>
                 <textarea
-                  value={bundleForm.description}
-                  onChange={(e) => setBundleForm({ ...bundleForm, description: e.target.value })}
-                  placeholder="اكتب تفاصيل المنتجات المشمولة وقيمة التوفير للزبائن..."
-                  rows={3}
+                  value={campaignForm.description}
+                  onChange={(e) => setCampaignForm({ ...campaignForm, description: e.target.value })}
+                  placeholder="وصف تفصيلي للحملة وأماكن توزيع الكروت..."
+                  rows={2}
                   className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:border-accent resize-none"
-                  required
                 />
               </div>
 
-              {/* Background gradient selection */}
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700">نمط خلفية كارت الحزمة التدرجي *</label>
-                <select
-                  value={bundleForm.bgStyle}
-                  onChange={(e) => setBundleForm({ ...bundleForm, bgStyle: e.target.value })}
-                  className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:border-accent cursor-pointer"
-                >
-                  <option value="from-[#312E81] via-[#1E1B4B] to-[#090533]">بنفسجي نيلي ليلي (Dark)</option>
-                  <option value="from-[#1E293B] via-[#0F172A] to-[#020617]">تيتانيوم داكن (Dark)</option>
-                  <option value="from-blue-600 via-indigo-600 to-sky-500">سماوي حديث متوهج (Cyber)</option>
-                  <option value="from-emerald-600 via-teal-600 to-cyan-500">زمردي تكنو فخم (Cyber)</option>
-                  <option value="from-rose-500 via-pink-600 to-red-500">ناري فاقع رائع (Cyber)</option>
-                </select>
-              </div>
-
-              {/* Price */}
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700">سعر الحزمة الإجمالي المخفض (د.ع) *</label>
-                <input
-                  type="number"
-                  value={bundleForm.price || ""}
-                  onChange={(e) => setBundleForm({ ...bundleForm, price: parseInt(e.target.value) || 0 })}
-                  placeholder="سعر البيع للحزمة الإجمالية..."
-                  className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:border-accent font-mono"
-                  required
-                />
-              </div>
-
-              {/* Products Checklist (Select Multi-products) */}
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-slate-700 block">اختر المنتجات المشمولة في الحزمة (اختر 2 أو أكثر) *</label>
-                <div className="border border-slate-200 rounded-xl p-3 bg-slate-50 space-y-2 max-h-48 overflow-y-auto">
-                  {products.map((p) => {
-                    const isChecked = bundleForm.productIds.includes(p.id);
-                    return (
-                      <div
-                        key={p.id}
-                        onClick={() => handleToggleProductInBundle(p.id)}
-                        className="flex items-center gap-2.5 p-1.5 rounded-lg hover:bg-slate-200/50 cursor-pointer select-none"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => { }}
-                          className="w-4 h-4 text-accent border-slate-350 rounded focus:ring-accent cursor-pointer"
-                        />
-                        <div className="flex-1 text-right">
-                          <span className="block text-xs font-bold text-slate-800">{p.name}</span>
-                          <span className="block text-[10px] text-slate-400 font-mono">{p.price.toLocaleString()} د.ع | {p.category}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
+              {/* UTM Parameters Grid */}
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-3">
+                <div className="font-bold text-[11px] text-slate-700">معلمات التتبع UTM (لربط التحليلات):</div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-500 block">المصدر (Source) *</label>
+                    <input
+                      type="text"
+                      value={campaignForm.source}
+                      onChange={(e) => setCampaignForm({ ...campaignForm, source: e.target.value })}
+                      placeholder="qr, facebook"
+                      className="w-full text-[10px] font-mono text-left border border-slate-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-500 block">الوسيط (Medium) *</label>
+                    <input
+                      type="text"
+                      value={campaignForm.medium}
+                      onChange={(e) => setCampaignForm({ ...campaignForm, medium: e.target.value })}
+                      placeholder="print, social"
+                      className="w-full text-[10px] font-mono text-left border border-slate-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-500 block">الحملة (Campaign) *</label>
+                    <input
+                      type="text"
+                      value={campaignForm.campaign}
+                      onChange={(e) => setCampaignForm({ ...campaignForm, campaign: e.target.value })}
+                      placeholder="promo_22"
+                      className="w-full text-[10px] font-mono text-left border border-slate-200 rounded-lg px-2 py-1.5 bg-white focus:outline-none"
+                      required
+                    />
+                  </div>
                 </div>
               </div>
+
+              {/* Landing Page Custom Text */}
+              <div className="bg-sky-50/50 p-3 rounded-xl border border-sky-100 space-y-3">
+                <div className="font-bold text-[11px] text-sky-800">نصوص صفحة الهبوط الترويجية للـ QR:</div>
+                <div className="space-y-2">
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-500 block">عنوان الصفحة الرئيسي *</label>
+                    <input
+                      type="text"
+                      value={campaignForm.landingTitle}
+                      onChange={(e) => setCampaignForm({ ...campaignForm, landingTitle: e.target.value })}
+                      placeholder="مبروك! حصلت على هدية خاصة"
+                      className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-500 block">عنوان الصفحة الفرعي *</label>
+                    <input
+                      type="text"
+                      value={campaignForm.landingSubtitle}
+                      onChange={(e) => setCampaignForm({ ...campaignForm, landingSubtitle: e.target.value })}
+                      placeholder="اضغط على الزر لتفعيل الخصم في حسابك..."
+                      className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Dates */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700">تاريخ البدء</label>
+                  <input
+                    type="datetime-local"
+                    value={campaignForm.startsAt}
+                    onChange={(e) => setCampaignForm({ ...campaignForm, startsAt: e.target.value })}
+                    className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none font-mono text-left"
+                    dir="ltr"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700">تاريخ الانتهاء</label>
+                  <input
+                    type="datetime-local"
+                    value={campaignForm.endsAt}
+                    onChange={(e) => setCampaignForm({ ...campaignForm, endsAt: e.target.value })}
+                    className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none font-mono text-left"
+                    dir="ltr"
+                  />
+                </div>
+              </div>
+
+              {/* Active Toggle */}
+              <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700 select-none">
+                <input
+                  type="checkbox"
+                  checked={campaignForm.isActive}
+                  onChange={(e) => setCampaignForm({ ...campaignForm, isActive: e.target.checked })}
+                  className="h-4 w-4 cursor-pointer rounded border-slate-350 text-accent focus:ring-accent"
+                />
+                تفعيل الحملة وتنشيط صفحاتها الترويجية فوراً
+              </label>
 
               {/* Action Buttons */}
               <div className="flex gap-3 pt-3 border-t border-slate-100 flex-shrink-0">
                 <button
                   type="button"
-                  onClick={() => setIsBundleModalOpen(false)}
+                  onClick={() => setIsCampaignModalOpen(false)}
+                  className="flex-1 border border-slate-200 text-slate-600 font-bold py-2 rounded-xl text-xs cursor-pointer text-center"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-[#1a1a1a] hover:bg-slate-855 text-white font-bold py-2 rounded-xl text-xs shadow-md cursor-pointer text-center"
+                >
+                  حفظ الحملة
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- ADD COUPON CODE MODAL (SINGLE GENERATOR) --- */}
+      {isCodeModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setIsCodeModalOpen(false)} />
+
+          <div className="relative z-50 w-full max-w-md bg-white rounded-2xl border border-card-border p-6 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden gap-4" dir="rtl">
+
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3 flex-shrink-0">
+              <h3 className="font-extrabold text-base text-slate-800">
+                إضافة رمز خصم جديد للحملة
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsCodeModalOpen(false)}
+                className="p-1 rounded-full hover:bg-slate-100 text-slate-400 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveCode} className="space-y-4 text-right overflow-y-auto flex-1 pl-1 pr-1 py-1 animate-fade-in">
+              
+              {/* Code */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700 flex justify-between items-center">
+                  <span>رمز الخصم (الكوبون) *</span>
+                  <button
+                    type="button"
+                    onClick={() => setCodeForm({ ...codeForm, code: generateRandomCode() })}
+                    className="text-[10px] text-accent hover:underline font-bold"
+                  >
+                    توليد رمز عشوائي
+                  </button>
+                </label>
+                <input
+                  type="text"
+                  value={codeForm.code}
+                  onChange={(e) => setCodeForm({ ...codeForm, code: e.target.value.toUpperCase() })}
+                  placeholder="مثال: RWAN-A7K2"
+                  className="w-full text-xs font-mono text-left border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:border-accent tracking-widest uppercase font-black"
+                  dir="ltr"
+                  required
+                />
+              </div>
+
+              {/* Discount Type and Value */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700">نوع الخصم *</label>
+                  <select
+                    value={codeForm.discountType}
+                    onChange={(e) => setCodeForm({ ...codeForm, discountType: e.target.value as "fixed" | "percent" })}
+                    className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none cursor-pointer"
+                  >
+                    <option value="fixed">خصم ثابت (د.ع)</option>
+                    <option value="percent">نسبة مئوية (%)</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700">قيمة الخصم *</label>
+                  <input
+                    type="number"
+                    value={codeForm.discountValue || ""}
+                    onChange={(e) => setCodeForm({ ...codeForm, discountValue: parseInt(e.target.value) || 0 })}
+                    placeholder="5000 أو 10"
+                    className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none font-mono"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Applies To */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700">مكان تطبيق الكوبون *</label>
+                <select
+                  value={codeForm.appliesTo}
+                  onChange={(e) => setCodeForm({ ...codeForm, appliesTo: e.target.value as "store" | "repair" | "both" })}
+                  className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none cursor-pointer"
+                >
+                  <option value="both">المتجر وخدمات الصيانة معاً (Both)</option>
+                  <option value="store">شراء المنتجات فقط (Store)</option>
+                  <option value="repair">حجز الصيانة فقط (Repair)</option>
+                </select>
+              </div>
+
+              {/* Limits */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700">الحد الأدنى للطلب (د.ع)</label>
+                  <input
+                    type="number"
+                    value={codeForm.minOrderAmount || ""}
+                    onChange={(e) => setCodeForm({ ...codeForm, minOrderAmount: parseInt(e.target.value) || 0 })}
+                    placeholder="0 لعدم وجود حد أدنى"
+                    className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none font-mono"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700">الحد الأقصى للاستخدام</label>
+                  <input
+                    type="number"
+                    value={codeForm.maxUses || ""}
+                    onChange={(e) => setCodeForm({ ...codeForm, maxUses: parseInt(e.target.value) || 0 })}
+                    placeholder="1 للاستخدام لمرة واحدة"
+                    className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none font-mono"
+                  />
+                  <span className="text-[10px] text-slate-400 block mt-0.5">الكوبون معد افتراضياً للاستخدام لمرة واحدة فقط.</span>
+                </div>
+              </div>
+
+              {/* Expiry Date */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700">تاريخ انتهاء صلاحية الكود</label>
+                <input
+                  type="datetime-local"
+                  value={codeForm.expiresAt}
+                  onChange={(e) => setCodeForm({ ...codeForm, expiresAt: e.target.value })}
+                  className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none font-mono text-left"
+                  dir="ltr"
+                />
+              </div>
+
+              {/* Active Toggle */}
+              <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700 select-none">
+                <input
+                  type="checkbox"
+                  checked={codeForm.isActive}
+                  onChange={(e) => setCodeForm({ ...codeForm, isActive: e.target.checked })}
+                  className="h-4 w-4 cursor-pointer rounded border-slate-350 text-accent focus:ring-accent"
+                />
+                تنشيط الرمز فوراً للاستخدام
+              </label>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-3 border-t border-slate-100 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsCodeModalOpen(false)}
                   className="flex-1 border border-slate-200 text-slate-600 font-bold py-2 rounded-xl text-xs cursor-pointer text-center"
                 >
                   إلغاء
@@ -3474,7 +4099,7 @@ export default function AdminPage() {
                   type="submit"
                   className="flex-1 bg-[#1a1a1a] hover:bg-slate-850 text-white font-bold py-2 rounded-xl text-xs shadow-md cursor-pointer text-center"
                 >
-                  حفظ الحزمة الترويجية
+                  حفظ الرمز
                 </button>
               </div>
 

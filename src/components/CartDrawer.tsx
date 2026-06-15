@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useEffect } from "react";
-import { X, Trash2, Plus, Minus, ShoppingBag } from "lucide-react";
-import { Product, CartItem } from "@/context/AppContext";
+import React, { useEffect, useState } from "react";
+import { X, Trash2, Plus, Minus, ShoppingBag, TicketPercent, CheckCircle2, AlertCircle } from "lucide-react";
+import { CartItem, AppliedCoupon, CouponValidationResult } from "@/context/AppContext";
 import ProductMockup from "@/components/ProductMockup";
 
 interface CartDrawerProps {
@@ -13,6 +13,10 @@ interface CartDrawerProps {
   onRemoveItem: (productId: string, selectedColorName?: string | null, selectedPort?: string | null) => void;
   onCheckout: () => void;
   shippingFee?: string;
+  appliedCoupon?: AppliedCoupon | null;
+  couponDiscount?: number;
+  onApplyCoupon?: (code: string) => CouponValidationResult;
+  onClearCoupon?: () => void;
 }
 
 export default function CartDrawer({
@@ -23,7 +27,14 @@ export default function CartDrawer({
   onRemoveItem,
   onCheckout,
   shippingFee = "مجاني",
+  appliedCoupon = null,
+  couponDiscount = 0,
+  onApplyCoupon,
+  onClearCoupon,
 }: CartDrawerProps) {
+  const [couponInput, setCouponInput] = useState("");
+  const [couponMessage, setCouponMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
   // Prevent background scrolling when drawer is open
   useEffect(() => {
     if (isOpen) {
@@ -42,7 +53,21 @@ export default function CartDrawer({
   );
 
   const numericShipping = parseInt(shippingFee.replace(/[^0-9]/g, "")) || 0;
-  const finalTotal = totalPrice + numericShipping;
+  const finalTotal = Math.max(0, totalPrice - couponDiscount) + numericShipping;
+
+  const handleApplyCoupon = () => {
+    if (!onApplyCoupon) return;
+
+    const result = onApplyCoupon(couponInput);
+    setCouponMessage({
+      type: result.isValid ? "success" : "error",
+      text: result.message,
+    });
+
+    if (result.isValid) {
+      setCouponInput("");
+    }
+  };
 
   return (
     <>
@@ -192,6 +217,67 @@ export default function CartDrawer({
                   {numericShipping > 0 ? `${numericShipping.toLocaleString()} د.ع` : shippingFee}
                 </span>
               </div>
+              <div className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-black text-slate-800">
+                    <TicketPercent className="h-4 w-4 text-accent" />
+                    رمز الخصم
+                  </span>
+                  {appliedCoupon && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClearCoupon?.();
+                        setCouponMessage(null);
+                      }}
+                      className="text-[10px] font-black text-rose-500 hover:text-rose-600 cursor-pointer"
+                    >
+                      إزالة
+                    </button>
+                  )}
+                </div>
+
+                {appliedCoupon ? (
+                  <div className="flex items-center justify-between rounded-xl bg-emerald-50 border border-emerald-100 px-3 py-2 text-xs">
+                    <span className="font-black text-emerald-700">{appliedCoupon.code}</span>
+                    <span className="font-bold text-emerald-700">-{couponDiscount.toLocaleString()} د.ع</span>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={couponInput}
+                      onChange={(e) => {
+                        setCouponInput(e.target.value.toUpperCase());
+                        setCouponMessage(null);
+                      }}
+                      placeholder="RWAN10"
+                      className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black uppercase tracking-wide text-left outline-none focus:border-accent focus:bg-white"
+                      dir="ltr"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleApplyCoupon}
+                      className="rounded-xl bg-slate-950 px-3 py-2 text-xs font-black text-white hover:bg-slate-800 cursor-pointer"
+                    >
+                      تطبيق
+                    </button>
+                  </div>
+                )}
+
+                {couponMessage && (
+                  <div className={`flex items-center gap-1.5 text-[10px] font-bold ${couponMessage.type === "success" ? "text-emerald-600" : "text-rose-600"}`}>
+                    {couponMessage.type === "success" ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertCircle className="h-3.5 w-3.5" />}
+                    <span>{couponMessage.text}</span>
+                  </div>
+                )}
+              </div>
+              {couponDiscount > 0 && (
+                <div className="flex justify-between text-xs text-emerald-600 font-bold">
+                  <span>خصم الكوبون</span>
+                  <span>-{couponDiscount.toLocaleString()} د.ع</span>
+                </div>
+              )}
               <div className="border-t border-dashed border-slate-200 my-2 pt-2 flex justify-between text-base font-bold">
                 <span>المجموع الإجمالي</span>
                 <span className="text-[#1a1a1a]">{finalTotal.toLocaleString()} د.ع</span>

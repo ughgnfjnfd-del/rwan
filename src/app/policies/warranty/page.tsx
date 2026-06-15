@@ -1,5 +1,5 @@
 import React from "react";
-import { ShieldCheck, CheckCircle2, AlertTriangle, HelpCircle } from "lucide-react";
+import { ShieldCheck, AlertTriangle, HelpCircle } from "lucide-react";
 
 export default function WarrantyPolicyPage() {
   return (

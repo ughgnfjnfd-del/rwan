@@ -14,12 +14,9 @@ import {
   ChevronRight,
   Shield,
   Star,
-  Phone,
-  Mail,
   Globe,
   MapPin,
   Clock,
-  ThumbsUp,
   Lock,
   Zap,
   Cable,
@@ -38,7 +35,7 @@ import CheckoutModal from "@/components/CheckoutModal";
 import WishlistDrawer from "@/components/WishlistDrawer";
 import PromoCarousel from "@/components/PromoCarousel";
 import Link from "next/link";
-import { useApp, Product, CartItem } from "@/context/AppContext";
+import { useApp, Product } from "@/context/AppContext";
 import { matchProduct } from "@/lib/search";
 
 import ProductMockup from "@/components/ProductMockup";
@@ -170,11 +167,6 @@ function ProductDetailModal({ product, isOpen, onClose, onAddToCart, allProducts
         ]
   );
 
-  // Simulated Customer Reviews
-  const reviews = [
-    { name: "حيدر الجبوري", rating: 5, comment: "ممتاز جداً وأصلي 100%، الشحن كان سريع وتغليف رائع.", date: "منذ يومين" },
-    { name: "فاطمة الموسوي", rating: 4.8, comment: "الجودة عالية جداً ويستحق السعر، خدمة العملاء سريعة بالرد.", date: "منذ أسبوع" }
-  ];
 
   // Related products (same category, excluding current)
   const related = allProducts
@@ -482,7 +474,31 @@ export default function Home() {
     siteSettings,
     wishlist,
     toggleWishlist,
+    appliedCoupon,
+    applyCoupon,
+    clearAppliedCoupon,
+    couponCodes,
+    recordCouponUse,
   } = useApp();
+
+  // Calculate dynamic coupon discount based on cart items and applied coupon conditions
+  const couponDiscount = React.useMemo(() => {
+    if (!appliedCoupon) return 0;
+    const coupon = couponCodes.find(c => c.code.toUpperCase() === appliedCoupon.code.toUpperCase());
+    if (!coupon || !coupon.isActive) return 0;
+
+    // Check appliesTo (only store or both)
+    if (coupon.appliesTo === "repair") return 0; // doesn't apply to cart items
+
+    const subtotal = cartItems.reduce((acc, curr) => acc + (curr.product.discountPrice || curr.product.price) * curr.quantity, 0);
+
+    if (coupon.minOrderAmount > 0 && subtotal < coupon.minOrderAmount) return 0;
+
+    if (coupon.discountType === "percent") {
+      return Math.min(subtotal, Math.round(subtotal * (coupon.discountValue / 100)));
+    }
+    return Math.min(subtotal, coupon.discountValue);
+  }, [appliedCoupon, couponCodes, cartItems]);
 
   // States
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -527,6 +543,7 @@ export default function Home() {
 
   const handleCheckoutSubmit = async (customer: { name: string; phone: string; address: string }): Promise<boolean> => {
     const total = cartItems.reduce((acc, curr) => acc + (curr.product.discountPrice || curr.product.price) * curr.quantity, 0);
+    const finalTotal = Math.max(0, total - couponDiscount) + (parseInt(siteSettings.shippingFee.replace(/[^0-9]/g, "")) || 0);
 
     try {
       const res = await fetch("/api/telegram", {
@@ -540,12 +557,19 @@ export default function Home() {
             customer,
             items: cartItems,
             total: total,
+            couponCode: appliedCoupon ? appliedCoupon.code : undefined,
+            couponDiscount: couponDiscount,
+            finalTotal: finalTotal,
           },
         }),
       });
 
       if (!res.ok) {
         throw new Error("Failed to send notification");
+      }
+
+      if (appliedCoupon) {
+        await recordCouponUse(appliedCoupon.code, "store", total);
       }
 
       clearCart();
@@ -687,7 +711,6 @@ export default function Home() {
                     ) : (
                       <div className="max-h-[360px] overflow-y-auto divide-y divide-slate-100/60">
                         {filteredProducts.slice(0, 5).map((product) => {
-                          const currentPrice = product.discountPrice || product.price;
                           const discountPercent = getDiscountPercent(product);
                           return (
                             <div 
@@ -904,7 +927,6 @@ export default function Home() {
                 ) : (
                   <div className="max-h-[320px] overflow-y-auto divide-y divide-slate-100/60">
                     {filteredProducts.slice(0, 5).map((product) => {
-                      const currentPrice = product.discountPrice || product.price;
                       const discountPercent = getDiscountPercent(product);
                       return (
                         <div 
@@ -1401,75 +1423,134 @@ export default function Home() {
         <FlashSaleBanner />
 
         {/* 5. Authorized Repair Center section */}
-        <section id="repair" className="bg-[#1a1a1a] text-white rounded-3xl p-6 sm:p-10 lg:p-12 overflow-hidden relative border border-slate-800">
-          {/* Subtle background graphic design */}
-          <div className="absolute -left-12 -bottom-12 w-64 h-64 bg-accent/10 rounded-full blur-3xl pointer-events-none"></div>
+        <section id="repair" className="relative overflow-hidden rounded-[32px] border border-slate-200 bg-[#f5f5f7] text-slate-950 shadow-[0_30px_90px_rgba(15,23,42,0.08)]">
+          <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(241,245,249,0.82)_48%,rgba(226,232,240,0.7)),linear-gradient(90deg,rgba(56,189,248,0.12),transparent_32%,rgba(16,185,129,0.1)_100%)]" />
+          <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(120deg,transparent_0%,rgba(255,255,255,0.72)_46%,transparent_58%)]" />
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center relative z-10">
-
-            {/* Left Column: Wrench Icon / Decorative */}
-            <div className="lg:col-span-4 flex flex-col items-center justify-center order-2 lg:order-1 text-center bg-white/5 border border-white/10 rounded-2xl p-6 backdrop-blur-sm">
-              <div className="p-4 bg-accent/20 rounded-2xl text-accent mb-4 animate-pulse">
-                <Wrench className="w-10 h-10" />
+          <div className="relative z-10 grid grid-cols-1 gap-8 p-5 sm:p-8 lg:grid-cols-12 lg:gap-10 lg:p-12">
+            <div className="lg:col-span-7 text-right">
+              <div className="mb-5 flex flex-wrap items-center justify-start gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/80 px-3 py-1.5 text-[11px] font-black text-slate-700 shadow-sm backdrop-blur-md">
+                  <Sparkles className="h-3.5 w-3.5 text-accent" />
+                  تجربة صيانة بمعايير فاخرة
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-[11px] font-black text-emerald-700">
+                  <BadgeCheck className="h-3.5 w-3.5" />
+                  فحص أولي مجاني
+                </span>
               </div>
-              <h3 className="font-extrabold text-base mb-1">قطع غيار أصلية</h3>
-              <p className="text-xs text-slate-400 max-w-[240px]">
-                نستخدم قطع غيار معتمدة بالكامل لضمان تشغيل هاتفك بأعلى كفاءة وأداء.
-              </p>
 
-              <div className="flex gap-4 mt-6 w-full border-t border-white/5 pt-4 text-slate-300 text-xs">
-                <div className="flex-1 text-center">
-                  <div className="font-bold text-base text-accent">3 يوم</div>
-                  <span className="text-[10px] text-slate-400">فترة الضمان</span>
-                </div>
-                <div className="w-px bg-white/10"></div>
-                <div className="flex-1 text-center">
-                  <div className="font-bold text-base text-accent">30 دقيقة</div>
-                  <span className="text-[10px] text-slate-400">متوسط وقت الصيانة</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Right Column: Information & Call to Action */}
-            <div className="lg:col-span-8 text-right space-y-5 order-1 lg:order-2">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/5 text-slate-300 border border-white/10 font-bold text-xs rounded-full">
-                <ThumbsUp className="w-3.5 h-3.5 text-accent" />
-                المركز الأول في صيانة الهواتف الذكية بالمنطقة
-              </span>
-              <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight leading-tight">
-                مركز الصيانة المعتمد <br />
-                <span className="text-accent">صيانة فورية وضمان معتمد</span>
+              <h2 className="max-w-3xl text-3xl font-black leading-tight tracking-tight text-slate-950 sm:text-4xl lg:text-5xl">
+                صيانة تشعر معها أن جهازك عاد جديدًا.
               </h2>
-              <p className="text-xs sm:text-sm text-slate-400 leading-relaxed max-w-3xl">
-                نعلم مدى أهمية هاتفك الذكي في حياتك اليومية، لذلك قمنا بتجهيز مركز صيانة متكامل بأحدث أدوات التشخيص والفحص. نقوم باستبدال الشاشات، صيانة البطاريات، منفذ الشحن، وحل جميع مشاكل النظام فوراً مع ضمان معتمد وقطع غيار أصلية.
+              <p className="mt-4 max-w-3xl text-sm font-medium leading-7 text-slate-500 sm:text-base">
+                تجربة صيانة هادئة وواضحة من لحظة الفحص حتى التسليم: تشخيص دقيق، قطع أصلية، تحديث حالة الجهاز، وضمان حقيقي على القطع المستبدلة.
               </p>
 
-              <div className="flex flex-wrap gap-4 justify-start pt-2">
+              <div className="mt-7 grid gap-3 sm:grid-cols-3">
+                {[
+                  { icon: Eye, title: "تشخيص شفاف", desc: "نعرض سبب العطل قبل البدء" },
+                  { icon: Cable, title: "قطع أصلية", desc: "شاشات، بطاريات ومنافذ معتمدة" },
+                  { icon: ShieldCheck, title: "ضمان موثق", desc: "3 أيام على الصيانة والقطع" },
+                ].map((item) => (
+                  <div key={item.title} className="rounded-2xl border border-white bg-white/72 p-4 shadow-sm backdrop-blur-xl transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
+                    <div className="mb-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-slate-950 text-white shadow-sm">
+                      <item.icon className="h-4 w-4" />
+                    </div>
+                    <h3 className="text-sm font-black text-slate-950">{item.title}</h3>
+                    <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-500">{item.desc}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-7 grid gap-3 rounded-[24px] border border-white bg-white/68 p-3 shadow-sm backdrop-blur-xl sm:grid-cols-4">
+                {[
+                  { value: "01", label: "استلام الجهاز" },
+                  { value: "02", label: "فحص العطل" },
+                  { value: "03", label: "تأكيد الكلفة" },
+                  { value: "04", label: "تسليم بضمان" },
+                ].map((step) => (
+                  <div key={step.value} className="flex items-center gap-3 rounded-2xl bg-slate-50/80 p-3">
+                    <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-slate-950 font-mono text-[11px] font-black text-white">
+                      {step.value}
+                    </span>
+                    <span className="text-xs font-black text-slate-700">{step.label}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
                 <button
                   onClick={() => setIsRepairOpen(true)}
-                  className="bg-accent hover:bg-accent-hover text-white font-bold text-sm px-8 py-3.5 rounded-xl transition-all duration-200 shadow-md hover:scale-[1.01] cursor-pointer"
+                  className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-7 py-3.5 text-sm font-black text-white shadow-[0_16px_35px_rgba(15,23,42,0.18)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-slate-800 active:scale-[0.99] cursor-pointer"
                 >
-                  احجز موعد صيانة الآن
+                  <Wrench className="h-4 w-4" />
+                  <span>احجز صيانة الآن</span>
                 </button>
-                <a
-                  href={`tel:${siteSettings?.phone ? siteSettings.phone.replace(/\s+/g, '') : ''}`}
-                  className="border border-white/20 hover:bg-white/5 text-white font-bold text-sm px-6 py-3.5 rounded-xl transition-all duration-200 text-center flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <span>اتصال مباشر بالفني</span>
-                  <span dir="ltr">({siteSettings?.phone})</span>
-                </a>
+
                 <a
                   href={`https://wa.me/${siteSettings?.phone ? siteSettings.phone.replace(/[^\d+]/g, '') : ''}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="border border-emerald-500 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm px-6 py-3.5 rounded-xl transition-all duration-200 text-center flex items-center justify-center gap-2 shadow-md hover:scale-[1.01] cursor-pointer"
+                  className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-6 py-3.5 text-sm font-black text-slate-800 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-200 hover:text-emerald-700 active:scale-[0.99] cursor-pointer"
                 >
-                  <MessageCircle className="w-4 h-4" />
-                  <span>تواصل عبر واتساب</span>
+                  <MessageCircle className="h-4 w-4" />
+                  <span>استشارة عبر واتساب</span>
                 </a>
               </div>
             </div>
 
+            <div className="lg:col-span-5">
+              <div className="relative mx-auto flex min-h-[460px] max-w-[430px] items-center justify-center">
+                <div className="relative z-10 w-full rounded-[32px] border border-white bg-white/78 p-4 shadow-[0_28px_80px_rgba(15,23,42,0.14)] backdrop-blur-2xl">
+                  <div className="rounded-[26px] border border-slate-200 bg-slate-950 p-4 text-white shadow-inner">
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_0_5px_rgba(52,211,153,0.14)]" />
+                        <span className="text-[11px] font-black text-slate-300">Live Diagnostics</span>
+                      </div>
+                      <span className="rounded-full border border-white/10 px-2.5 py-1 font-mono text-[10px] font-black text-slate-400">RWAN OS</span>
+                    </div>
+
+                    <div className="relative mx-auto mb-5 flex h-[235px] w-[128px] items-center justify-center rounded-[32px] border-[7px] border-slate-800 bg-gradient-to-b from-slate-900 via-slate-950 to-black shadow-[0_30px_55px_rgba(0,0,0,0.42)]">
+                      <div className="absolute top-2 h-1.5 w-12 rounded-full bg-slate-800" />
+                      <Smartphone className="h-16 w-16 text-accent/80" strokeWidth={1.5} />
+                      <div className="absolute bottom-5 left-5 right-5 h-1.5 rounded-full bg-slate-800">
+                        <div className="h-full w-[76%] rounded-full bg-accent" />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { icon: Cpu, label: "المعالج", value: "مستقر" },
+                        { icon: Zap, label: "الشحن", value: "جاهز" },
+                        { icon: Lock, label: "البيانات", value: "محمي" },
+                        { icon: Clock, label: "الوقت", value: "30 دقيقة" },
+                      ].map((item) => (
+                        <div key={item.label} className="rounded-2xl border border-white/10 bg-white/[0.06] p-3">
+                          <item.icon className="mb-2 h-4 w-4 text-accent" />
+                          <span className="block text-[10px] font-bold text-slate-400">{item.label}</span>
+                          <span className="block text-xs font-black text-white">{item.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    {[
+                      { value: "3 يوم", label: "ضمان" },
+                      { value: "4 مراحل", label: "متابعة" },
+                      { value: "أصلي", label: "قطع" },
+                    ].map((stat) => (
+                      <div key={stat.label} className="rounded-2xl bg-slate-50 p-3 text-center">
+                        <span className="block text-sm font-black text-slate-950">{stat.value}</span>
+                        <span className="block text-[10px] font-bold text-slate-500">{stat.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -1534,31 +1615,7 @@ export default function Home() {
                 مركز الروان المعتمد لبيع وشراء الهواتف الذكية وحافضاتها الأنيقة والعصرية، والمركز المعتمد الأسرع في الصيانة بالمنطقة.
               </p>
               
-              <div className="space-y-2 text-xs text-slate-500 border-t border-slate-200/60 pt-3">
-                <div className="flex items-center gap-2 justify-start flex-row-reverse">
-                  <a href={`tel:${siteSettings?.phone ? siteSettings.phone.replace(/[^\d+]/g, '') : ''}`} className="font-mono font-bold text-slate-700 hover:text-accent transition-colors" dir="ltr">{siteSettings?.phone}</a>
-                  <span className="font-extrabold text-slate-900">:الهاتف</span>
-                  <Phone className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                </div>
-                <div className="flex items-center gap-2 justify-start flex-row-reverse">
-                  <a 
-                    href={`https://wa.me/${siteSettings?.phone ? siteSettings.phone.replace(/[^\d+]/g, '') : ''}`} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    className="font-mono font-bold text-slate-700 hover:text-emerald-600 transition-colors" 
-                    dir="ltr"
-                  >
-                    {siteSettings?.phone}
-                  </a>
-                  <span className="font-extrabold text-slate-900">:واتساب</span>
-                  <MessageCircle className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
-                </div>
-                <div className="flex items-center gap-2 justify-start flex-row-reverse">
-                  <a href={`mailto:${siteSettings?.email || ''}`} className="font-mono font-bold text-slate-700 hover:text-accent transition-colors" dir="ltr">{siteSettings?.email}</a>
-                  <span className="font-extrabold text-slate-900">:البريد</span>
-                  <Mail className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                </div>
-              </div>
+
             </div>
 
             {/* Column 2: Quick links */}
@@ -1655,6 +1712,13 @@ export default function Home() {
         onRemoveItem={handleRemoveItem}
         onCheckout={handleCheckout}
         shippingFee={siteSettings.shippingFee}
+        appliedCoupon={appliedCoupon}
+        couponDiscount={couponDiscount}
+        onApplyCoupon={(code) => {
+          const subtotal = cartItems.reduce((acc, curr) => acc + (curr.product.discountPrice || curr.product.price) * curr.quantity, 0);
+          return applyCoupon(code, "store", subtotal);
+        }}
+        onClearCoupon={clearAppliedCoupon}
       />
 
       {/* Wishlist Drawer */}
@@ -1679,6 +1743,8 @@ export default function Home() {
         cartItems={cartItems}
         onSubmit={handleCheckoutSubmit}
         shippingFee={siteSettings.shippingFee}
+        appliedCoupon={appliedCoupon}
+        couponDiscount={couponDiscount}
       />
 
       {/* Product Detail Modal */}

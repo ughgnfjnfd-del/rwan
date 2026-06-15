@@ -110,6 +110,58 @@ export interface Appointment {
   createdAt: string;
 }
 
+export type CouponAppliesTo = "store" | "repair" | "both";
+export type CouponDiscountType = "percent" | "fixed";
+
+export interface CouponCampaign {
+  id: string;
+  name: string;
+  description: string;
+  source: string;
+  medium: string;
+  campaign: string;
+  isActive: boolean;
+  startsAt: string;
+  endsAt: string;
+  landingTitle: string;
+  landingSubtitle: string;
+  qrNote: string;
+  createdAt: string;
+}
+
+export interface CouponCode {
+  id: string;
+  campaignId: string;
+  code: string;
+  discountType: CouponDiscountType;
+  discountValue: number;
+  appliesTo: CouponAppliesTo;
+  minOrderAmount: number;
+  maxUses: number;
+  usedCount: number;
+  scanCount: number;
+  isActive: boolean;
+  expiresAt: string;
+  createdAt: string;
+  lastUsedAt?: string;
+}
+
+export interface AppliedCoupon {
+  code: string;
+  discountAmount: number;
+  label: string;
+  appliesTo: CouponAppliesTo;
+  campaignId: string;
+}
+
+export interface CouponValidationResult {
+  isValid: boolean;
+  message: string;
+  coupon?: CouponCode;
+  discountAmount: number;
+  label: string;
+}
+
 export interface PromoBanner {
   isEnabled: boolean;
   badge: string;
@@ -211,6 +263,9 @@ interface AppContextType {
   productBundles: ProductBundle[];
   promoPopUp: PromoPopUp;
   premiumShowcase: PremiumShowcase;
+  couponCampaigns: CouponCampaign[];
+  couponCodes: CouponCode[];
+  appliedCoupon: AppliedCoupon | null;
   addProduct: (product: Omit<Product, "id">) => void;
   updateProduct: (id: string, product: Partial<Product>) => void;
   deleteProduct: (id: string) => void;
@@ -229,6 +284,12 @@ interface AppContextType {
   updateProductBundles: (bundles: ProductBundle[]) => Promise<void>;
   updatePromoPopUp: (popup: PromoPopUp) => Promise<void>;
   updatePremiumShowcase: (settings: PremiumShowcase) => Promise<void>;
+  updateCoupons: (campaigns: CouponCampaign[], codes: CouponCode[]) => Promise<void>;
+  applyCoupon: (code: string, appliesTo: CouponAppliesTo, subtotal?: number) => CouponValidationResult;
+  validateCoupon: (code: string, appliesTo: CouponAppliesTo, subtotal?: number) => CouponValidationResult;
+  clearAppliedCoupon: () => void;
+  recordCouponScan: (code: string) => Promise<void>;
+  recordCouponUse: (code: string, appliesTo: CouponAppliesTo, subtotal?: number) => Promise<void>;
   addBundleToCart: (productIds: string[]) => void;
   isInitialized: boolean;
 }
@@ -304,6 +365,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   });
   const [productBundles, setProductBundles] = useState<ProductBundle[]>([]);
   const [premiumShowcase, setPremiumShowcase] = useState<PremiumShowcase>(DEFAULT_PREMIUM_SHOWCASE);
+  const [couponCampaigns, setCouponCampaigns] = useState<CouponCampaign[]>([]);
+  const [couponCodes, setCouponCodes] = useState<CouponCode[]>([]);
+  const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
   const [promoPopUp, setPromoPopUp] = useState<PromoPopUp>({
     isEnabled: false,
     title: "مرحباً بك في مركز الروان!",
@@ -366,11 +430,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const bundlesObj = settingsData.find((s: any) => s.key === "product_bundles")?.value;
           const promoPopUpObj = settingsData.find((s: any) => s.key === "promo_popup")?.value;
           const premiumShowcaseObj = settingsData.find((s: { key: string; value: unknown }) => s.key === "premium_showcase")?.value as Partial<PremiumShowcase> | undefined;
+          const couponMarketingObj = settingsData.find((s: any) => s.key === "coupon_marketing")?.value;
 
           if (marqueeObj) setMarqueeSettings(marqueeObj);
           if (flashSaleObj) setFlashSale(flashSaleObj);
           if (Array.isArray(bundlesObj)) setProductBundles(bundlesObj);
           if (promoPopUpObj) setPromoPopUp(promoPopUpObj);
+          if (couponMarketingObj) {
+            if (Array.isArray(couponMarketingObj.campaigns)) setCouponCampaigns(couponMarketingObj.campaigns);
+            if (Array.isArray(couponMarketingObj.codes)) setCouponCodes(couponMarketingObj.codes);
+          }
           if (premiumShowcaseObj) {
             const premiumTheme = premiumShowcaseObj.theme;
             const theme: PremiumShowcase["theme"] = premiumTheme === "titanium" || premiumTheme === "aqua" || premiumTheme === "blush"
@@ -408,6 +477,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const storedWishlist = localStorage.getItem("mw_wishlist");
         if (storedWishlist) {
           setWishlist(JSON.parse(storedWishlist));
+        }
+
+        const storedCoupon = localStorage.getItem("mw_applied_coupon");
+        if (storedCoupon) {
+          setAppliedCoupon(JSON.parse(storedCoupon));
         }
       } catch (e) {
         console.error("Error fetching data from Supabase", e);
@@ -742,6 +816,253 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const persistCouponData = async (campaigns: CouponCampaign[], codes: CouponCode[]) => {
+    const { error } = await supabase
+      .from("site_settings")
+      .upsert({
+        key: "coupon_marketing",
+        value: {
+          campaigns,
+          codes,
+          updatedAt: new Date().toISOString(),
+        },
+      });
+
+    if (error) {
+      console.error("Error updating coupon marketing settings in Supabase", error);
+    }
+  };
+
+  const updateCoupons = async (campaigns: CouponCampaign[], codes: CouponCode[]) => {
+    setCouponCampaigns(campaigns);
+    setCouponCodes(codes);
+    await persistCouponData(campaigns, codes);
+  };
+
+  const getCouponLabel = (coupon: CouponCode) => (
+    coupon.discountType === "percent"
+      ? `خصم ${coupon.discountValue}%`
+      : `خصم ${coupon.discountValue.toLocaleString()} د.ع`
+  );
+
+  const calculateCouponDiscount = (coupon: CouponCode, subtotal = 0) => {
+    if (coupon.discountType === "percent") {
+      return Math.min(subtotal, Math.round(subtotal * (coupon.discountValue / 100)));
+    }
+
+    return Math.min(subtotal, coupon.discountValue);
+  };
+
+  const validateCoupon = (rawCode: string, appliesTo: CouponAppliesTo, subtotal = 0): CouponValidationResult => {
+    const normalizedCode = rawCode.trim().toUpperCase();
+    const coupon = couponCodes.find((item) => item.code.toUpperCase() === normalizedCode);
+
+    if (!coupon) {
+      return {
+        isValid: false,
+        message: "رمز الخصم غير موجود.",
+        discountAmount: 0,
+        label: "",
+      };
+    }
+
+    const campaign = couponCampaigns.find((item) => item.id === coupon.campaignId);
+    const now = Date.now();
+    const couponExpiry = coupon.expiresAt ? new Date(coupon.expiresAt).getTime() : 0;
+    const campaignStarts = campaign?.startsAt ? new Date(campaign.startsAt).getTime() : 0;
+    const campaignEnds = campaign?.endsAt ? new Date(campaign.endsAt).getTime() : 0;
+
+    if (!coupon.isActive || (campaign && !campaign.isActive)) {
+      return {
+        isValid: false,
+        message: "هذا الرمز غير فعال حالياً.",
+        coupon,
+        discountAmount: 0,
+        label: getCouponLabel(coupon),
+      };
+    }
+
+    if (campaignStarts && now < campaignStarts) {
+      return {
+        isValid: false,
+        message: "الحملة لم تبدأ بعد.",
+        coupon,
+        discountAmount: 0,
+        label: getCouponLabel(coupon),
+      };
+    }
+
+    if ((couponExpiry && now > couponExpiry) || (campaignEnds && now > campaignEnds)) {
+      return {
+        isValid: false,
+        message: "انتهت صلاحية رمز الخصم.",
+        coupon,
+        discountAmount: 0,
+        label: getCouponLabel(coupon),
+      };
+    }
+
+    if (coupon.maxUses > 0 && coupon.usedCount >= coupon.maxUses) {
+      return {
+        isValid: false,
+        message: "عذراً، تم استخدام هذا الكوبون بالكامل ولا يمكن استخدامه مجدداً.",
+        coupon,
+        discountAmount: 0,
+        label: getCouponLabel(coupon),
+      };
+    }
+
+    // Prevent reuse of the same coupon code on the same device
+    if (typeof window !== "undefined") {
+      try {
+        const usedCoupons = JSON.parse(localStorage.getItem("mw_used_coupons") || "[]");
+        if (Array.isArray(usedCoupons) && usedCoupons.includes(normalizedCode)) {
+          return {
+            isValid: false,
+            message: "لقد قمت باستخدام هذا الرمز مسبقاً على هذا الجهاز.",
+            coupon,
+            discountAmount: 0,
+            label: getCouponLabel(coupon),
+          };
+        }
+      } catch (e) {
+        console.error("Error checking used coupons from localStorage", e);
+      }
+    }
+
+    if (appliesTo !== "both" && coupon.appliesTo !== "both" && coupon.appliesTo !== appliesTo) {
+      return {
+        isValid: false,
+        message: appliesTo === "store" ? "هذا الرمز مخصص للصيانة فقط." : "هذا الرمز مخصص للمتجر فقط.",
+        coupon,
+        discountAmount: 0,
+        label: getCouponLabel(coupon),
+      };
+    }
+
+    if (coupon.minOrderAmount > 0 && subtotal > 0 && subtotal < coupon.minOrderAmount) {
+      return {
+        isValid: false,
+        message: `هذا الرمز يحتاج طلباً بقيمة ${coupon.minOrderAmount.toLocaleString()} د.ع أو أكثر.`,
+        coupon,
+        discountAmount: 0,
+        label: getCouponLabel(coupon),
+      };
+    }
+
+    const discountAmount = calculateCouponDiscount(coupon, subtotal);
+
+    return {
+      isValid: true,
+      message: "تم تطبيق رمز الخصم بنجاح.",
+      coupon,
+      discountAmount,
+      label: getCouponLabel(coupon),
+    };
+  };
+
+  const applyCoupon = (rawCode: string, appliesTo: CouponAppliesTo, subtotal = 0): CouponValidationResult => {
+    const result = validateCoupon(rawCode, appliesTo, subtotal);
+
+    if (result.isValid && result.coupon) {
+      const nextAppliedCoupon: AppliedCoupon = {
+        code: result.coupon.code,
+        campaignId: result.coupon.campaignId,
+        appliesTo: result.coupon.appliesTo,
+        discountAmount: result.discountAmount,
+        label: result.label,
+      };
+
+      setAppliedCoupon(nextAppliedCoupon);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("mw_applied_coupon", JSON.stringify(nextAppliedCoupon));
+      }
+    }
+
+    return result;
+  };
+
+  const clearAppliedCoupon = () => {
+    setAppliedCoupon(null);
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("mw_applied_coupon");
+    }
+  };
+
+  const recordCouponScan = async (rawCode: string) => {
+    const normalizedCode = rawCode.trim().toUpperCase();
+    if (!normalizedCode) return;
+
+    const nextCodes = couponCodes.map((coupon) =>
+      coupon.code.toUpperCase() === normalizedCode
+        ? { ...coupon, scanCount: (coupon.scanCount || 0) + 1 }
+        : coupon
+    );
+
+    setCouponCodes(nextCodes);
+    await persistCouponData(couponCampaigns, nextCodes);
+  };
+
+  const recordCouponUse = async (rawCode: string, appliesTo: CouponAppliesTo, subtotal = 0) => {
+    const result = validateCoupon(rawCode, appliesTo, subtotal);
+    if (!result.isValid || !result.coupon) return;
+
+    const normalizedCode = rawCode.trim().toUpperCase();
+
+    // Blacklist this coupon locally for this device/browser
+    if (typeof window !== "undefined") {
+      try {
+        const usedCoupons = JSON.parse(localStorage.getItem("mw_used_coupons") || "[]");
+        if (Array.isArray(usedCoupons) && !usedCoupons.includes(normalizedCode)) {
+          usedCoupons.push(normalizedCode);
+          localStorage.setItem("mw_used_coupons", JSON.stringify(usedCoupons));
+        }
+      } catch (e) {
+        console.error("Error saving used coupon to localStorage", e);
+      }
+    }
+
+    const nextCodes = couponCodes.map((coupon) =>
+      coupon.code.toUpperCase() === normalizedCode
+        ? {
+            ...coupon,
+            usedCount: (coupon.usedCount || 0) + 1,
+            lastUsedAt: new Date().toISOString(),
+          }
+        : coupon
+    );
+
+    setCouponCodes(nextCodes);
+    clearAppliedCoupon();
+    await persistCouponData(couponCampaigns, nextCodes);
+  };
+
+  useEffect(() => {
+    if (!isInitialized || couponCodes.length === 0 || typeof window === "undefined") return;
+
+    const url = new URL(window.location.href);
+    const couponFromQuery = url.searchParams.get("coupon") || url.searchParams.get("code");
+    const couponFromPath = url.pathname.startsWith("/promo/")
+      ? decodeURIComponent(url.pathname.split("/promo/")[1]?.split("/")[0] || "")
+      : "";
+    const incomingCode = (couponFromQuery || couponFromPath).trim().toUpperCase();
+
+    if (!incomingCode) return;
+
+    const scanKey = `mw_coupon_scan_${incomingCode}`;
+    if (!sessionStorage.getItem(scanKey)) {
+      sessionStorage.setItem(scanKey, "1");
+      void recordCouponScan(incomingCode);
+    }
+
+    const result = applyCoupon(incomingCode, "both", 0);
+    if (result.isValid) {
+      triggerToast(incomingCode, "cases", "تم حفظ رمز الخصم وسيظهر تلقائياً عند الشراء أو حجز الصيانة.");
+    }
+    // URL coupon capture should only react when coupons finish loading.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInitialized, couponCodes.length]);
+
   const addBundleToCart = (productIds: string[]) => {
     let newCartItems = [...cartItems];
 
@@ -778,6 +1099,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         productBundles,
         promoPopUp,
         premiumShowcase,
+        couponCampaigns,
+        couponCodes,
+        appliedCoupon,
         addProduct,
         updateProduct,
         deleteProduct,
@@ -797,6 +1121,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         updateProductBundles,
         updatePromoPopUp,
         updatePremiumShowcase,
+        updateCoupons,
+        applyCoupon,
+        validateCoupon,
+        clearAppliedCoupon,
+        recordCouponScan,
+        recordCouponUse,
         addBundleToCart,
         isInitialized,
       }}

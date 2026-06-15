@@ -2,6 +2,8 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { supabase, deleteImageFromSupabase } from "@/lib/supabase";
+import { CheckCircle2, ShoppingBag, X } from "lucide-react";
+import ProductMockup from "@/components/ProductMockup";
 
 // Types
 export interface Product {
@@ -258,6 +260,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   });
   const [heroSlides, setHeroSlides] = useState<SlideItem[]>([]);
   const [wishlist, setWishlist] = useState<string[]>([]);
+
+  // Premium Toast Notification State
+  const [toast, setToast] = useState<{
+    isOpen: boolean;
+    message: string;
+    productName?: string;
+    productImage?: string;
+  } | null>(null);
+
+  const triggerToast = (productName: string, productImage: string, message: string) => {
+    setToast({
+      isOpen: true,
+      message,
+      productName,
+      productImage,
+    });
+  };
+
+  useEffect(() => {
+    if (toast?.isOpen) {
+      const timer = setTimeout(() => {
+        setToast((prev) => prev ? { ...prev, isOpen: false } : null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
   const [marqueeSettings, setMarqueeSettings] = useState<MarqueeSettings>({
     isEnabled: false,
     items: [
@@ -548,6 +576,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
     setCartItems(updated);
     saveCartToStorage(updated);
+    triggerToast(product.name, product.image, "تمت إضافة المنتج إلى السلة بنجاح!");
   };
 
   const removeFromCart = (productId: string, selectedColorName?: string | null, selectedPort?: string | null) => {
@@ -733,6 +762,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     setCartItems(newCartItems);
     saveCartToStorage(newCartItems);
+    triggerToast("الحزمة الترويجية المميزة", "cases", "تمت إضافة كافة منتجات الحزمة إلى السلة بنجاح! 📦✨");
   };
 
   return (
@@ -772,6 +802,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }}
     >
       {children}
+      <ToastNotification toast={toast} onClose={() => setToast(null)} />
     </AppContext.Provider>
   );
 }
@@ -782,4 +813,61 @@ export function useApp() {
     throw new Error("useApp must be used within an AppProvider");
   }
   return context;
+}
+
+// Toast Notification Component
+function ToastNotification({
+  toast,
+  onClose
+}: {
+  toast: { isOpen: boolean; message: string; productName?: string; productImage?: string } | null;
+  onClose: () => void;
+}) {
+  if (!toast || !toast.isOpen) return null;
+
+  // Helper to resolve preset images just like main app
+  const isPreset = (img: string) => [
+    "iphone", "samsung", "cases", "headphones", "earbuds", "cable", "smartwatch", "powerbank", "screen-protector"
+  ].includes(img) || img.startsWith("charger-");
+
+  return (
+    <div className="fixed top-6 left-4 right-4 md:left-auto md:right-6 md:w-96 z-[9999] bg-white/95 backdrop-blur-md border border-slate-200/80 rounded-2xl shadow-2xl p-4 flex items-center gap-3.5 transition-all duration-300 animate-slide-down text-right" dir="rtl">
+      
+      {/* Product visual */}
+      <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center p-1 overflow-hidden flex-shrink-0">
+        {toast.productImage ? (
+          isPreset(toast.productImage) ? (
+            <div className="scale-75">
+              <ProductMockup image={toast.productImage} name={toast.productName || ""} sizeClass="w-8 aspect-[9/18]" />
+            </div>
+          ) : (
+            <img src={toast.productImage} alt={toast.productName} className="w-full h-full object-contain mix-blend-multiply" />
+          )
+        ) : (
+          <ShoppingBag className="w-5 h-5 text-emerald-500" />
+        )}
+      </div>
+
+      {/* Text Info */}
+      <div className="flex-1 min-w-0">
+        <h4 className="text-[11px] font-black text-emerald-600 flex items-center gap-1">
+          <CheckCircle2 className="w-3.5 h-3.5" />
+          <span>تمت الإضافة للسلة بنجاح</span>
+        </h4>
+        <p className="text-xs font-bold text-slate-800 truncate mt-0.5" title={toast.productName}>
+          {toast.productName}
+        </p>
+        <p className="text-[10px] text-slate-400 mt-0.5">{toast.message}</p>
+      </div>
+
+      {/* Close button */}
+      <button 
+        onClick={onClose}
+        className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+      >
+        <X className="w-4 h-4" />
+      </button>
+
+    </div>
+  );
 }

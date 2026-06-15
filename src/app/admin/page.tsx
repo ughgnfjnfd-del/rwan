@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useApp, Product, Appointment, SlideItem, MarqueeSettings, FlashSale, PromoPopUp, ProductBundle, PremiumShowcase, DEFAULT_PREMIUM_SHOWCASE } from "@/context/AppContext";
 import { supabase, deleteImageFromSupabase } from "@/lib/supabase";
 import ProductMockup from "@/components/ProductMockup";
+import { matchProduct } from "@/lib/search";
 import {
   Lock,
   User,
@@ -395,6 +396,7 @@ export default function AdminPage() {
     items: []
   });
   const [newMarqueeItem, setNewMarqueeItem] = useState("");
+  const [isSavingAllSettings, setIsSavingAllSettings] = useState(false);
 
   useEffect(() => {
     if (marqueeSettings) {
@@ -418,13 +420,24 @@ export default function AdminPage() {
     });
   };
 
-  const handleSaveMarquee = async (e: React.FormEvent) => {
+  const handleSaveAllSettings = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!settingsForm.email || !settingsForm.phone) {
+      alert("يرجى ملء البريد الإلكتروني ورقم الهاتف");
+      return;
+    }
+
+    setIsSavingAllSettings(true);
     try {
+      await updateSiteSettings(settingsForm);
       await updateMarqueeSettings(marqueeForm);
-      alert("تم حفظ إعدادات شريط الإعلانات بنجاح! 🚀");
+      await updatePromoPopUp(promoPopUpForm);
+      alert("تم حفظ كافة إعدادات الموقع بنجاح! 💾✨");
     } catch (err: any) {
-      alert(`حدث خطأ أثناء الحفظ: ${err.message || err}`);
+      console.error(err);
+      alert(`حدث خطأ أثناء حفظ الإعدادات: ${err.message || err}`);
+    } finally {
+      setIsSavingAllSettings(false);
     }
   };
 
@@ -444,15 +457,7 @@ export default function AdminPage() {
     }
   }, [promoPopUp]);
 
-  const handleSavePromoPopUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await updatePromoPopUp(promoPopUpForm);
-      alert("تم حفظ إعدادات العرض المنبثق بنجاح! 🔔");
-    } catch (err: any) {
-      alert(`حدث خطأ أثناء الحفظ: ${err.message || err}`);
-    }
-  };
+
 
   // Premium Showcase States
   const [premiumShowcaseForm, setPremiumShowcaseForm] = useState<PremiumShowcase>(DEFAULT_PREMIUM_SHOWCASE);
@@ -688,21 +693,7 @@ export default function AdminPage() {
     }));
   };
 
-  const handleSaveSettings = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!settingsForm.email || !settingsForm.phone) {
-      alert("يرجى ملء البريد الإلكتروني ورقم الهاتف");
-      return;
-    }
 
-    try {
-      await updateSiteSettings(settingsForm);
-      alert("تم حفظ إعدادات الموقع بنجاح!");
-    } catch (err) {
-      console.error(err);
-      alert("حدث خطأ أثناء حفظ الإعدادات!");
-    }
-  };
   const [productSearch, setProductSearch] = useState("");
 
   // Repair Filter State
@@ -936,9 +927,7 @@ export default function AdminPage() {
 
   // Filtered Products List
   const filteredProducts = products.filter((prod) =>
-    prod.name.toLowerCase().includes(productSearch.toLowerCase()) ||
-    prod.nameEn.toLowerCase().includes(productSearch.toLowerCase()) ||
-    prod.category.toLowerCase().includes(productSearch.toLowerCase())
+    matchProduct(prod, productSearch)
   );
 
   const premiumCandidateProducts = [...products].sort((a, b) => {
@@ -1523,45 +1512,38 @@ export default function AdminPage() {
                               <button
                                 onClick={() => updateAppointmentStatus(appt.id, "completed")}
                                 className="p-1 bg-emerald-50 text-emerald-500 rounded hover:bg-emerald-100 transition-colors cursor-pointer"
-                                title="إكمال وتسليم"
+                                title="إكمال الصيانة"
                               >
                                 <CheckCircle className="w-3.5 h-3.5" />
                               </button>
                             )}
 
                             {/* Cancel: Mark Cancelled */}
-                            {appt.status !== "completed" && appt.status !== "cancelled" && (
+                            {(appt.status === "pending" || appt.status === "in-progress") && (
                               <button
                                 onClick={() => updateAppointmentStatus(appt.id, "cancelled")}
                                 className="p-1 bg-rose-50 text-rose-500 rounded hover:bg-rose-100 transition-colors cursor-pointer"
-                                title="إلغاء الطلب"
+                                title="إلغاء الموعد"
                               >
                                 <XCircle className="w-3.5 h-3.5" />
                               </button>
                             )}
 
-                            {/* Trash: Delete booking */}
+                            {/* Trash: Delete Appointment */}
                             <button
-                              onClick={() => {
-                                if (confirm("هل تريد إزالة هذا الحجز نهائياً من النظام؟")) {
-                                  deleteAppointment(appt.id);
-                                }
-                              }}
-                              className="p-1 text-slate-400 hover:text-rose-500 rounded hover:bg-slate-100 transition-colors cursor-pointer"
-                              title="حذف الحجز"
+                              onClick={() => deleteAppointment(appt.id)}
+                              className="p-1 text-slate-400 hover:text-rose-500 rounded transition-colors cursor-pointer"
+                              title="حذف الحجز نهائياً"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
-
                           </td>
-
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
               )}
-
             </div>
           )}
 
@@ -1570,10 +1552,10 @@ export default function AdminPage() {
             <div className="space-y-6">
               <div className="border-b border-slate-100 pb-4">
                 <h2 className="text-xl font-extrabold text-[#1a1a1a]">إعدادات الموقع ومعلومات الاتصال</h2>
-                <p className="text-xs text-slate-400">تعديل البريد الإلكتروني، رقم الهاتف، وحسابات التواصل الاجتماعي المعروضة بالموقع</p>
+                <p className="text-xs text-slate-400">تعديل البريد الإلكتروني، رقم الهاتف، أجور التوصيل، حسابات التواصل، شريط الإعلانات، والعرض المنبثق</p>
               </div>
 
-              <form onSubmit={handleSaveSettings} className="space-y-6 text-right">
+              <form onSubmit={handleSaveAllSettings} className="space-y-6 text-right">
 
                 {/* Contact Info Section */}
                 <div className="bg-slate-50/50 border border-slate-100 rounded-2xl p-5 space-y-4">
@@ -1850,186 +1832,180 @@ export default function AdminPage() {
 
                 </div>
 
-              </form>
-
-              {/* --- Infinite Marquee Settings Section --- */}
-              <form onSubmit={handleSaveMarquee} className="bg-slate-50/50 border border-slate-100 rounded-2xl p-5 space-y-4 text-right">
-                <div className="flex justify-between items-center border-b border-slate-200/60 pb-2">
-                  <h3 className="font-extrabold text-sm text-slate-800 flex items-center gap-2">
-                    <Globe className="w-4 h-4 text-accent" />
-                    إعدادات شريط الإعلانات المتحرك (Marquee Ticker)
-                  </h3>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="marqueeEnabled"
-                      checked={marqueeForm.isEnabled}
-                      onChange={(e) => setMarqueeForm({ ...marqueeForm, isEnabled: e.target.checked })}
-                      className="w-4 h-4 text-accent border-slate-300 rounded focus:ring-accent cursor-pointer"
-                    />
-                    <label htmlFor="marqueeEnabled" className="text-xs font-bold text-slate-700 cursor-pointer select-none">
-                      تفعيل شريط الإعلانات أعلى الصفحة
-                    </label>
+                {/* --- Infinite Marquee Settings Section --- */}
+                <div className="bg-slate-50/50 border border-slate-100 rounded-2xl p-5 space-y-4 text-right">
+                  <div className="flex justify-between items-center border-b border-slate-200/60 pb-2">
+                    <h3 className="font-extrabold text-sm text-slate-800 flex items-center gap-2">
+                      <Globe className="w-4 h-4 text-accent" />
+                      إعدادات شريط الإعلانات المتحرك (Marquee Ticker)
+                    </h3>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="marqueeEnabled"
+                        checked={marqueeForm.isEnabled}
+                        onChange={(e) => setMarqueeForm({ ...marqueeForm, isEnabled: e.target.checked })}
+                        className="w-4 h-4 text-accent border-slate-300 rounded focus:ring-accent cursor-pointer"
+                      />
+                      <label htmlFor="marqueeEnabled" className="text-xs font-bold text-slate-700 cursor-pointer select-none">
+                        تفعيل شريط الإعلانات أعلى الصفحة
+                      </label>
+                    </div>
                   </div>
+
+                  {marqueeForm.isEnabled && (
+                    <div className="space-y-4 animate-fade-in">
+                      <div className="space-y-2">
+                        <label className="text-xs font-semibold text-slate-700">الجمل الإعلانية الحالية:</label>
+                        {marqueeForm.items.length === 0 ? (
+                          <div className="p-3 border border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-400">
+                            لا توجد جمل إعلانية حالياً.
+                          </div>
+                        ) : (
+                          <div className="space-y-1.5">
+                            {marqueeForm.items.map((item, index) => (
+                              <div key={index} className="flex justify-between items-center bg-white border border-slate-150 p-2.5 rounded-xl">
+                                <span className="text-xs text-slate-700 font-medium">{item}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveMarqueeItem(index)}
+                                  className="text-[10px] font-bold text-rose-500 hover:text-rose-700 p-1 hover:bg-rose-50 rounded"
+                                >
+                                  حذف
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex gap-2 items-end pt-2 border-t border-slate-100">
+                        <div className="flex-1 space-y-1">
+                          <label className="text-[10px] font-semibold text-slate-500">أضف جملة إعلانية جديدة (مع إيموجي للتجميل):</label>
+                          <input
+                            type="text"
+                            value={newMarqueeItem}
+                            onChange={(e) => setNewMarqueeItem(e.target.value)}
+                            placeholder="مثال: 🚚 توصيل مجاني وسريع لكافة المحافظات"
+                            className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:border-accent"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleAddMarqueeItem}
+                          className="bg-[#1a1a1a] hover:bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all h-fit cursor-pointer"
+                        >
+                          إضافة
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {marqueeForm.isEnabled && (
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <label className="text-xs font-semibold text-slate-700">الجمل الإعلانية الحالية:</label>
-                      {marqueeForm.items.length === 0 ? (
-                        <div className="p-3 border border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-400">
-                          لا توجد جمل إعلانية حالياً.
-                        </div>
-                      ) : (
-                        <div className="space-y-1.5">
-                          {marqueeForm.items.map((item, index) => (
-                            <div key={index} className="flex justify-between items-center bg-white border border-slate-150 p-2.5 rounded-xl">
-                              <span className="text-xs text-slate-700 font-medium">{item}</span>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveMarqueeItem(index)}
-                                className="text-[10px] font-bold text-rose-500 hover:text-rose-700 p-1 hover:bg-rose-50 rounded"
-                              >
-                                حذف
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                {/* --- Exit Intent / Promo Pop-Up Section --- */}
+                <div className="bg-slate-50/50 border border-slate-100 rounded-2xl p-5 space-y-4 text-right">
+                  <div className="flex justify-between items-center border-b border-slate-200/60 pb-2">
+                    <h3 className="font-extrabold text-sm text-slate-800 flex items-center gap-2">
+                      <Star className="w-4 h-4 text-rose-500 fill-rose-500" />
+                      العرض المنبثق الترويجي للزوار (Promo Pop-up)
+                    </h3>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="promoPopUpEnabled"
+                        checked={promoPopUpForm.isEnabled}
+                        onChange={(e) => setPromoPopUpForm({ ...promoPopUpForm, isEnabled: e.target.checked })}
+                        className="w-4 h-4 text-accent border-slate-350 rounded focus:ring-accent cursor-pointer"
+                      />
+                      <label htmlFor="promoPopUpEnabled" className="text-xs font-bold text-slate-700 cursor-pointer select-none">
+                        تفعيل العرض المنبثق
+                      </label>
                     </div>
+                  </div>
 
-                    <div className="flex gap-2 items-end pt-2 border-t border-slate-100">
-                      <div className="flex-1 space-y-1">
-                        <label className="text-[10px] font-semibold text-slate-500">أضف جملة إعلانية جديدة (مع إيموجي للتجميل):</label>
+                  {promoPopUpForm.isEnabled && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
+                      {/* Title */}
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-slate-700">عنوان العرض الرئيسي *</label>
                         <input
                           type="text"
-                          value={newMarqueeItem}
-                          onChange={(e) => setNewMarqueeItem(e.target.value)}
-                          placeholder="مثال: 🚚 توصيل مجاني وسريع لكافة المحافظات"
-                          className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:border-accent"
+                          value={promoPopUpForm.title}
+                          onChange={(e) => setPromoPopUpForm({ ...promoPopUpForm, title: e.target.value })}
+                          placeholder="مثال: خصم 10% على أول صيانة!"
+                          className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:border-accent"
+                          required
                         />
                       </div>
-                      <button
-                        type="button"
-                        onClick={handleAddMarqueeItem}
-                        className="bg-[#1a1a1a] hover:bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all h-fit"
-                      >
-                        إضافة
-                      </button>
-                    </div>
-                  </div>
-                )}
 
-                <div className="flex justify-end pt-2 border-t border-slate-150">
+                      {/* Image URL */}
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-slate-700">رابط صورة تسويقية (اختياري)</label>
+                        <input
+                          type="url"
+                          value={promoPopUpForm.imageUrl}
+                          onChange={(e) => setPromoPopUpForm({ ...promoPopUpForm, imageUrl: e.target.value })}
+                          placeholder="https://example.com/banner.png"
+                          className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:border-accent font-mono text-left"
+                          dir="ltr"
+                        />
+                      </div>
+
+                      {/* Description */}
+                      <div className="space-y-1 md:col-span-2">
+                        <label className="text-xs font-semibold text-slate-700">وصف العرض والتعليمات *</label>
+                        <textarea
+                          value={promoPopUpForm.description}
+                          onChange={(e) => setPromoPopUpForm({ ...promoPopUpForm, description: e.target.value })}
+                          placeholder="اكتب تفاصيل مقنعة ومبهرة لجذب الزوار..."
+                          rows={2}
+                          className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:border-accent text-right resize-none"
+                          required
+                        />
+                      </div>
+
+                      {/* Button Text */}
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-slate-700">نص زر التوجيه *</label>
+                        <input
+                          type="text"
+                          value={promoPopUpForm.btnText}
+                          onChange={(e) => setPromoPopUpForm({ ...promoPopUpForm, btnText: e.target.value })}
+                          placeholder="مثال: احجز الآن"
+                          className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:border-accent"
+                          required
+                        />
+                      </div>
+
+                      {/* Button Link */}
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-slate-700">رابط زر التوجيه *</label>
+                        <input
+                          type="text"
+                          value={promoPopUpForm.btnLink}
+                          onChange={(e) => setPromoPopUpForm({ ...promoPopUpForm, btnLink: e.target.value })}
+                          placeholder="مثال: #repair أو رابط خارجي"
+                          className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:border-accent font-mono text-left"
+                          dir="ltr"
+                          required
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Sticky consolidated save button bar */}
+                <div className="sticky bottom-4 z-20 bg-white/85 backdrop-blur-md border border-slate-200/80 p-4 rounded-2xl shadow-lg flex flex-col sm:flex-row items-center justify-between gap-3 text-right">
                   <button
                     type="submit"
-                    className="bg-[#1a1a1a] hover:bg-slate-800 text-white font-bold text-[11px] px-6 py-2.5 rounded-xl transition-all shadow-sm cursor-pointer animate-fade-in"
+                    disabled={isSavingAllSettings}
+                    className="w-full sm:w-auto bg-[#1a1a1a] hover:bg-slate-800 disabled:bg-slate-350 text-white font-extrabold text-xs px-8 py-3.5 rounded-xl transition-all shadow-md cursor-pointer hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-1.5"
                   >
-                    حفظ إعدادات شريط الإعلانات
+                    {isSavingAllSettings ? "جاري حفظ الإعدادات..." : "حفظ كافة إعدادات الموقع بالكامل"}
                   </button>
-                </div>
-              </form>
-
-              {/* --- Exit Intent / Promo Pop-Up Section --- */}
-              <form onSubmit={handleSavePromoPopUp} className="bg-slate-50/50 border border-slate-100 rounded-2xl p-5 space-y-4 text-right">
-                <div className="flex justify-between items-center border-b border-slate-200/60 pb-2">
-                  <h3 className="font-extrabold text-sm text-slate-800 flex items-center gap-2">
-                    <Star className="w-4 h-4 text-rose-500 fill-rose-500" />
-                    العرض المنبثق الترويجي للزوار (Promo Pop-up)
-                  </h3>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="promoPopUpEnabled"
-                      checked={promoPopUpForm.isEnabled}
-                      onChange={(e) => setPromoPopUpForm({ ...promoPopUpForm, isEnabled: e.target.checked })}
-                      className="w-4 h-4 text-accent border-slate-350 rounded focus:ring-accent cursor-pointer"
-                    />
-                    <label htmlFor="promoPopUpEnabled" className="text-xs font-bold text-slate-700 cursor-pointer select-none">
-                      تفعيل العرض المنبثق
-                    </label>
-                  </div>
+                  <span className="text-xs font-bold text-slate-500">يرجى حفظ التغييرات لتطبيقها فورياً على جميع زوار المتجر</span>
                 </div>
 
-                {promoPopUpForm.isEnabled && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
-                    {/* Title */}
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-700">عنوان العرض الرئيسي *</label>
-                      <input
-                        type="text"
-                        value={promoPopUpForm.title}
-                        onChange={(e) => setPromoPopUpForm({ ...promoPopUpForm, title: e.target.value })}
-                        placeholder="مثال: خصم 10% على أول صيانة!"
-                        className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:border-accent"
-                        required
-                      />
-                    </div>
-
-                    {/* Image URL */}
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-700">رابط صورة تسويقية (اختياري)</label>
-                      <input
-                        type="url"
-                        value={promoPopUpForm.imageUrl}
-                        onChange={(e) => setPromoPopUpForm({ ...promoPopUpForm, imageUrl: e.target.value })}
-                        placeholder="https://example.com/banner.png"
-                        className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:border-accent font-mono text-left"
-                        dir="ltr"
-                      />
-                    </div>
-
-                    {/* Description */}
-                    <div className="space-y-1 md:col-span-2">
-                      <label className="text-xs font-semibold text-slate-700">وصف العرض والتعليمات *</label>
-                      <textarea
-                        value={promoPopUpForm.description}
-                        onChange={(e) => setPromoPopUpForm({ ...promoPopUpForm, description: e.target.value })}
-                        placeholder="اكتب تفاصيل مقنعة ومبهرة لجذب الزوار..."
-                        rows={2}
-                        className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:border-accent text-right resize-none"
-                        required
-                      />
-                    </div>
-
-                    {/* Button Text */}
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-700">نص زر التوجيه *</label>
-                      <input
-                        type="text"
-                        value={promoPopUpForm.btnText}
-                        onChange={(e) => setPromoPopUpForm({ ...promoPopUpForm, btnText: e.target.value })}
-                        placeholder="مثال: احجز الآن"
-                        className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:border-accent"
-                        required
-                      />
-                    </div>
-
-                    {/* Button Link */}
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-700">رابط زر التوجيه *</label>
-                      <input
-                        type="text"
-                        value={promoPopUpForm.btnLink}
-                        onChange={(e) => setPromoPopUpForm({ ...promoPopUpForm, btnLink: e.target.value })}
-                        placeholder="مثال: #repair أو رابط خارجي"
-                        className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:border-accent font-mono text-left"
-                        dir="ltr"
-                        required
-                      />
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex justify-end pt-2 border-t border-slate-150">
-                  <button
-                    type="submit"
-                    className="bg-[#1a1a1a] hover:bg-slate-800 text-white font-bold text-[11px] px-6 py-2.5 rounded-xl transition-all shadow-sm cursor-pointer"
-                  >
-                    حفظ إعدادات العرض المنبثق
-                  </button>
-                </div>
               </form>
 
             </div>

@@ -22,7 +22,7 @@ export default function BundlesSection() {
         <p className="text-xs text-slate-500">مجموعات منسقة بعناية من المنتجات والملحقات بأسعار مخفضة وخصومات مذهلة</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="flex md:grid overflow-x-auto md:overflow-x-visible gap-6 pb-4 md:pb-0 px-4 -mx-4 md:px-0 md:mx-0 scrollbar-none snap-x snap-mandatory md:grid-cols-2">
         {productBundles.map((bundle) => {
           // Find the products in this bundle
           const bundleProds = bundle.productIds
@@ -38,7 +38,7 @@ export default function BundlesSection() {
           return (
             <div
               key={bundle.id}
-              className={`rounded-3xl p-6 relative overflow-hidden border border-white/10 shadow-xl flex flex-col justify-between gap-6 bg-gradient-to-br ${bundle.bgStyle || "from-indigo-650 via-purple-650 to-pink-600"} text-white group`}
+              className={`rounded-3xl p-6 relative overflow-hidden border border-white/10 shadow-xl flex flex-col justify-between gap-6 bg-gradient-to-br ${bundle.bgStyle || "from-indigo-650 via-purple-650 to-pink-600"} text-white group flex-shrink-0 w-[290px] xs:w-[320px] md:w-auto snap-start`}
             >
               {/* Glowing bubbles behind */}
               <div className="absolute top-0 right-0 w-36 h-36 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>

@@ -324,7 +324,7 @@ export default function PremiumShowcaseSection({ onSelectProduct, onAddToCart }:
       )}
 
       {supportProducts.length > 0 && (
-        <div className="relative mt-6 grid gap-3 md:grid-cols-3">
+        <div className="relative mt-6 flex md:grid overflow-x-auto md:overflow-x-visible gap-3 pb-3 md:pb-0 px-4 -mx-4 md:px-0 md:mx-0 scrollbar-none snap-x snap-mandatory md:grid-cols-3">
           {supportProducts.map((product) => {
             const productDiscount = getDiscountPercent(product);
             const productIndex = rotationProducts.findIndex((item) => item.id === product.id);
@@ -333,7 +333,7 @@ export default function PremiumShowcaseSection({ onSelectProduct, onAddToCart }:
                 key={product.id}
                 type="button"
                 onClick={() => setActiveIndex(Math.max(productIndex, 0))}
-                className="group grid min-h-[132px] grid-cols-[96px_1fr] gap-3 rounded-3xl border border-slate-200/80 bg-white/80 p-3 text-right shadow-sm backdrop-blur-md transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg cursor-pointer"
+                className="group grid min-h-[132px] grid-cols-[96px_1fr] gap-3 rounded-3xl border border-slate-200/80 bg-white/80 p-3 text-right shadow-sm backdrop-blur-md transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg cursor-pointer flex-shrink-0 w-[280px] md:w-auto snap-start"
               >
                 <div className="relative flex h-full min-h-[108px] items-center justify-center overflow-hidden rounded-2xl border border-slate-100 bg-slate-50">
                   <div className={`absolute inset-x-4 bottom-3 h-1.5 rounded-full bg-gradient-to-l ${theme.accent}`} />

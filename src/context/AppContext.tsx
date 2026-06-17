@@ -251,6 +251,26 @@ export const DEFAULT_PREMIUM_SHOWCASE: PremiumShowcase = {
   theme: "titanium",
 };
 
+export interface GalleryItem {
+  id: string;
+  productId: string;
+  imageUrl: string;
+}
+
+export interface GalleryShowcase {
+  isEnabled: boolean;
+  title: string;
+  subtitle: string;
+  items: GalleryItem[];
+}
+
+export const DEFAULT_GALLERY_SHOWCASE: GalleryShowcase = {
+  isEnabled: true,
+  title: "أحدث المنتجات. ألقِ نظرة على ما هو جديد الآن.",
+  subtitle: "استكشف أحدث الأجهزة والملحقات المميزة المضافة حديثاً في المركز.",
+  items: [],
+};
+
 interface AppContextType {
   products: Product[];
   appointments: Appointment[];
@@ -291,6 +311,8 @@ interface AppContextType {
   recordCouponScan: (code: string) => Promise<void>;
   recordCouponUse: (code: string, appliesTo: CouponAppliesTo, subtotal?: number) => Promise<void>;
   addBundleToCart: (productIds: string[]) => void;
+  galleryShowcase: GalleryShowcase;
+  updateGalleryShowcase: (settings: GalleryShowcase) => Promise<void>;
   isInitialized: boolean;
 }
 
@@ -365,6 +387,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   });
   const [productBundles, setProductBundles] = useState<ProductBundle[]>([]);
   const [premiumShowcase, setPremiumShowcase] = useState<PremiumShowcase>(DEFAULT_PREMIUM_SHOWCASE);
+  const [galleryShowcase, setGalleryShowcase] = useState<GalleryShowcase>(DEFAULT_GALLERY_SHOWCASE);
   const [couponCampaigns, setCouponCampaigns] = useState<CouponCampaign[]>([]);
   const [couponCodes, setCouponCodes] = useState<CouponCode[]>([]);
   const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
@@ -430,6 +453,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const bundlesObj = settingsData.find((s: any) => s.key === "product_bundles")?.value;
           const promoPopUpObj = settingsData.find((s: any) => s.key === "promo_popup")?.value;
           const premiumShowcaseObj = settingsData.find((s: { key: string; value: unknown }) => s.key === "premium_showcase")?.value as Partial<PremiumShowcase> | undefined;
+          const galleryShowcaseObj = settingsData.find((s: any) => s.key === "gallery_showcase")?.value as Partial<GalleryShowcase> | undefined;
           const couponMarketingObj = settingsData.find((s: any) => s.key === "coupon_marketing")?.value;
 
           if (marqueeObj) setMarqueeSettings(marqueeObj);
@@ -452,6 +476,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               heroProductId: typeof premiumShowcaseObj.heroProductId === "string" ? premiumShowcaseObj.heroProductId : "",
               productIds: Array.isArray(premiumShowcaseObj.productIds) ? premiumShowcaseObj.productIds : [],
               theme,
+            });
+          }
+
+          if (galleryShowcaseObj) {
+            setGalleryShowcase({
+              ...DEFAULT_GALLERY_SHOWCASE,
+              ...galleryShowcaseObj,
+              items: Array.isArray(galleryShowcaseObj.items) ? galleryShowcaseObj.items : [],
             });
           }
         } else {
@@ -816,6 +848,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const updateGalleryShowcase = async (settings: GalleryShowcase) => {
+    const normalizedSettings: GalleryShowcase = {
+      ...DEFAULT_GALLERY_SHOWCASE,
+      ...settings,
+      items: Array.isArray(settings.items) ? settings.items.filter(item => item.productId && item.imageUrl) : [],
+    };
+
+    setGalleryShowcase(normalizedSettings);
+
+    const { error } = await supabase
+      .from("site_settings")
+      .upsert({ key: "gallery_showcase", value: normalizedSettings });
+
+    if (error) {
+      console.error("Error updating gallery showcase settings in Supabase", error);
+      throw error;
+    }
+  };
+
   const persistCouponData = async (campaigns: CouponCampaign[], codes: CouponCode[]) => {
     const { error } = await supabase
       .from("site_settings")
@@ -1121,7 +1172,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         updateProductBundles,
         updatePromoPopUp,
         updatePremiumShowcase,
+        updateGalleryShowcase,
         updateCoupons,
+        galleryShowcase,
         applyCoupon,
         validateCoupon,
         clearAppliedCoupon,

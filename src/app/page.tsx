@@ -44,6 +44,7 @@ import FlashSaleBanner from "@/components/FlashSaleBanner";
 import BundlesSection from "@/components/BundlesSection";
 import PromoPopUp from "@/components/PromoPopUp";
 import PremiumShowcaseSection from "@/components/PremiumShowcaseSection";
+import GalleryShowcase from "@/components/GalleryShowcase";
 
 const getProductHighlights = (product: Product) => {
   if (product.image.startsWith("charger-")) {
@@ -1170,6 +1171,8 @@ export default function Home() {
           </div>
         </section>
 
+
+        <GalleryShowcase onSelectProduct={setSelectedProduct} />
 
         <PremiumShowcaseSection
           onSelectProduct={setSelectedProduct}

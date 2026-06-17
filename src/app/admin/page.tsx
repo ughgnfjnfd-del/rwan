@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { useApp, Product, Appointment, SlideItem, MarqueeSettings, FlashSale, PromoPopUp, ProductBundle, PremiumShowcase, DEFAULT_PREMIUM_SHOWCASE } from "@/context/AppContext";
+import { useApp, Product, Appointment, SlideItem, MarqueeSettings, FlashSale, PromoPopUp, ProductBundle, PremiumShowcase, DEFAULT_PREMIUM_SHOWCASE, GalleryShowcase, DEFAULT_GALLERY_SHOWCASE } from "@/context/AppContext";
 import { supabase, deleteImageFromSupabase } from "@/lib/supabase";
 import ProductMockup from "@/components/ProductMockup";
 import { matchProduct } from "@/lib/search";
@@ -120,6 +120,8 @@ export default function AdminPage() {
     couponCampaigns,
     couponCodes,
     updateCoupons,
+    galleryShowcase,
+    updateGalleryShowcase,
   } = useApp();
 
   // Authentication States
@@ -345,8 +347,8 @@ export default function AdminPage() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Tab State: "overview", "products", "repairs", "settings", "flash", "slides", "premium", "bundles", "coupons"
-  const [activeTab, setActiveTab] = useState<"overview" | "products" | "repairs" | "settings" | "flash" | "slides" | "premium" | "bundles" | "coupons">("overview");
+  // Tab State: "overview", "products", "repairs", "settings", "flash", "slides", "premium", "bundles", "coupons" | "gallery"
+  const [activeTab, setActiveTab] = useState<"overview" | "products" | "repairs" | "settings" | "flash" | "slides" | "premium" | "bundles" | "coupons" | "gallery">("overview");
 
   // Coupon/Campaign Management States
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
@@ -621,6 +623,106 @@ export default function AdminPage() {
       alert(`حدث خطأ أثناء حفظ العروض المميزة: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
+
+  // Gallery Showcase States
+  const [galleryShowcaseForm, setGalleryShowcaseForm] = useState<GalleryShowcase>(DEFAULT_GALLERY_SHOWCASE);
+  const [newGalleryProductId, setNewGalleryProductId] = useState("");
+  const [newGalleryImageFile, setNewGalleryImageFile] = useState<File | null>(null);
+  const [newGalleryImagePreview, setNewGalleryImagePreview] = useState<string | null>(null);
+  const [isUploadingGalleryImage, setIsUploadingGalleryImage] = useState(false);
+
+  const handleAddGalleryItem = async () => {
+    if (!newGalleryProductId) {
+      alert("يرجى اختيار المنتج المرتبط بالكارت أولاً.");
+      return;
+    }
+    if (!newGalleryImageFile) {
+      alert("يرجى اختيار ملف الصورة لرفعها.");
+      return;
+    }
+
+    setIsUploadingGalleryImage(true);
+    try {
+      // Compress and resize image to 1200x1500 for optimal marquee performance
+      const compressedBlob = await compressAndResizeImage(newGalleryImageFile, 1200, 1500, 0.95);
+      const fileExtension = newGalleryImageFile.name.split('.').pop() || 'jpg';
+      const cleanName = newGalleryImageFile.name.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 20);
+      const filePath = `gallery/${Date.now()}-${cleanName}.${fileExtension}`;
+
+      // Upload to Supabase Storage products bucket
+      const { data, error: uploadError } = await supabase.storage
+        .from("products")
+        .upload(filePath, compressedBlob, {
+          contentType: `image/${fileExtension === 'png' ? 'png' : 'jpeg'}`,
+          cacheControl: "3600",
+          upsert: false
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from("products")
+        .getPublicUrl(filePath);
+
+      const newItem = {
+        id: `gallery-item-${Date.now()}`,
+        productId: newGalleryProductId,
+        imageUrl: publicUrl,
+      };
+
+      setGalleryShowcaseForm((prev) => ({
+        ...prev,
+        items: [...(prev.items || []), newItem],
+      }));
+
+      // Reset item inputs
+      setNewGalleryProductId("");
+      setNewGalleryImageFile(null);
+      setNewGalleryImagePreview(null);
+    } catch (err: any) {
+      console.error("Error uploading gallery image:", err);
+      alert(`حدث خطأ أثناء رفع الصورة: ${err.message || err}`);
+    } finally {
+      setIsUploadingGalleryImage(false);
+    }
+  };
+
+  const handleDeleteGalleryItem = async (itemId: string, imageUrl: string) => {
+    if (confirm("هل أنت متأكد من حذف هذا الكارت من المعرض؟")) {
+      setGalleryShowcaseForm((prev) => ({
+        ...prev,
+        items: (prev.items || []).filter((item) => item.id !== itemId),
+      }));
+
+      // Delete from storage
+      try {
+        await deleteImageFromSupabase(imageUrl);
+      } catch (err) {
+        console.error("Failed to remove image from Supabase:", err);
+      }
+    }
+  };
+
+  const handleSaveGalleryShowcase = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await updateGalleryShowcase(galleryShowcaseForm);
+      alert("تم حفظ إعدادات معرض الصور الأحدث بنجاح! 🖼️✨");
+    } catch (err) {
+      alert(`حدث خطأ أثناء حفظ إعدادات معرض الصور: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
+  useEffect(() => {
+    if (galleryShowcase) {
+      setGalleryShowcaseForm({
+        isEnabled: galleryShowcase.isEnabled ?? true,
+        title: galleryShowcase.title || "",
+        subtitle: galleryShowcase.subtitle || "",
+        items: Array.isArray(galleryShowcase.items) ? galleryShowcase.items : [],
+      });
+    }
+  }, [galleryShowcase]);
 
   // Flash Sale States
   const [flashSaleForm, setFlashSaleForm] = useState<FlashSale>({
@@ -1280,6 +1382,22 @@ export default function AdminPage() {
           >
             <Sparkles className="w-4.5 h-4.5" />
             <span>العروض المميزة ({premiumShowcase.productIds.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("gallery")}
+            className={`w-full flex items-center gap-3 p-3.5 rounded-xl text-sm font-bold transition-all text-right cursor-pointer ${activeTab === "gallery"
+              ? "bg-[#1a1a1a] text-white shadow-md"
+              : "hover:bg-slate-50 text-slate-600"
+              }`}
+          >
+            <Sparkles className="w-4.5 h-4.5 text-sky-500" />
+            <span>معرض الصور الأحدث ({galleryShowcase?.items?.length || 0})</span>
+            {galleryShowcase?.isEnabled && (
+              <span className="mr-auto rounded-full bg-emerald-500 px-2 py-0.5 text-[9px] font-black text-white">
+                مفعل
+              </span>
+            )}
           </button>
 
           <button
@@ -2673,6 +2791,209 @@ export default function AdminPage() {
                   className="rounded-xl bg-[#1a1a1a] px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-slate-800 cursor-pointer"
                 >
                   حفظ واجهة العروض المميزة
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* TAB 10: GALLERY SHOWCASE MANAGEMENT */}
+          {activeTab === "gallery" && (
+            <form onSubmit={handleSaveGalleryShowcase} className="space-y-8 text-right" dir="rtl">
+              <div className="flex flex-col gap-4 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-extrabold text-[#1a1a1a]">إدارة معرض الصور الأحدث (Gallery Showcase)</h2>
+                  <p className="text-xs text-slate-400">تحكم بالصور المخصصة المعروضة في شريط المعرض اللانهائي المتحرك بالصفحة الرئيسية.</p>
+                </div>
+
+                <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={galleryShowcaseForm.isEnabled}
+                    onChange={(e) => setGalleryShowcaseForm({ ...galleryShowcaseForm, isEnabled: e.target.checked })}
+                    className="h-4 w-4 cursor-pointer rounded border-slate-300 text-accent focus:ring-accent"
+                  />
+                  تفعيل القسم بالرئيسية
+                </label>
+              </div>
+
+              {/* Title & Subtitle inputs */}
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-slate-700">عنوان القسم</label>
+                  <input
+                    type="text"
+                    value={galleryShowcaseForm.title}
+                    onChange={(e) => setGalleryShowcaseForm({ ...galleryShowcaseForm, title: e.target.value })}
+                    placeholder="مثال: الأحدث. ألقِ نظرة على ما هو جديد الآن."
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs focus:border-accent focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-slate-700">الوصف المختصر</label>
+                  <input
+                    type="text"
+                    value={galleryShowcaseForm.subtitle}
+                    onChange={(e) => setGalleryShowcaseForm({ ...galleryShowcaseForm, subtitle: e.target.value })}
+                    placeholder="مثال: استكشف أحدث الأجهزة والملحقات المميزة المضافة حديثاً في المركز."
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs focus:border-accent focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Add New Gallery Item Section */}
+              <div className="rounded-3xl border border-slate-200 bg-slate-50/50 p-5 space-y-4">
+                <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-1">
+                  <Plus className="w-4 h-4 text-sky-500" />
+                  إضافة كارت جديد إلى المعرض
+                </h3>
+                
+                <div className="grid gap-4 md:grid-cols-2">
+                  
+                  {/* Select Associated Product */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-slate-700">المنتج المرتبط بالكارت</label>
+                    <select
+                      value={newGalleryProductId}
+                      onChange={(e) => setNewGalleryProductId(e.target.value)}
+                      className="w-full cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs focus:border-accent focus:outline-none"
+                    >
+                      <option value="">-- اختر المنتج --</option>
+                      {products.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} ({p.category})
+                        </option>
+                      ))}
+                    </select>
+                    <span className="block text-[10px] text-slate-400">عندما يضغط العميل على هذا الكارت، سينتقل تلقائياً لصفحة هذا المنتج.</span>
+                  </div>
+
+                  {/* Upload Custom Image File */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-slate-700">الصورة المخصصة للكارت (الأبعاد المفضلة 4:5)</label>
+                    
+                    <div className="relative">
+                      {newGalleryImagePreview ? (
+                        <div className="relative w-32 aspect-[4/5] rounded-2xl border border-slate-200 overflow-hidden bg-white group">
+                          <img
+                            src={newGalleryImagePreview}
+                            alt="Preview"
+                            className="w-full h-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNewGalleryImageFile(null);
+                              setNewGalleryImagePreview(null);
+                            }}
+                            className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow cursor-pointer z-10"
+                            title="إزالة الصورة"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="border-2 border-dashed border-slate-200 rounded-xl p-4 bg-white hover:bg-slate-50 transition-colors flex flex-col items-center justify-center cursor-pointer relative group min-h-[110px]">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                setNewGalleryImageFile(file);
+                                setNewGalleryImagePreview(URL.createObjectURL(file));
+                              }
+                            }}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                          />
+                          <Upload className="w-6 h-6 text-slate-400 group-hover:text-accent transition-colors mb-1" />
+                          <span className="text-[10px] font-bold text-slate-500">اختر صورة مخصصة لرفعها</span>
+                          <span className="text-[8px] text-slate-400 mt-0.5">JPG, PNG بنسبة 4:5 (مثل 800×1000)</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="button"
+                    onClick={handleAddGalleryItem}
+                    disabled={isUploadingGalleryImage || !newGalleryProductId || !newGalleryImageFile}
+                    className="rounded-xl bg-[#1a1a1a] px-5 py-2.5 text-xs font-bold text-white shadow hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1.5"
+                  >
+                    {isUploadingGalleryImage ? (
+                      <>
+                        <Clock className="w-3.5 h-3.5 animate-spin" />
+                        جاري رفع الصورة...
+                      </>
+                    ) : (
+                      <>
+                        <PlusCircle className="w-3.5 h-3.5" />
+                        إضافة الكارت إلى قائمة المعرض
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Configured Gallery Items Grid */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-extrabold text-slate-900">الكروت الحالية بالمعرض ({galleryShowcaseForm.items?.length || 0})</h3>
+                
+                {(!galleryShowcaseForm.items || galleryShowcaseForm.items.length === 0) ? (
+                  <div className="rounded-2xl border border-dashed border-slate-200 p-10 text-center text-xs text-slate-400 bg-slate-50/20">
+                    لم تقم بإضافة أي كروت مخصصة للمعرض حالياً. قم بإضافة كروت باستخدام النموذج أعلاه.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                    {galleryShowcaseForm.items.map((item) => {
+                      const linkedProd = products.find(p => p.id === item.productId);
+                      return (
+                        <div
+                          key={item.id}
+                          className="relative aspect-[4/5] rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm group hover:border-rose-300 hover:shadow-md transition-all duration-300"
+                        >
+                          {/* Image */}
+                          <img
+                            src={item.imageUrl}
+                            alt="Gallery showcase card"
+                            className="w-full h-full object-cover"
+                          />
+                          
+                          {/* Card details overlay (hover) */}
+                          <div className="absolute inset-0 bg-slate-950/70 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-between p-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteGalleryItem(item.id, item.imageUrl)}
+                              className="self-start p-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg transition-colors cursor-pointer"
+                              title="حذف الكارت"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                            
+                            <div className="min-w-0">
+                              <span className="block text-[8px] font-bold text-slate-400">المنتج المرتبط:</span>
+                              <p className="text-[10px] font-black text-white truncate" title={linkedProd?.name}>
+                                {linkedProd?.name || "منتج غير معروف"}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Form Save Button */}
+              <div className="flex justify-end border-t border-slate-100 pt-4">
+                <button
+                  type="submit"
+                  className="rounded-xl bg-[#1a1a1a] px-6 py-3 text-xs font-bold text-white shadow-md hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  حفظ إعدادات معرض الصور
                 </button>
               </div>
             </form>

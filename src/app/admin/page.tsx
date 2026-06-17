@@ -130,6 +130,8 @@ export default function AdminPage() {
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+  const [isAdminVerified, setIsAdminVerified] = useState(false);
+  const [isVerifyingAdmin, setIsVerifyingAdmin] = useState(false);
 
   // Slides States
   const [isSlideModalOpen, setIsSlideModalOpen] = useState(false);
@@ -317,22 +319,50 @@ export default function AdminPage() {
     }
   };
 
+  const verifyAdminLive = async (token: string) => {
+    setIsVerifyingAdmin(true);
+    try {
+      const res = await fetch("/api/admin/verify", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ token }),
+      });
+      const data = await res.json();
+      if (data.isAdmin) {
+        setIsAdminVerified(true);
+      } else {
+        setIsAdminVerified(false);
+        setLoginError("حسابك غير مصرح له بالدخول كمسؤول!");
+        await supabase.auth.signOut();
+      }
+    } catch (e) {
+      console.error("Error verifying admin status:", e);
+      setIsAdminVerified(false);
+    } finally {
+      setIsVerifyingAdmin(false);
+    }
+  };
+
   useEffect(() => {
     // Check active sessions and sets the user
     const checkSession = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) {
-          // If refresh token is invalid or missing, clear the session data from local storage
-          if (error.message?.includes("Refresh Token")) {
+        if (error || !session) {
+          if (error?.message?.includes("Refresh Token")) {
             await supabase.auth.signOut().catch(() => { });
           }
           setIsLoggedIn(false);
+          setIsAdminVerified(false);
         } else {
-          setIsLoggedIn(!!session);
+          setIsLoggedIn(true);
+          await verifyAdminLive(session.access_token);
         }
       } catch (err) {
         setIsLoggedIn(false);
+        setIsAdminVerified(false);
       } finally {
         setIsLoadingAuth(false);
       }
@@ -342,6 +372,9 @@ export default function AdminPage() {
     // Listen for changes on auth state (logged in, signed out, etc.)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsLoggedIn(!!session);
+      if (!session) {
+        setIsAdminVerified(false);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -918,13 +951,15 @@ export default function AdminPage() {
     e.preventDefault();
     setLoginError("");
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (error) {
       setLoginError("البريد الإلكتروني أو كلمة المرور غير صحيحة!");
+    } else if (data.session) {
+      await verifyAdminLive(data.session.access_token);
     }
   };
 
@@ -1169,18 +1204,18 @@ export default function AdminPage() {
   );
 
   // --- LOGIN VIEW ---
-  if (isLoadingAuth) {
+  if (isLoadingAuth || isVerifyingAdmin) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans text-right" dir="rtl">
         <div className="animate-pulse flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-accent border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-slate-500 font-bold">جاري التحقق من الهوية...</p>
+          <p className="text-slate-500 font-bold">جاري التحقق من الهوية والصلاحيات...</p>
         </div>
       </div>
     );
   }
 
-  if (!isLoggedIn) {
+  if (!isLoggedIn || !isAdminVerified) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans text-right" dir="rtl">
         <div className="w-full max-w-md bg-white border border-card-border rounded-2xl p-8 shadow-xl space-y-6">

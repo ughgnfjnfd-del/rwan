@@ -8,7 +8,7 @@ import { useApp } from "@/context/AppContext";
 export default function PromoLandingPage() {
   const params = useParams();
   const router = useRouter();
-  const { couponCampaigns, couponCodes, applyCoupon, isInitialized } = useApp();
+  const { couponCampaigns, couponCodes, applyCoupon, validateCoupon, isInitialized } = useApp();
   const [successClaimed, setSuccessClaimed] = useState(false);
 
   const rawCode = params?.code;
@@ -18,7 +18,8 @@ export default function PromoLandingPage() {
   const campaign = coupon ? couponCampaigns.find((item) => item.id === coupon.campaignId) : null;
 
   // Perform initial scan record and validation
-  const isValid = coupon && coupon.isActive && (!campaign || campaign.isActive);
+  const validationResult = validateCoupon(code, "both", 0);
+  const isValid = validationResult.isValid;
 
   const handleClaim = () => {
     if (!code) return;
@@ -105,15 +106,15 @@ export default function PromoLandingPage() {
                 <div className="text-right space-y-1">
                   <span className="block text-[10px] font-black text-slate-400">قيمة الهدية</span>
                   <strong className="block text-2xl font-mono font-black text-sky-400">
-                    {coupon.discountType === "percent"
+                    {coupon?.discountType === "percent"
                       ? `${coupon.discountValue}% خصم`
-                      : `${coupon.discountValue.toLocaleString()} د.ع خصم`}
+                      : `${coupon?.discountValue?.toLocaleString()} د.ع خصم`}
                   </strong>
                 </div>
                 <div className="text-left space-y-1">
                   <span className="block text-[10px] font-black text-slate-400">الرمز الخاص بك</span>
                   <span className="block text-base font-mono font-black text-white tracking-widest bg-white/10 px-3.5 py-1 rounded-xl border border-white/10">
-                    {coupon.code}
+                    {coupon?.code}
                   </span>
                 </div>
               </div>
@@ -124,15 +125,15 @@ export default function PromoLandingPage() {
                   <TicketPercent className="w-4 h-4 text-sky-400 flex-shrink-0" />
                   <span>ينطبق الخصم على: 
                     <strong className="text-slate-200 mr-1.5">
-                      {coupon.appliesTo === "store"
+                      {coupon?.appliesTo === "store"
                         ? "المنتجات فقط"
-                        : coupon.appliesTo === "repair"
+                        : coupon?.appliesTo === "repair"
                         ? "خدمات الصيانة فقط"
                         : "كافة المنتجات وخدمات الصيانة"}
                     </strong>
                   </span>
                 </div>
-                {coupon.minOrderAmount > 0 && (
+                {coupon && coupon.minOrderAmount > 0 && (
                   <div className="flex items-center justify-start gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                     <span>الحد الأدنى للاستخدام: <strong className="text-slate-200 mr-1.5">{coupon.minOrderAmount.toLocaleString()} د.ع</strong></span>
@@ -157,9 +158,9 @@ export default function PromoLandingPage() {
               </div>
 
               <div className="space-y-3">
-                <h1 className="text-xl sm:text-2xl font-black text-white">رمز الخصم غير صالح</h1>
+                <h1 className="text-xl sm:text-2xl font-black text-white">رمز الخصم غير صالح أو مستخدم</h1>
                 <p className="text-xs sm:text-sm text-slate-400 leading-relaxed max-w-sm">
-                  عذراً، يبدو أن الكود <strong>{code}</strong> المستخدم غير متوفر في نظامنا أو قد انتهت صلاحية العرض الخاص به.
+                  {validationResult.message || `عذراً، يبدو أن الكود ${code} المستخدم غير متوفر في نظامنا أو قد انتهت صلاحية العرض الخاص به.`}
                 </p>
               </div>
 

@@ -477,6 +477,7 @@ export default function Home() {
     toggleWishlist,
     appliedCoupon,
     applyCoupon,
+    validateCouponLive,
     clearAppliedCoupon,
     couponCodes,
     recordCouponUse,
@@ -544,7 +545,21 @@ export default function Home() {
 
   const handleCheckoutSubmit = async (customer: { name: string; phone: string; address: string }): Promise<boolean> => {
     const total = cartItems.reduce((acc, curr) => acc + (curr.product.discountPrice || curr.product.price) * curr.quantity, 0);
-    const finalTotal = Math.max(0, total - couponDiscount) + (parseInt(siteSettings.shippingFee.replace(/[^0-9]/g, "")) || 0);
+    
+    let currentDiscount = couponDiscount;
+    let finalCouponCode = appliedCoupon ? appliedCoupon.code : undefined;
+
+    if (appliedCoupon) {
+      const liveValidation = await validateCouponLive(appliedCoupon.code, "store", total);
+      if (!liveValidation.isValid) {
+        alert(`عذراً، لم يعد رمز الخصم صالحاً للاستخدام: ${liveValidation.message}`);
+        clearAppliedCoupon();
+        return false;
+      }
+      currentDiscount = liveValidation.discountAmount;
+    }
+
+    const finalTotal = Math.max(0, total - currentDiscount) + (parseInt(siteSettings.shippingFee.replace(/[^0-9]/g, "")) || 0);
 
     try {
       const res = await fetch("/api/telegram", {
@@ -558,8 +573,8 @@ export default function Home() {
             customer,
             items: cartItems,
             total: total,
-            couponCode: appliedCoupon ? appliedCoupon.code : undefined,
-            couponDiscount: couponDiscount,
+            couponCode: finalCouponCode,
+            couponDiscount: currentDiscount,
             finalTotal: finalTotal,
           },
         }),

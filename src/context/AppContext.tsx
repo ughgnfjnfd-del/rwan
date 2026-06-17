@@ -307,6 +307,7 @@ interface AppContextType {
   updateCoupons: (campaigns: CouponCampaign[], codes: CouponCode[]) => Promise<void>;
   applyCoupon: (code: string, appliesTo: CouponAppliesTo, subtotal?: number) => CouponValidationResult;
   validateCoupon: (code: string, appliesTo: CouponAppliesTo, subtotal?: number) => CouponValidationResult;
+  validateCouponLive: (code: string, appliesTo: CouponAppliesTo, subtotal?: number) => Promise<CouponValidationResult>;
   clearAppliedCoupon: () => void;
   recordCouponScan: (code: string) => Promise<void>;
   recordCouponUse: (code: string, appliesTo: CouponAppliesTo, subtotal?: number) => Promise<void>;
@@ -1054,13 +1055,166 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await persistCouponData(couponCampaigns, nextCodes);
   };
 
+  const validateCouponLive = async (rawCode: string, appliesTo: CouponAppliesTo, subtotal = 0): Promise<CouponValidationResult> => {
+    try {
+      const { data: settingsData, error } = await supabase
+        .from("site_settings")
+        .select("*")
+        .eq("key", "coupon_marketing")
+        .single();
+
+      if (!error && settingsData && settingsData.value) {
+        const couponMarketingObj = settingsData.value;
+        let freshCampaigns = couponCampaigns;
+        let freshCodes = couponCodes;
+
+        if (Array.isArray(couponMarketingObj.campaigns)) {
+          freshCampaigns = couponMarketingObj.campaigns;
+          setCouponCampaigns(freshCampaigns);
+        }
+        if (Array.isArray(couponMarketingObj.codes)) {
+          freshCodes = couponMarketingObj.codes;
+          setCouponCodes(freshCodes);
+        }
+
+        const normalizedCode = rawCode.trim().toUpperCase();
+        const coupon = freshCodes.find((item) => item.code.toUpperCase() === normalizedCode);
+
+        if (!coupon) {
+          return {
+            isValid: false,
+            message: "رمز الخصم غير موجود.",
+            discountAmount: 0,
+            label: "",
+          };
+        }
+
+        const campaign = freshCampaigns.find((item) => item.id === coupon.campaignId);
+        const now = Date.now();
+        const couponExpiry = coupon.expiresAt ? new Date(coupon.expiresAt).getTime() : 0;
+        const campaignStarts = campaign?.startsAt ? new Date(campaign.startsAt).getTime() : 0;
+        const campaignEnds = campaign?.endsAt ? new Date(campaign.endsAt).getTime() : 0;
+
+        if (!coupon.isActive || (campaign && !campaign.isActive)) {
+          return {
+            isValid: false,
+            message: "هذا الرمز غير فعال حالياً.",
+            coupon,
+            discountAmount: 0,
+            label: getCouponLabel(coupon),
+          };
+        }
+
+        if (campaignStarts && now < campaignStarts) {
+          return {
+            isValid: false,
+            message: "الحملة لم تبدأ بعد.",
+            coupon,
+            discountAmount: 0,
+            label: getCouponLabel(coupon),
+          };
+        }
+
+        if ((couponExpiry && now > couponExpiry) || (campaignEnds && now > campaignEnds)) {
+          return {
+            isValid: false,
+            message: "انتهت صلاحية رمز الخصم.",
+            coupon,
+            discountAmount: 0,
+            label: getCouponLabel(coupon),
+          };
+        }
+
+        if (coupon.maxUses > 0 && coupon.usedCount >= coupon.maxUses) {
+          return {
+            isValid: false,
+            message: "عذراً، تم استخدام هذا الكوبون بالكامل ولا يمكن استخدامه مجدداً.",
+            coupon,
+            discountAmount: 0,
+            label: getCouponLabel(coupon),
+          };
+        }
+
+        if (typeof window !== "undefined") {
+          try {
+            const usedCoupons = JSON.parse(localStorage.getItem("mw_used_coupons") || "[]");
+            if (Array.isArray(usedCoupons) && usedCoupons.includes(normalizedCode)) {
+              return {
+                isValid: false,
+                message: "لقد قمت باستخدام هذا الرمز مسبقاً على هذا الجهاز.",
+                coupon,
+                discountAmount: 0,
+                label: getCouponLabel(coupon),
+              };
+            }
+          } catch (e) {
+            console.error("Error checking used coupons from localStorage", e);
+          }
+        }
+
+        if (appliesTo !== "both" && coupon.appliesTo !== "both" && coupon.appliesTo !== appliesTo) {
+          return {
+            isValid: false,
+            message: appliesTo === "store" ? "هذا الرمز مخصص للصيانة فقط." : "هذا الرمز مخصص للمتجر فقط.",
+            coupon,
+            discountAmount: 0,
+            label: getCouponLabel(coupon),
+          };
+        }
+
+        if (coupon.minOrderAmount > 0 && subtotal > 0 && subtotal < coupon.minOrderAmount) {
+          return {
+            isValid: false,
+            message: `هذا الرمز يحتاج طلباً بقيمة ${coupon.minOrderAmount.toLocaleString()} د.ع أو أكثر.`,
+            coupon,
+            discountAmount: 0,
+            label: getCouponLabel(coupon),
+          };
+        }
+
+        const discountAmount = calculateCouponDiscount(coupon, subtotal);
+
+        return {
+          isValid: true,
+          message: "تم تطبيق رمز الخصم بنجاح.",
+          coupon,
+          discountAmount,
+          label: getCouponLabel(coupon),
+        };
+      }
+    } catch (e) {
+      console.error("Error fetching live coupon data from Supabase:", e);
+    }
+
+    return validateCoupon(rawCode, appliesTo, subtotal);
+  };
+
   const recordCouponUse = async (rawCode: string, appliesTo: CouponAppliesTo, subtotal = 0) => {
-    const result = validateCoupon(rawCode, appliesTo, subtotal);
-    if (!result.isValid || !result.coupon) return;
+    let latestCampaigns = couponCampaigns;
+    let latestCodes = couponCodes;
+    try {
+      const { data: settingsData, error } = await supabase
+        .from("site_settings")
+        .select("*")
+        .eq("key", "coupon_marketing")
+        .single();
+      if (!error && settingsData && settingsData.value) {
+        if (Array.isArray(settingsData.value.campaigns)) latestCampaigns = settingsData.value.campaigns;
+        if (Array.isArray(settingsData.value.codes)) latestCodes = settingsData.value.codes;
+      }
+    } catch (e) {
+      console.error("Error fetching latest coupons in recordCouponUse:", e);
+    }
 
     const normalizedCode = rawCode.trim().toUpperCase();
+    const coupon = latestCodes.find((item) => item.code.toUpperCase() === normalizedCode);
+    if (!coupon || !coupon.isActive) return;
 
-    // Blacklist this coupon locally for this device/browser
+    if (coupon.maxUses > 0 && coupon.usedCount >= coupon.maxUses) {
+      console.warn("Coupon is already fully used in recordCouponUse.");
+      return;
+    }
+
     if (typeof window !== "undefined") {
       try {
         const usedCoupons = JSON.parse(localStorage.getItem("mw_used_coupons") || "[]");
@@ -1073,19 +1227,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    const nextCodes = couponCodes.map((coupon) =>
-      coupon.code.toUpperCase() === normalizedCode
+    const nextCodes = latestCodes.map((item) =>
+      item.code.toUpperCase() === normalizedCode
         ? {
-            ...coupon,
-            usedCount: (coupon.usedCount || 0) + 1,
+            ...item,
+            usedCount: (item.usedCount || 0) + 1,
             lastUsedAt: new Date().toISOString(),
           }
-        : coupon
+        : item
     );
 
+    setCouponCampaigns(latestCampaigns);
     setCouponCodes(nextCodes);
     clearAppliedCoupon();
-    await persistCouponData(couponCampaigns, nextCodes);
+    await persistCouponData(latestCampaigns, nextCodes);
   };
 
   useEffect(() => {
@@ -1177,6 +1332,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         galleryShowcase,
         applyCoupon,
         validateCoupon,
+        validateCouponLive,
         clearAppliedCoupon,
         recordCouponScan,
         recordCouponUse,

@@ -31,7 +31,8 @@ export async function POST(request: Request) {
         const colorText = item.selectedColor ? ` (اللون: ${item.selectedColor.name})` : "";
         const portText = item.selectedPort ? ` (المنفذ: ${item.selectedPort})` : "";
         text += `${i + 1}. <b>${item.product.name}${colorText}${portText}</b>\n`;
-        text += `   الكمية: ${item.quantity} | السعر: ${(item.product.price * item.quantity).toLocaleString()} د.ع\n`;
+        const itemPrice = item.product.discountPrice || item.product.price;
+        text += `   الكمية: ${item.quantity} | السعر: ${(itemPrice * item.quantity).toLocaleString()} د.ع\n`;
       });
       
       if (couponCode && couponDiscount > 0) {

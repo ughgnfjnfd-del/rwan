@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import PartnerSiteButton from "@/components/PartnerSiteButton";
 import {
   Scale,
   ShieldCheck,
@@ -77,6 +78,7 @@ export default function PoliciesLayout({ children }: PolicyLayoutProps) {
             <Link href="/#categories" className="hover:text-accent transition-colors">ملحقات</Link>
             <Link href="/#repair" className="hover:text-accent transition-colors">صيانة</Link>
             <Link href="/#about" className="hover:text-accent transition-colors">من نحن</Link>
+            <PartnerSiteButton />
           </nav>
 
           {/* Return button */}
@@ -88,6 +90,8 @@ export default function PoliciesLayout({ children }: PolicyLayoutProps) {
               <ArrowRight className="w-3.5 h-3.5" />
               <span>العودة للمتجر</span>
             </Link>
+
+            <PartnerSiteButton variant="mobile" />
 
             {/* Mobile menu trigger */}
             <button

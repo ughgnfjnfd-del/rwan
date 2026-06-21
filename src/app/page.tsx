@@ -45,6 +45,7 @@ import BundlesSection from "@/components/BundlesSection";
 import PromoPopUp from "@/components/PromoPopUp";
 import PremiumShowcaseSection from "@/components/PremiumShowcaseSection";
 import GalleryShowcase from "@/components/GalleryShowcase";
+import PartnerSiteButton from "@/components/PartnerSiteButton";
 
 const getProductHighlights = (product: Product) => {
   if (product.image.startsWith("charger-")) {
@@ -342,11 +343,10 @@ function ProductDetailModal({ product, isOpen, onClose, onAddToCart, allProducts
                       key={idx}
                       onClick={() => setSelectedPort(port)}
                       type="button"
-                      className={`relative px-4 py-2 text-xs font-bold rounded-xl border transition-all duration-200 active:scale-95 cursor-pointer ${
-                        isSelected
+                      className={`relative px-4 py-2 text-xs font-bold rounded-xl border transition-all duration-200 active:scale-95 cursor-pointer ${isSelected
                           ? "bg-[#1a1a1a] border-[#1a1a1a] text-white shadow-md scale-[1.02]"
                           : "bg-slate-50/50 border-slate-200 text-slate-650 hover:bg-slate-50 hover:border-slate-350"
-                      }`}
+                        }`}
                     >
                       {port}
                     </button>
@@ -545,9 +545,9 @@ export default function Home() {
 
   const handleCheckoutSubmit = async (customer: { name: string; phone: string; address: string }): Promise<boolean> => {
     const total = cartItems.reduce((acc, curr) => acc + (curr.product.discountPrice || curr.product.price) * curr.quantity, 0);
-    
+
     let currentDiscount = couponDiscount;
-    let finalCouponCode = appliedCoupon ? appliedCoupon.code : undefined;
+    const finalCouponCode = appliedCoupon ? appliedCoupon.code : undefined;
 
     if (appliedCoupon) {
       const liveValidation = await validateCouponLive(appliedCoupon.code, "store", total);
@@ -681,6 +681,7 @@ export default function Home() {
             <a href="#repair" className="hover:text-accent transition-colors">صيانة</a>
             <a href="#about" className="hover:text-accent transition-colors">من نحن</a>
             <a href="#contact" className="hover:text-accent transition-colors">اتصل بنا</a>
+            <PartnerSiteButton />
           </nav>
 
           {/* Left: Actions (Desktop & Mobile) */}
@@ -712,8 +713,8 @@ export default function Home() {
                   <div className="absolute left-0 mt-2 w-[420px] bg-white/95 backdrop-blur-md border border-slate-200/80 rounded-2xl shadow-2xl z-50 overflow-hidden text-right animate-in fade-in-50 slide-in-from-top-2 duration-200">
                     <div className="p-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                       <span className="text-[11px] font-extrabold text-slate-500">نتائج البحث السريعة ({filteredProducts.length})</span>
-                      <button 
-                        onClick={() => setShowSearchDropdown(false)} 
+                      <button
+                        onClick={() => setShowSearchDropdown(false)}
                         className="text-slate-400 hover:text-slate-650 p-1 rounded-full hover:bg-slate-100 transition-colors"
                       >
                         <X className="w-3.5 h-3.5" />
@@ -722,14 +723,14 @@ export default function Home() {
 
                     {filteredProducts.length === 0 ? (
                       <div className="p-6 text-center text-slate-400 text-xs">
-                        لا توجد نتائج مطابقة لبحثك "{searchQuery}".
+                        لا توجد نتائج مطابقة لبحثك &quot;{searchQuery}&quot;.
                       </div>
                     ) : (
                       <div className="max-h-[360px] overflow-y-auto divide-y divide-slate-100/60">
                         {filteredProducts.slice(0, 5).map((product) => {
                           const discountPercent = getDiscountPercent(product);
                           return (
-                            <div 
+                            <div
                               key={product.id}
                               onClick={() => {
                                 setSelectedProduct(product);
@@ -856,6 +857,8 @@ export default function Home() {
               <Lock className="w-4 h-4 text-slate-600 group-hover:text-accent transition-colors" />
             </Link>
 
+            <PartnerSiteButton variant="mobile" />
+
             {/* Mobile Hamburg Menu Button */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -928,8 +931,8 @@ export default function Home() {
               <div className="absolute right-0 left-0 mt-2 bg-white/95 backdrop-blur-md border border-slate-200/80 rounded-2xl shadow-2xl z-50 overflow-hidden text-right animate-in fade-in-50 slide-in-from-top-2 duration-200">
                 <div className="p-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                   <span className="text-[11px] font-extrabold text-slate-500">نتائج البحث السريعة ({filteredProducts.length})</span>
-                  <button 
-                    onClick={() => setShowSearchDropdown(false)} 
+                  <button
+                    onClick={() => setShowSearchDropdown(false)}
                     className="text-slate-400 hover:text-slate-650 p-1 rounded-full hover:bg-slate-100 transition-colors"
                   >
                     <X className="w-3.5 h-3.5" />
@@ -938,14 +941,14 @@ export default function Home() {
 
                 {filteredProducts.length === 0 ? (
                   <div className="p-6 text-center text-slate-400 text-xs">
-                    لا توجد نتائج مطابقة لبحثك "{searchQuery}".
+                    لا توجد نتائج مطابقة لبحثك &quot;{searchQuery}&quot;.
                   </div>
                 ) : (
                   <div className="max-h-[320px] overflow-y-auto divide-y divide-slate-100/60">
                     {filteredProducts.slice(0, 5).map((product) => {
                       const discountPercent = getDiscountPercent(product);
                       return (
-                        <div 
+                        <div
                           key={product.id}
                           onClick={() => {
                             setSelectedProduct(product);
@@ -1051,8 +1054,8 @@ export default function Home() {
             <div
               onClick={() => handleCategoryClick("موبايلات")}
               className={`p-5 rounded-2xl border text-right transition-all duration-200 hover:shadow-md cursor-pointer group flex flex-col justify-between h-40 ${activeCategory === "موبايلات"
-                  ? "bg-slate-50 border-accent/60 ring-1 ring-accent/60"
-                  : "bg-white border-card-border hover:border-slate-300"
+                ? "bg-slate-50 border-accent/60 ring-1 ring-accent/60"
+                : "bg-white border-card-border hover:border-slate-300"
                 }`}
             >
               <div className="p-2.5 bg-slate-100 rounded-xl text-slate-700 w-fit group-hover:scale-105 transition-transform duration-200">
@@ -1070,8 +1073,8 @@ export default function Home() {
             <div
               onClick={() => handleCategoryClick("كفرات")}
               className={`p-5 rounded-2xl border text-right transition-all duration-200 hover:shadow-md cursor-pointer group flex flex-col justify-between h-40 ${activeCategory === "كفرات"
-                  ? "bg-slate-50 border-accent/60 ring-1 ring-accent/60"
-                  : "bg-white border-card-border hover:border-slate-300"
+                ? "bg-slate-50 border-accent/60 ring-1 ring-accent/60"
+                : "bg-white border-card-border hover:border-slate-300"
                 }`}
             >
               <div className="p-2.5 bg-slate-100 rounded-xl text-slate-700 w-fit group-hover:scale-105 transition-transform duration-200">
@@ -1089,8 +1092,8 @@ export default function Home() {
             <div
               onClick={() => handleCategoryClick("سماعات")}
               className={`p-5 rounded-2xl border text-right transition-all duration-200 hover:shadow-md cursor-pointer group flex flex-col justify-between h-40 ${activeCategory === "سماعات"
-                  ? "bg-slate-50 border-accent/60 ring-1 ring-accent/60"
-                  : "bg-white border-card-border hover:border-slate-300"
+                ? "bg-slate-50 border-accent/60 ring-1 ring-accent/60"
+                : "bg-white border-card-border hover:border-slate-300"
                 }`}
             >
               <div className="p-2.5 bg-slate-100 rounded-xl text-slate-700 w-fit group-hover:scale-105 transition-transform duration-200">
@@ -1108,8 +1111,8 @@ export default function Home() {
             <div
               onClick={() => handleCategoryClick("شواحن")}
               className={`p-5 rounded-2xl border text-right transition-all duration-200 hover:shadow-md cursor-pointer group flex flex-col justify-between h-40 ${activeCategory === "شواحن"
-                  ? "bg-slate-50 border-accent/60 ring-1 ring-accent/60"
-                  : "bg-white border-card-border hover:border-slate-300"
+                ? "bg-slate-50 border-accent/60 ring-1 ring-accent/60"
+                : "bg-white border-card-border hover:border-slate-300"
                 }`}
             >
               <div className="p-2.5 bg-slate-100 rounded-xl text-slate-700 w-fit group-hover:scale-105 transition-transform duration-200">
@@ -1127,8 +1130,8 @@ export default function Home() {
             <div
               onClick={() => handleCategoryClick("كابلات")}
               className={`p-5 rounded-2xl border text-right transition-all duration-200 hover:shadow-md cursor-pointer group flex flex-col justify-between h-40 ${activeCategory === "كابلات"
-                  ? "bg-slate-50 border-accent/60 ring-1 ring-accent/60"
-                  : "bg-white border-card-border hover:border-slate-300"
+                ? "bg-slate-50 border-accent/60 ring-1 ring-accent/60"
+                : "bg-white border-card-border hover:border-slate-300"
                 }`}
             >
               <div className="p-2.5 bg-slate-100 rounded-xl text-slate-700 w-fit group-hover:scale-105 transition-transform duration-200">
@@ -1146,8 +1149,8 @@ export default function Home() {
             <div
               onClick={() => handleCategoryClick("ملحقات")}
               className={`p-5 rounded-2xl border text-right transition-all duration-200 hover:shadow-md cursor-pointer group flex flex-col justify-between h-40 ${activeCategory === "ملحقات"
-                  ? "bg-slate-50 border-accent/60 ring-1 ring-accent/60"
-                  : "bg-white border-card-border hover:border-slate-300"
+                ? "bg-slate-50 border-accent/60 ring-1 ring-accent/60"
+                : "bg-white border-card-border hover:border-slate-300"
                 }`}
             >
               <div className="p-2.5 bg-slate-100 rounded-xl text-slate-700 w-fit group-hover:scale-105 transition-transform duration-200">
@@ -1216,8 +1219,8 @@ export default function Home() {
                   key={cat}
                   onClick={() => setActiveCategory(cat)}
                   className={`text-xs font-bold px-4 py-2 rounded-lg border transition-all cursor-pointer ${activeCategory === cat
-                      ? "bg-[#1a1a1a] border-[#1a1a1a] text-white"
-                      : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                    ? "bg-[#1a1a1a] border-[#1a1a1a] text-white"
+                    : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
                     }`}
                 >
                   {cat}
@@ -1576,14 +1579,14 @@ export default function Home() {
         {siteSettings.promoBanner?.isEnabled && (
           <section
             className={`rounded-3xl p-6 sm:p-8 lg:p-10 relative overflow-hidden shadow-xl border flex flex-col md:flex-row items-center justify-between gap-6 transition-all duration-300 ${siteSettings.promoBanner.bgStyle === "glass-blue"
-                ? "bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-500 text-white border-blue-500/20 shadow-blue-500/20"
-                : siteSettings.promoBanner.bgStyle === "glass-emerald"
-                  ? "bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-500 text-white border-emerald-500/20 shadow-emerald-500/20"
-                  : siteSettings.promoBanner.bgStyle === "glass-amber"
-                    ? "bg-gradient-to-r from-amber-500 via-orange-600 to-yellow-500 text-white border-amber-500/20 shadow-amber-500/20"
-                    : siteSettings.promoBanner.bgStyle === "glass-dark"
-                      ? "bg-gradient-to-r from-slate-900 via-slate-800 to-slate-950 text-white border-slate-800 shadow-slate-950/40"
-                      : "bg-gradient-to-r from-rose-500 via-pink-600 to-red-500 text-white border-rose-500/20 shadow-rose-500/20" // default glass-rose
+              ? "bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-500 text-white border-blue-500/20 shadow-blue-500/20"
+              : siteSettings.promoBanner.bgStyle === "glass-emerald"
+                ? "bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-500 text-white border-emerald-500/20 shadow-emerald-500/20"
+                : siteSettings.promoBanner.bgStyle === "glass-amber"
+                  ? "bg-gradient-to-r from-amber-500 via-orange-600 to-yellow-500 text-white border-amber-500/20 shadow-amber-500/20"
+                  : siteSettings.promoBanner.bgStyle === "glass-dark"
+                    ? "bg-gradient-to-r from-slate-900 via-slate-800 to-slate-950 text-white border-slate-800 shadow-slate-950/40"
+                    : "bg-gradient-to-r from-rose-500 via-pink-600 to-red-500 text-white border-rose-500/20 shadow-rose-500/20" // default glass-rose
               }`}
           >
             {/* Glowing background bubble decorative graphics */}
@@ -1632,7 +1635,7 @@ export default function Home() {
               <p className="text-xs text-slate-500 leading-relaxed">
                 مركز الروان المعتمد لبيع وشراء الهواتف الذكية وحافضاتها الأنيقة والعصرية، والمركز المعتمد الأسرع في الصيانة بالمنطقة.
               </p>
-              
+
 
             </div>
 
@@ -1673,7 +1676,7 @@ export default function Home() {
                     </span>
                   </div>
                 </div>
-                
+
                 <div className="flex items-start gap-2.5 justify-start border-t border-slate-150/60 pt-3">
                   <div className="p-2 bg-sky-50 text-accent rounded-lg flex-shrink-0 mt-0.5">
                     <Clock className="w-4 h-4" />

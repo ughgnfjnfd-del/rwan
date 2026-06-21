@@ -172,12 +172,18 @@ export interface PromoBanner {
   bgStyle: string;
 }
 
+export interface PartnerSiteSettings {
+  name: string;
+  url: string;
+}
+
 export interface SiteSettings {
   email: string;
   phone: string;
   socials: Array<{ platform: string; url: string; name: string }>;
   shippingFee: string;
   promoBanner: PromoBanner;
+  partnerSite: PartnerSiteSettings;
 }
 
 export interface SlideItem {
@@ -340,6 +346,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       buttonText: "احجز الآن",
       buttonLink: "#repair",
       bgStyle: "glass-rose"
+    },
+    partnerSite: {
+      name: "",
+      url: ""
     }
   });
   const [heroSlides, setHeroSlides] = useState<SlideItem[]>([]);
@@ -425,6 +435,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const socialsObj = settingsData.find((s: any) => s.key === "socials")?.value;
           const shippingObj = settingsData.find((s: any) => s.key === "shipping")?.value;
           const promoBannerObj = settingsData.find((s: any) => s.key === "promo_banner")?.value;
+          const partnerSiteObj = settingsData.find((s: any) => s.key === "partner_site")?.value;
           const heroSlidesObj = settingsData.find((s: any) => s.key === "hero_slides")?.value;
 
           setSiteSettings((prev) => ({
@@ -440,6 +451,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               buttonText: promoBannerObj?.buttonText || prev.promoBanner.buttonText,
               buttonLink: promoBannerObj?.buttonLink || prev.promoBanner.buttonLink,
               bgStyle: promoBannerObj?.bgStyle || prev.promoBanner.bgStyle,
+            },
+            partnerSite: {
+              name: typeof partnerSiteObj?.name === "string" ? partnerSiteObj.name : prev.partnerSite.name,
+              url: typeof partnerSiteObj?.url === "string" ? partnerSiteObj.url : prev.partnerSite.url,
             }
           }));
 
@@ -766,6 +781,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         .from("site_settings")
         .upsert({ key: "promo_banner", value: updated.promoBanner });
       if (error) console.error("Error updating promo banner settings in Supabase", error);
+    }
+
+    if (updated.partnerSite !== undefined) {
+      const { error } = await supabase
+        .from("site_settings")
+        .upsert({ key: "partner_site", value: updated.partnerSite });
+      if (error) {
+        console.error("Error updating partner site settings in Supabase", error);
+        throw error;
+      }
     }
   };
 

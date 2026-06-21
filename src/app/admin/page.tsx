@@ -37,7 +37,8 @@ import {
   TicketPercent,
   Gift,
   BarChart2,
-  Copy
+  Copy,
+  Monitor
 } from "lucide-react";
 
 // Helper function to compress and resize images on client side
@@ -443,7 +444,7 @@ export default function AdminPage() {
       landingTitle: campaignForm.landingTitle,
       landingSubtitle: campaignForm.landingSubtitle,
       qrNote: campaignForm.qrNote,
-      createdAt: editingCampaignId 
+      createdAt: editingCampaignId
         ? (couponCampaigns.find(c => c.id === editingCampaignId)?.createdAt || new Date().toISOString())
         : new Date().toISOString(),
     };
@@ -535,6 +536,10 @@ export default function AdminPage() {
       buttonText: "احجز الآن",
       buttonLink: "#repair",
       bgStyle: "glass-rose"
+    },
+    partnerSite: {
+      name: "",
+      url: ""
     }
   });
 
@@ -903,6 +908,10 @@ export default function AdminPage() {
           buttonText: "احجز الآن",
           buttonLink: "#repair",
           bgStyle: "glass-rose"
+        },
+        partnerSite: siteSettings.partnerSite || {
+          name: "",
+          url: ""
         }
       });
     }
@@ -1882,6 +1891,46 @@ export default function AdminPage() {
                         required
                       />
                       <p className="text-[10px] text-slate-400">يمكنك كتابة رقم مثل "5000" ليتم احتسابه كـ 5,000 د.ع في الفاتورة، أو كتابة "مجاني" ليكون التوصيل مجاناً.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Partner Site Link Section */}
+                <div className="bg-sky-50/50 border border-sky-100 rounded-2xl p-5 space-y-4">
+                  <h3 className="font-extrabold text-sm text-slate-800 flex items-center gap-2">
+                    <Monitor className="w-4 h-4 text-sky-600" />
+                    ربط موقع الشريك
+                  </h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-700">اسم الموقع الآخر</label>
+                      <input
+                        type="text"
+                        value={settingsForm.partnerSite.name}
+                        onChange={(e) => setSettingsForm({
+                          ...settingsForm,
+                          partnerSite: { ...settingsForm.partnerSite, name: e.target.value }
+                        })}
+                        placeholder="قسم تجميعات الـ PC والشاشات"
+                        className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:border-sky-500 text-right"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-700">رابط الموقع الآخر (URL)</label>
+                      <input
+                        type="text"
+                        value={settingsForm.partnerSite.url}
+                        onChange={(e) => setSettingsForm({
+                          ...settingsForm,
+                          partnerSite: { ...settingsForm.partnerSite, url: e.target.value }
+                        })}
+                        placeholder="https://example.com"
+                        className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:border-sky-500 font-mono text-left"
+                        dir="ltr"
+                      />
+                      <p className="text-[10px] text-slate-400">سيظهر الزر في الشريط العلوي فقط عند إدخال رابط صحيح.</p>
                     </div>
                   </div>
                 </div>
@@ -2882,9 +2931,9 @@ export default function AdminPage() {
                   <Plus className="w-4 h-4 text-sky-500" />
                   إضافة كارت جديد إلى المعرض
                 </h3>
-                
+
                 <div className="grid gap-4 md:grid-cols-2">
-                  
+
                   {/* Select Associated Product */}
                   <div className="space-y-2">
                     <label className="text-xs font-semibold text-slate-700">المنتج المرتبط بالكارت</label>
@@ -2906,7 +2955,7 @@ export default function AdminPage() {
                   {/* Upload Custom Image File */}
                   <div className="space-y-2">
                     <label className="text-xs font-semibold text-slate-700">الصورة المخصصة للكارت (الأبعاد المفضلة 4:5)</label>
-                    
+
                     <div className="relative">
                       {newGalleryImagePreview ? (
                         <div className="relative w-32 aspect-[4/5] rounded-2xl border border-slate-200 overflow-hidden bg-white group">
@@ -2976,7 +3025,7 @@ export default function AdminPage() {
               {/* Configured Gallery Items Grid */}
               <div className="space-y-3">
                 <h3 className="text-sm font-extrabold text-slate-900">الكروت الحالية بالمعرض ({galleryShowcaseForm.items?.length || 0})</h3>
-                
+
                 {(!galleryShowcaseForm.items || galleryShowcaseForm.items.length === 0) ? (
                   <div className="rounded-2xl border border-dashed border-slate-200 p-10 text-center text-xs text-slate-400 bg-slate-50/20">
                     لم تقم بإضافة أي كروت مخصصة للمعرض حالياً. قم بإضافة كروت باستخدام النموذج أعلاه.
@@ -2996,7 +3045,7 @@ export default function AdminPage() {
                             alt="Gallery showcase card"
                             className="w-full h-full object-cover"
                           />
-                          
+
                           {/* Card details overlay (hover) */}
                           <div className="absolute inset-0 bg-slate-950/70 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-between p-3 text-right">
                             <button
@@ -3007,7 +3056,7 @@ export default function AdminPage() {
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
-                            
+
                             <div className="min-w-0">
                               <span className="block text-[8px] font-bold text-slate-400">المنتج المرتبط:</span>
                               <p className="text-[10px] font-black text-white truncate" title={linkedProd?.name}>
@@ -3111,7 +3160,7 @@ export default function AdminPage() {
           {/* TAB 8: COUPONS & MARKETING CAMPAIGNS */}
           {activeTab === "coupons" && (
             <div className="space-y-6 text-right" dir="rtl">
-              
+
               {/* Header */}
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-4">
                 <div>
@@ -3172,11 +3221,11 @@ export default function AdminPage() {
 
               {/* Content Split */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                
+
                 {/* Campaigns List Column */}
                 <div className="lg:col-span-5 space-y-4">
                   <h3 className="font-extrabold text-sm text-slate-850">قائمة الحملات التسويقية</h3>
-                  
+
                   {couponCampaigns.length === 0 ? (
                     <div className="p-8 border border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-450">
                       لا توجد حملات تسويقية مضافة حالياً.
@@ -3190,32 +3239,29 @@ export default function AdminPage() {
                           <div
                             key={cam.id}
                             onClick={() => setSelectedCampaignId(cam.id)}
-                            className={`p-4 rounded-xl border transition-all cursor-pointer text-right space-y-2 relative group ${
-                              isSelected
+                            className={`p-4 rounded-xl border transition-all cursor-pointer text-right space-y-2 relative group ${isSelected
                                 ? "bg-slate-900 border-slate-900 text-white shadow-md"
                                 : "bg-white border-slate-200 hover:border-slate-350"
-                            }`}
+                              }`}
                           >
                             <div className="flex justify-between items-start">
                               <h4 className="font-black text-xs sm:text-sm">{cam.name}</h4>
-                              <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
-                                cam.isActive
+                              <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${cam.isActive
                                   ? isSelected ? "bg-emerald-500/20 text-emerald-300" : "bg-emerald-50 text-emerald-600"
                                   : isSelected ? "bg-white/10 text-white/50" : "bg-slate-150 text-slate-400"
-                              }`}>
+                                }`}>
                                 {cam.isActive ? "نشط" : "متوقف"}
                               </span>
                             </div>
-                            <p className={`text-[11px] leading-relaxed line-clamp-2 ${
-                              isSelected ? "text-slate-300" : "text-slate-500"
-                            }`}>
+                            <p className={`text-[11px] leading-relaxed line-clamp-2 ${isSelected ? "text-slate-300" : "text-slate-500"
+                              }`}>
                               {cam.description || "لا يوجد وصف للحملة."}
                             </p>
                             <div className="flex justify-between items-center text-[10px] border-t pt-2 mt-2 border-slate-150/10">
                               <span className={isSelected ? "text-slate-400" : "text-slate-500"}>
                                 الرموز: {camCodes.length} | مسحات: {camCodes.reduce((acc, c) => acc + (c.scanCount || 0), 0)}
                               </span>
-                              
+
                               {/* Edit / Delete Buttons */}
                               <div className="flex gap-2">
                                 <button
@@ -3238,9 +3284,8 @@ export default function AdminPage() {
                                     });
                                     setIsCampaignModalOpen(true);
                                   }}
-                                  className={`p-1 rounded hover:bg-white/10 ${
-                                    isSelected ? "text-white" : "text-slate-500"
-                                  }`}
+                                  className={`p-1 rounded hover:bg-white/10 ${isSelected ? "text-white" : "text-slate-500"
+                                    }`}
                                   title="تعديل الحملة"
                                 >
                                   <Edit2 className="w-3.5 h-3.5" />
@@ -3258,9 +3303,8 @@ export default function AdminPage() {
                                       }
                                     }
                                   }}
-                                  className={`p-1 rounded hover:bg-rose-500/10 ${
-                                    isSelected ? "text-rose-300" : "text-rose-500"
-                                  }`}
+                                  className={`p-1 rounded hover:bg-rose-500/10 ${isSelected ? "text-rose-300" : "text-rose-500"
+                                    }`}
                                   title="حذف الحملة"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
@@ -3278,8 +3322,8 @@ export default function AdminPage() {
                 <div className="lg:col-span-7 space-y-4">
                   <div className="flex justify-between items-center">
                     <h3 className="font-extrabold text-sm text-slate-850">
-                      {selectedCampaignId 
-                        ? `رموز الخصم للحملة: ${couponCampaigns.find(c => c.id === selectedCampaignId)?.name}` 
+                      {selectedCampaignId
+                        ? `رموز الخصم للحملة: ${couponCampaigns.find(c => c.id === selectedCampaignId)?.name}`
                         : "اختر حملة تسويقية لعرض وإدارة الأكواد"}
                     </h3>
                     {selectedCampaignId && (
@@ -3316,7 +3360,7 @@ export default function AdminPage() {
                       const selectedCam = couponCampaigns.find(c => c.id === selectedCampaignId)!;
                       return (
                         <div className="space-y-4">
-                          
+
                           {/* QR / UTM Info Quick Card */}
                           <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl text-xs space-y-2 leading-relaxed">
                             <div className="font-bold text-slate-700">تتبع UTM لروابط الحملة:</div>
@@ -3361,9 +3405,8 @@ export default function AdminPage() {
                                         استخدام: {c.usedCount || 0} / {c.maxUses > 0 ? c.maxUses : "∞"} | مسح: {c.scanCount || 0}
                                       </td>
                                       <td className="p-3">
-                                        <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
-                                          c.isActive ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : "bg-rose-50 text-rose-600 border border-rose-100"
-                                        }`}>
+                                        <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${c.isActive ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : "bg-rose-50 text-rose-600 border border-rose-100"
+                                          }`}>
                                           {c.isActive ? "فعال" : "متوقف"}
                                         </span>
                                       </td>
@@ -3677,11 +3720,10 @@ export default function AdminPage() {
                     return (
                       <label
                         key={portItem.key}
-                        className={`flex items-center justify-center gap-1.5 p-2 rounded-lg border text-[11px] font-bold cursor-pointer select-none transition-all duration-200 ${
-                          isChecked
+                        className={`flex items-center justify-center gap-1.5 p-2 rounded-lg border text-[11px] font-bold cursor-pointer select-none transition-all duration-200 ${isChecked
                             ? "bg-[#1a1a1a] border-[#1a1a1a] text-white shadow-xs"
                             : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                        }`}
+                          }`}
                       >
                         <input
                           type="checkbox"
@@ -4157,7 +4199,7 @@ export default function AdminPage() {
             </div>
 
             <form onSubmit={handleSaveCampaign} className="space-y-4 text-right overflow-y-auto flex-1 pl-1 pr-1 py-1 animate-fade-in">
-              
+
               {/* Name */}
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-700">اسم الحملة *</label>
@@ -4330,7 +4372,7 @@ export default function AdminPage() {
             </div>
 
             <form onSubmit={handleSaveCode} className="space-y-4 text-right overflow-y-auto flex-1 pl-1 pr-1 py-1 animate-fade-in">
-              
+
               {/* Code */}
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-700 flex justify-between items-center">

@@ -417,18 +417,27 @@ function ProductDetailModal({ product, isOpen, onClose, onAddToCart, allProducts
               </div>
             </div>
 
-            <button
-              onClick={() => {
-                for (let i = 0; i < qty; i++) {
-                  onAddToCart(product, selectedColor, selectedPort);
-                }
-                onClose();
-              }}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1a1a1a] px-6 py-4 text-sm font-black text-white shadow-lg shadow-slate-900/15 transition-all hover:bg-slate-800 active:scale-[0.99] cursor-pointer"
-            >
-              <ShoppingBag className="w-4 h-4" />
-              أضف للسلة الآن
-            </button>
+            {product.isOutOfStock ? (
+              <button
+                disabled
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-100 border border-slate-200 px-6 py-4 text-sm font-black text-slate-400 cursor-not-allowed"
+              >
+                المنتج نفذ من المخزون حالياً
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  for (let i = 0; i < qty; i++) {
+                    onAddToCart(product, selectedColor, selectedPort);
+                  }
+                  onClose();
+                }}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1a1a1a] px-6 py-4 text-sm font-black text-white shadow-lg shadow-slate-900/15 transition-all hover:bg-slate-800 active:scale-[0.99] cursor-pointer"
+              >
+                <ShoppingBag className="w-4 h-4" />
+                أضف للسلة الآن
+              </button>
+            )}
           </div>
 
           {related.length > 0 && (
@@ -644,15 +653,21 @@ export default function Home() {
 
           {/* Right: Brand Logo */}
           <div className="flex items-center gap-3">
-            <div className="text-right">
-              <span className="block text-lg sm:text-xl font-extrabold tracking-tight text-[#1a1a1a]">
-                مركز الروان
-              </span>
-              <span className="block text-[10px] sm:text-xs font-semibold tracking-wider text-slate-400 uppercase -mt-1 font-mono">
-                Rwan Center
-              </span>
-            </div>
-            <div className="w-1.5 h-8 bg-accent rounded-full hidden sm:block"></div>
+            {siteSettings?.logo?.url ? (
+              <img src={siteSettings.logo.url} alt="Logo" className="h-14 sm:h-16 w-auto object-contain" />
+            ) : (
+              <>
+                <div className="text-right">
+                  <span className="block text-lg sm:text-xl font-extrabold tracking-tight text-[#1a1a1a]">
+                    مركز الروان
+                  </span>
+                  <span className="block text-[10px] sm:text-xs font-semibold tracking-wider text-slate-400 uppercase -mt-1 font-mono">
+                    Rwan Center
+                  </span>
+                </div>
+                <div className="w-1.5 h-8 bg-accent rounded-full hidden sm:block"></div>
+              </>
+            )}
           </div>
 
           {/* Center: Desktop Menu */}
@@ -857,7 +872,7 @@ export default function Home() {
               <Lock className="w-4 h-4 text-slate-600 group-hover:text-accent transition-colors" />
             </Link>
 
-            <PartnerSiteButton variant="mobile" />
+
 
             {/* Mobile Hamburg Menu Button */}
             <button
@@ -875,13 +890,17 @@ export default function Home() {
 
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-30 bg-black/40 backdrop-blur-sm md:hidden" onClick={() => setIsMobileMenuOpen(false)}>
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm md:hidden" onClick={() => setIsMobileMenuOpen(false)}>
           <div className="w-3/4 max-w-sm bg-white h-full p-6 shadow-2xl flex flex-col space-y-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-card-border pb-4">
-              <div>
-                <span className="block text-md font-extrabold">مركز الروان</span>
-                <span className="block text-[9px] font-bold text-slate-400 uppercase font-mono">Rwan Center</span>
-              </div>
+              {siteSettings?.logo?.url ? (
+                <img src={siteSettings.logo.url} alt="Logo" className="h-12 w-auto object-contain" />
+              ) : (
+                <div>
+                  <span className="block text-md font-extrabold">مركز الروان</span>
+                  <span className="block text-[9px] font-bold text-slate-400 uppercase font-mono">Rwan Center</span>
+                </div>
+              )}
               <button
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="p-1 rounded-full hover:bg-slate-100 text-slate-400"
@@ -897,6 +916,10 @@ export default function Home() {
               <a href="#repair" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-accent">مركز الصيانة</a>
               <a href="#about" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-accent">من نحن</a>
               <a href="#contact" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-accent">اتصل بنا</a>
+              
+              <div className="pt-2">
+                <PartnerSiteButton variant="mobile" />
+              </div>
             </nav>
           </div>
         </div>
@@ -1389,9 +1412,15 @@ export default function Home() {
                                       </span>
                                     )}
                                   </div>
-                                  <span className="hidden rounded-md bg-emerald-50 px-2 py-1 text-[9px] font-black text-emerald-600 sm:inline-flex">
-                                    متوفر
-                                  </span>
+                                  {product.isOutOfStock ? (
+                                    <span className="hidden rounded-md bg-rose-50 px-2 py-1 text-[9px] font-black text-rose-600 sm:inline-flex">
+                                      نفذت الكمية
+                                    </span>
+                                  ) : (
+                                    <span className="hidden rounded-md bg-emerald-50 px-2 py-1 text-[9px] font-black text-emerald-600 sm:inline-flex">
+                                      متوفر
+                                    </span>
+                                  )}
                                 </div>
 
                                 <div className="grid grid-cols-[1fr_auto] gap-2">
@@ -1404,15 +1433,26 @@ export default function Home() {
                                   >
                                     التفاصيل
                                   </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleAddToCart(product);
-                                    }}
-                                    className="flex items-center justify-center gap-1 rounded-xl bg-[#1a1a1a] px-3 py-2 text-[10px] font-black text-white transition-colors hover:bg-slate-800 cursor-pointer"
-                                  >
-                                    <ShoppingBag className="h-3.5 w-3.5" />
-                                  </button>
+                                  {product.isOutOfStock ? (
+                                    <button
+                                      disabled
+                                      className="flex items-center justify-center gap-1 rounded-xl bg-slate-100 px-3 py-2 text-[10px] font-black text-slate-400 cursor-not-allowed"
+                                      title="نفذت الكمية"
+                                    >
+                                      <span className="px-1 text-[9px]">نفذ</span>
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleAddToCart(product);
+                                      }}
+                                      className="flex items-center justify-center gap-1 rounded-xl bg-[#1a1a1a] px-3 py-2 text-[10px] font-black text-white transition-colors hover:bg-slate-800 cursor-pointer"
+                                      title="أضف للسلة"
+                                    >
+                                      <ShoppingBag className="h-3.5 w-3.5" />
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                             </div>

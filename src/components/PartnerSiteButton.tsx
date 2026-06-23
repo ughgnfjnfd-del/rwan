@@ -76,10 +76,10 @@ export default function PartnerSiteButton({ variant = "desktop" }: PartnerSiteBu
         rel="noopener noreferrer"
         aria-label={label}
         title={label}
-        className="inline-flex md:hidden h-10 w-10 items-center justify-center rounded-full border border-sky-200 bg-sky-50 text-sky-700 shadow-sm transition-all duration-200 hover:bg-sky-100 hover:text-sky-800 active:scale-95"
+        className="flex items-center gap-3 p-3 mt-2 rounded-xl border border-sky-100 bg-sky-50 text-sky-700 shadow-sm transition-all duration-200 hover:bg-sky-100 active:scale-[0.98] font-bold md:hidden"
       >
-        <Monitor className="h-4.5 w-4.5" />
-        <span className="sr-only">{label}</span>
+        <Monitor className="h-5 w-5" />
+        <span>{label}</span>
       </a>
     );
   }

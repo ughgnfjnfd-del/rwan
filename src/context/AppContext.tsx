@@ -21,6 +21,7 @@ export interface Product {
   rating?: number | null;
   reviewsCount?: number | null;
   ports?: string[] | null;
+  isOutOfStock?: boolean;
 }
 
 // Database Helpers & Mappers
@@ -39,6 +40,7 @@ const mapDBProduct = (dbProd: any): Product => ({
   rating: dbProd.rating !== undefined && dbProd.rating !== null ? Number(dbProd.rating) : 5,
   reviewsCount: dbProd.reviews_count !== undefined && dbProd.reviews_count !== null ? Number(dbProd.reviews_count) : 24,
   ports: dbProd.ports || null,
+  isOutOfStock: dbProd.is_out_of_stock || dbProd.isOutOfStock || false,
 });
 
 const mapLocalProductToDB = (prod: Partial<Product>) => {
@@ -59,6 +61,7 @@ const mapLocalProductToDB = (prod: Partial<Product>) => {
   if (prod.rating !== undefined) dbProd.rating = prod.rating;
   if (prod.reviewsCount !== undefined) dbProd.reviews_count = prod.reviewsCount;
   if (prod.ports !== undefined) dbProd.ports = prod.ports;
+  if (prod.isOutOfStock !== undefined) dbProd.is_out_of_stock = prod.isOutOfStock;
   return dbProd;
 };
 
@@ -184,6 +187,7 @@ export interface SiteSettings {
   shippingFee: string;
   promoBanner: PromoBanner;
   partnerSite: PartnerSiteSettings;
+  logo: { url: string };
 }
 
 export interface SlideItem {
@@ -350,7 +354,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     partnerSite: {
       name: "",
       url: ""
-    }
+    },
+    logo: { url: "" }
   });
   const [heroSlides, setHeroSlides] = useState<SlideItem[]>([]);
   const [wishlist, setWishlist] = useState<string[]>([]);
@@ -436,6 +441,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const shippingObj = settingsData.find((s: any) => s.key === "shipping")?.value;
           const promoBannerObj = settingsData.find((s: any) => s.key === "promo_banner")?.value;
           const partnerSiteObj = settingsData.find((s: any) => s.key === "partner_site")?.value;
+          const logoObj = settingsData.find((s: any) => s.key === "logo")?.value;
           const heroSlidesObj = settingsData.find((s: any) => s.key === "hero_slides")?.value;
 
           setSiteSettings((prev) => ({
@@ -455,6 +461,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             partnerSite: {
               name: typeof partnerSiteObj?.name === "string" ? partnerSiteObj.name : prev.partnerSite.name,
               url: typeof partnerSiteObj?.url === "string" ? partnerSiteObj.url : prev.partnerSite.url,
+            },
+            logo: {
+              url: typeof logoObj?.url === "string" ? logoObj.url : prev.logo.url,
             }
           }));
 
@@ -789,6 +798,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         .upsert({ key: "partner_site", value: updated.partnerSite });
       if (error) {
         console.error("Error updating partner site settings in Supabase", error);
+        throw error;
+      }
+    }
+
+    if (updated.logo !== undefined) {
+      const { error } = await supabase
+        .from("site_settings")
+        .upsert({ key: "logo", value: updated.logo });
+      if (error) {
+        console.error("Error updating logo settings in Supabase", error);
         throw error;
       }
     }

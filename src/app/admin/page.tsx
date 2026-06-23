@@ -85,7 +85,7 @@ const compressAndResizeImage = (file: File, maxWidth = 800, maxHeight = 800, qua
               reject(new Error("Canvas compression returned null blob"));
             }
           },
-          "image/jpeg",
+          file.type === "image/png" ? "image/png" : "image/webp",
           quality
         );
       };
@@ -515,6 +515,7 @@ export default function AdminPage() {
     description: "",
     specs: "",
     isPopular: false,
+    isOutOfStock: false,
     rating: 5,
     reviewsCount: 24,
     ports: [] as string[],
@@ -540,8 +541,24 @@ export default function AdminPage() {
     partnerSite: {
       name: "",
       url: ""
-    }
+    },
+    logo: { url: "" }
   });
+
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+
+  useEffect(() => {
+    if (siteSettings) {
+      setSettingsForm(prev => ({
+        ...prev,
+        ...siteSettings,
+        logo: siteSettings.logo || { url: "" }
+      }));
+      setLogoPreview(siteSettings.logo?.url || null);
+    }
+  }, [siteSettings]);
 
   const [newSocial, setNewSocial] = useState({
     platform: "facebook",
@@ -587,8 +604,48 @@ export default function AdminPage() {
     }
 
     setIsSavingAllSettings(true);
+    let finalLogoUrl = settingsForm.logo?.url || "";
+
+    if (logoFile) {
+      setIsUploadingLogo(true);
+      try {
+        const compressedBlob = await compressAndResizeImage(logoFile, 800, 800, 0.95);
+        const fileExtension = logoFile.name.split('.').pop() || 'png';
+        const cleanName = logoFile.name.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 20);
+        const filePath = `logo/${Date.now()}-${cleanName}.${fileExtension}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("products")
+          .upload(filePath, compressedBlob, {
+            contentType: `image/${fileExtension === 'png' ? 'png' : 'jpeg'}`,
+            cacheControl: "3600",
+            upsert: false
+          });
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from("products")
+          .getPublicUrl(filePath);
+
+        finalLogoUrl = publicUrl;
+
+        // Delete old logo if it exists
+        if (settingsForm.logo?.url && settingsForm.logo.url !== finalLogoUrl) {
+          await deleteImageFromSupabase(settingsForm.logo.url).catch(console.error);
+        }
+      } catch (error: any) {
+        console.error("Error uploading logo:", error);
+        alert(`حدث خطأ أثناء رفع الشعار: ${error.message || error}`);
+        setIsSavingAllSettings(false);
+        setIsUploadingLogo(false);
+        return;
+      }
+    }
+
     try {
-      await updateSiteSettings(settingsForm);
+      const finalSettings = { ...settingsForm, logo: { url: finalLogoUrl } };
+      await updateSiteSettings(finalSettings);
       await updateMarqueeSettings(marqueeForm);
       await updatePromoPopUp(promoPopUpForm);
       alert("تم حفظ كافة إعدادات الموقع بنجاح! 💾✨");
@@ -597,6 +654,8 @@ export default function AdminPage() {
       alert(`حدث خطأ أثناء حفظ الإعدادات: ${err.message || err}`);
     } finally {
       setIsSavingAllSettings(false);
+      setIsUploadingLogo(false);
+      setLogoFile(null);
     }
   };
 
@@ -912,7 +971,8 @@ export default function AdminPage() {
         partnerSite: siteSettings.partnerSite || {
           name: "",
           url: ""
-        }
+        },
+        logo: siteSettings.logo || { url: "", file: null }
       });
     }
   }, [siteSettings]);
@@ -994,6 +1054,7 @@ export default function AdminPage() {
       description: "",
       specs: "",
       isPopular: false,
+      isOutOfStock: false,
       rating: 5,
       reviewsCount: 24,
       ports: [],
@@ -1023,6 +1084,7 @@ export default function AdminPage() {
       description: product.description || "",
       specs: product.specs || "",
       isPopular: product.isPopular || false,
+      isOutOfStock: product.isOutOfStock || false,
       rating: product.rating !== undefined && product.rating !== null ? product.rating : 5,
       reviewsCount: product.reviewsCount !== undefined && product.reviewsCount !== null ? product.reviewsCount : 24,
       ports: product.ports || [],
@@ -1155,6 +1217,7 @@ export default function AdminPage() {
       description: productForm.description,
       specs: productForm.specs,
       isPopular: productForm.isPopular,
+      isOutOfStock: productForm.isOutOfStock,
       colors: finalColors,
       rating: productForm.rating,
       reviewsCount: productForm.reviewsCount,
@@ -1841,6 +1904,59 @@ export default function AdminPage() {
               </div>
 
               <form onSubmit={handleSaveAllSettings} className="space-y-6 text-right">
+
+                {/* Logo Section */}
+                <div className="bg-slate-50/50 border border-slate-100 rounded-2xl p-5 space-y-4">
+                  <h3 className="font-extrabold text-sm text-slate-800 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-accent" />
+                    شعار الموقع (Logo)
+                  </h3>
+                  
+                  <div className="flex flex-col sm:flex-row items-center gap-6">
+                    <div className="w-32 h-32 rounded-2xl border-2 border-dashed border-slate-300 bg-white flex flex-col items-center justify-center relative overflow-hidden group">
+                      {logoPreview ? (
+                        <>
+                          <img src={logoPreview} alt="Logo Preview" className="w-full h-full object-contain p-2" />
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <Trash2 
+                              className="w-6 h-6 text-white cursor-pointer hover:text-rose-400" 
+                              onClick={() => {
+                                setLogoPreview(null);
+                                setLogoFile(null);
+                                setSettingsForm({ ...settingsForm, logo: { url: "" } });
+                              }} 
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-center text-slate-400">
+                          <Upload className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                          <span className="text-[10px] font-bold block">رفع الشعار</span>
+                        </div>
+                      )}
+                      <input 
+                        type="file" 
+                        accept="image/png, image/jpeg, image/svg+xml, image/webp" 
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setLogoFile(file);
+                            setLogoPreview(URL.createObjectURL(file));
+                          }
+                        }}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+                        title="اختر صورة للشعار"
+                      />
+                    </div>
+                    
+                    <div className="flex-1 space-y-2 text-right">
+                      <p className="text-xs font-bold text-slate-700">قم برفع شعار للموقع بدقة عالية</p>
+                      <p className="text-[10px] text-slate-500 leading-relaxed">
+                        يُفضل استخدام صورة بصيغة PNG بخلفية شفافة. سيظهر هذا الشعار في ترويسة الموقع بدلاً من النص الافتراضي، ليعطي مظهراً احترافياً وأنيقاً. المقاس الموصى به: 200x60 بكسل أو ما يعادله.
+                      </p>
+                    </div>
+                  </div>
+                </div>
 
                 {/* Contact Info Section */}
                 <div className="bg-slate-50/50 border border-slate-100 rounded-2xl p-5 space-y-4">
@@ -3854,6 +3970,20 @@ export default function AdminPage() {
                 />
                 <label htmlFor="isPopular" className="text-xs font-semibold text-slate-700 cursor-pointer select-none">
                   عرض هذا المنتج كـ "منتج شائع" (Popular Product) في الشاشة الرئيسية
+                </label>
+              </div>
+
+              {/* Is Out Of Stock Checkbox */}
+              <div className="flex items-center gap-2 border border-red-100 rounded-xl p-3 bg-red-50">
+                <input
+                  type="checkbox"
+                  id="isOutOfStock"
+                  checked={productForm.isOutOfStock}
+                  onChange={(e) => setProductForm({ ...productForm, isOutOfStock: e.target.checked })}
+                  className="w-4 h-4 text-red-500 border-red-300 rounded focus:ring-red-500 cursor-pointer"
+                />
+                <label htmlFor="isOutOfStock" className="text-xs font-semibold text-red-700 cursor-pointer select-none">
+                  المنتج نفذ من المخزون (لن يتمكن العميل من إضافته للسلة)
                 </label>
               </div>
 

@@ -5,7 +5,7 @@ import "./globals.css";
 
 const cairo = Cairo({
   subsets: ["arabic", "latin"],
-  weight: ["300", "400", "500", "600", "700", "800"],
+  weight: ["300", "400", "500", "600", "700", "800", "900"],
   variable: "--font-cairo",
 });
 
@@ -25,7 +25,7 @@ export default function RootLayout({
       dir="rtl"
       className={`${cairo.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col font-sans bg-white text-[#1a1a1a]">
+      <body className="min-h-full flex flex-col font-sans bg-[#fcfcfc] text-[#1a1a1a]">
         <AppProvider>{children}</AppProvider>
       </body>
     </html>

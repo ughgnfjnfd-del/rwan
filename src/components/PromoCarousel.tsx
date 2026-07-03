@@ -76,7 +76,7 @@ export default function PromoCarousel({ onOpenRepairModal }: PromoCarouselProps)
   // Reset and restart timers when active index changes
   useEffect(() => {
     if (!heroSlides || heroSlides.length === 0) return;
-    
+
     // Clear existing intervals
     if (timerRef.current) clearTimeout(timerRef.current);
     if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
@@ -115,9 +115,10 @@ export default function PromoCarousel({ onOpenRepairModal }: PromoCarouselProps)
   const isProductVisual = activeSlide.graphicType === "product";
 
   return (
-    <section className="relative w-full rounded-[32px] overflow-hidden shadow-2xl border border-slate-200/50 select-none group/carousel">
+    <section className="relative w-full overflow-hidden select-none group/carousel bg-black">
       {/* Dynamic Backgrounds Styles Injector */}
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         @keyframes float-slow {
           0%, 100% { transform: translateY(0px) rotate(0deg); }
           50% { transform: translateY(-12px) rotate(1.5deg); }
@@ -148,42 +149,40 @@ export default function PromoCarousel({ onOpenRepairModal }: PromoCarouselProps)
       `}} />
 
       {/* Main Slide Panel */}
-      <div className={`w-full bg-gradient-to-br ${activeSlide.bgStyle} transition-all duration-700 ease-in-out ${isCustomVisual ? "min-h-[560px] sm:min-h-[620px] lg:min-h-[560px] px-5 py-8 sm:p-10 lg:px-12 lg:py-10" : "min-h-[480px] sm:min-h-[520px] lg:min-h-[440px] px-6 py-10 sm:p-12 lg:p-14"} flex flex-col lg:flex-row items-center justify-between ${isCustomVisual ? "gap-5 sm:gap-7 lg:gap-6" : "gap-8 sm:gap-12"} relative overflow-hidden`}>
-        
+      <div className={`w-full bg-gradient-to-br ${activeSlide.bgStyle} transition-all duration-1000 ease-in-out flex flex-col lg:flex-row items-center justify-center relative overflow-hidden min-h-[85vh] lg:min-h-[90vh]`}>
+
+        <div className={`max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 flex flex-col lg:flex-row items-center justify-between ${isCustomVisual ? "gap-5 sm:gap-7 lg:gap-6" : "gap-8 sm:gap-12"} z-10`}>
+
         {/* Glow ambient effects */}
         <div className={`absolute -top-1/2 -right-1/4 w-96 h-96 rounded-full blur-[100px] pointer-events-none opacity-40 transition-all duration-700 ${activeSlide.theme === 'dark' ? 'bg-sky-500' : 'bg-blue-300'}`}></div>
         <div className={`absolute -bottom-1/2 -left-1/4 w-96 h-96 rounded-full blur-[100px] pointer-events-none opacity-40 transition-all duration-700 ${activeSlide.theme === 'dark' ? 'bg-purple-600' : 'bg-yellow-200'}`}></div>
 
         {/* 1. Slide Text Information (RTL) */}
         <div className={`${isCustomVisual ? "lg:w-[38%] lg:flex-none" : "flex-1"} w-full text-right space-y-4 sm:space-y-5 z-10 order-2 lg:order-2`}>
-          
+
           {/* Badge */}
-          <span className={`inline-flex items-center gap-1.5 px-3 py-1 font-extrabold text-[10px] sm:text-xs rounded-full border tracking-wide shadow-sm animate-pulse ${
-            activeSlide.theme === "dark" 
-              ? "bg-white/10 text-sky-400 border-sky-500/20" 
+          <span className={`inline-flex items-center gap-1.5 px-3 py-1 font-extrabold text-[10px] sm:text-xs rounded-full border tracking-wide shadow-sm animate-pulse ${activeSlide.theme === "dark"
+              ? "bg-white/10 text-sky-400 border-sky-500/20"
               : "bg-blue-600/10 text-blue-600 border-blue-600/20"
-          }`}>
+            }`}>
             ✨ {activeSlide.badge}
           </span>
 
           {/* Title Banner */}
           <div className="space-y-1 sm:space-y-2">
-            <h2 className={`${isCustomVisual ? "text-3xl sm:text-4xl lg:text-5xl xl:text-6xl" : "text-3xl sm:text-4xl lg:text-5xl"} font-black tracking-tight leading-tight ${
-              activeSlide.theme === 'dark' ? 'text-white' : 'text-slate-900'
-            }`}>
+            <h2 className={`${isCustomVisual ? "text-3xl sm:text-4xl lg:text-5xl xl:text-6xl" : "text-3xl sm:text-4xl lg:text-5xl"} font-black tracking-tight leading-tight ${activeSlide.theme === 'dark' ? 'text-white' : 'text-slate-900'
+              }`}>
               {activeSlide.title}
             </h2>
-            <p className={`text-base sm:text-lg lg:text-xl font-bold tracking-tight ${
-              activeSlide.theme === 'dark' ? 'text-sky-400 text-glow-dark' : 'text-blue-600 text-glow-light'
-            }`}>
+            <p className={`text-base sm:text-lg lg:text-xl font-bold tracking-tight ${activeSlide.theme === 'dark' ? 'text-sky-400 text-glow-dark' : 'text-blue-600 text-glow-light'
+              }`}>
               {activeSlide.titleAccent}
             </p>
           </div>
 
           {/* Description */}
-          <p className={`text-xs sm:text-sm leading-relaxed max-w-2xl font-medium ${
-            activeSlide.theme === 'dark' ? 'text-slate-350' : 'text-slate-500'
-          }`}>
+          <p className={`text-xs sm:text-sm leading-relaxed max-w-2xl font-medium ${activeSlide.theme === 'dark' ? 'text-slate-350' : 'text-slate-500'
+            }`}>
             {activeSlide.description}
           </p>
 
@@ -192,22 +191,20 @@ export default function PromoCarousel({ onOpenRepairModal }: PromoCarouselProps)
             {activeSlide.actionType === "repair" ? (
               <button
                 onClick={onOpenRepairModal}
-                className={`w-full sm:w-auto text-center font-extrabold text-xs sm:text-sm px-8 py-3.5 rounded-2xl shadow-lg hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 cursor-pointer ${
-                  activeSlide.theme === "dark"
+                className={`w-full sm:w-auto text-center font-extrabold text-xs sm:text-sm px-8 py-3.5 rounded-2xl shadow-lg hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 cursor-pointer ${activeSlide.theme === "dark"
                     ? "bg-sky-500 text-slate-950 hover:bg-sky-400 shadow-sky-500/25"
                     : "bg-blue-600 text-white hover:bg-blue-500 shadow-blue-600/25"
-                }`}
+                  }`}
               >
                 {activeSlide.btnText}
               </button>
             ) : (
               <a
                 href={activeSlide.btnLink}
-                className={`w-full sm:w-auto text-center font-extrabold text-xs sm:text-sm px-8 py-3.5 rounded-2xl shadow-lg hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 block ${
-                  activeSlide.theme === "dark"
+                className={`w-full sm:w-auto text-center font-extrabold text-xs sm:text-sm px-8 py-3.5 rounded-2xl shadow-lg hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 block ${activeSlide.theme === "dark"
                     ? "bg-white text-slate-950 hover:bg-slate-50 shadow-white/10"
                     : "bg-[#1a1a1a] text-white hover:bg-slate-800 shadow-slate-900/25"
-                }`}
+                  }`}
               >
                 {activeSlide.btnText}
               </a>
@@ -215,7 +212,7 @@ export default function PromoCarousel({ onOpenRepairModal }: PromoCarouselProps)
           </div>
         </div>        {/* 2. Slide Visual Showcase (LTL/Left) */}
         <div className={`w-full ${isCustomVisual ? "lg:w-[62%]" : "lg:w-5/12"} flex items-center justify-center ${isCustomVisual ? "min-h-[320px] sm:min-h-[430px] lg:min-h-[500px]" : "min-h-[200px] sm:min-h-[260px] lg:min-h-0"} z-10 order-1 lg:order-1 relative`}>
-          
+
           {/* Laptop Mockup (MacBook Slide) */}
           {activeSlide.graphicType === "macbook" && (
             <div className="relative w-full max-w-[320px] sm:max-w-[360px] aspect-video flex flex-col items-center justify-center animate-float-slow">
@@ -258,7 +255,7 @@ export default function PromoCarousel({ onOpenRepairModal }: PromoCarouselProps)
             <div className="relative w-full max-w-[280px] aspect-[9/10] flex items-center justify-center">
               {/* Backglow */}
               <div className="absolute w-44 h-44 bg-sky-500/20 rounded-full blur-2xl animate-pulse"></div>
-              
+
               {/* Left Phone (Backwards / tilted) */}
               <div className="w-28 aspect-[9/18] bg-slate-800 rounded-[32px] p-[5px] border-2 border-slate-600 shadow-xl absolute -left-2 rotate-[-12deg] z-10 translate-y-3 scale-95 opacity-90 animate-float-reverse">
                 <div className="w-full h-full rounded-[27px] bg-gradient-to-b from-zinc-800 to-zinc-950 flex flex-col justify-between p-3 relative overflow-hidden">
@@ -284,7 +281,7 @@ export default function PromoCarousel({ onOpenRepairModal }: PromoCarouselProps)
                     <span>9:41</span>
                     <span className="text-sky-400 font-extrabold animate-pulse">5G</span>
                   </div>
-                  
+
                   <div className="flex-1 flex flex-col items-center justify-center py-4">
                     <span className="text-[15px] font-black text-white tracking-tight leading-none text-center">
                       A18 PRO
@@ -367,7 +364,7 @@ export default function PromoCarousel({ onOpenRepairModal }: PromoCarouselProps)
               <div className="absolute bottom-2 left-[10%] right-[4%] h-16 rounded-[100%] bg-black/30 blur-3xl opacity-45"></div>
               <div className="absolute -right-6 top-8 h-20 w-48 rounded-full border border-white/10 bg-white/10 blur-sm"></div>
               <div className="absolute -left-4 bottom-10 h-1 w-2/3 rounded-full bg-gradient-to-r from-transparent via-sky-300/70 to-transparent"></div>
-              
+
               {activeSlide.customImageUrl ? (
                 <div className="relative flex items-center justify-center rounded-[2.25rem] border border-white/20 bg-white/[0.07] p-2.5 shadow-[0_35px_90px_rgba(0,0,0,0.34)] backdrop-blur-md overflow-hidden">
                   <BannerSharpImage
@@ -394,7 +391,7 @@ export default function PromoCarousel({ onOpenRepairModal }: PromoCarouselProps)
             <div className="relative w-full max-w-[430px] aspect-[9/10] flex items-center justify-center">
               {/* Backglow */}
               <div className="absolute w-44 h-44 bg-sky-500/20 rounded-full blur-2xl animate-pulse"></div>
-              
+
               <div className="z-10 flex items-center justify-center">
                 {(() => {
                   const product = products.find((p) => p.id === activeSlide.productId);
@@ -434,66 +431,66 @@ export default function PromoCarousel({ onOpenRepairModal }: PromoCarouselProps)
           )}
 
         </div>
+      </div>
 
-        {/* 3. Slider Navigation Controls (Left/Right Arrows) */}
+      {/* 3. Slider Navigation Controls (Left/Right Arrows) */}
         <button
           onClick={prevSlide}
-          className={`absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 p-2 rounded-full backdrop-blur-md border border-white/10 opacity-100 md:opacity-0 md:group-hover/carousel:opacity-100 transition-opacity duration-300 z-30 cursor-pointer ${
-            activeSlide.theme === 'dark' 
-              ? 'bg-slate-900/40 text-white hover:bg-slate-900/60' 
+          className={`absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 p-2 rounded-full backdrop-blur-md border border-white/10 opacity-100 md:opacity-0 md:group-hover/carousel:opacity-100 transition-opacity duration-300 z-30 cursor-pointer ${activeSlide.theme === 'dark'
+              ? 'bg-slate-900/40 text-white hover:bg-slate-900/60'
               : 'bg-white/40 text-slate-800 hover:bg-white/60'
-          }`}
+            }`}
           aria-label="السابق"
         >
           <ChevronLeft className="w-4 h-4 sm:w-5 h-5" />
         </button>
         <button
           onClick={nextSlide}
-          className={`absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 p-2 rounded-full backdrop-blur-md border border-white/10 opacity-100 md:opacity-0 md:group-hover/carousel:opacity-100 transition-opacity duration-300 z-30 cursor-pointer ${
-            activeSlide.theme === 'dark' 
-              ? 'bg-slate-900/40 text-white hover:bg-slate-900/60' 
-              : 'bg-white/40 text-slate-800 hover:bg-white/60'
-          }`}
+          className={`absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 p-3 rounded-full backdrop-blur-md border border-white/10 opacity-100 md:opacity-0 md:group-hover/carousel:opacity-100 transition-all duration-300 z-30 cursor-pointer ${activeSlide.theme === 'dark'
+              ? 'bg-slate-900/40 text-white hover:bg-slate-900/80 hover:scale-110'
+              : 'bg-white/40 text-slate-800 hover:bg-white/80 hover:scale-110'
+            }`}
           aria-label="التالي"
         >
-          <ChevronRight className="w-4 h-4 sm:w-5 h-5" />
+          <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
         </button>
       </div>
 
-      {/* 4. Bottom Tab Bar Navigation (Pills Selector with sliding capsule) */}
-      <div className="w-full bg-slate-50 border-t border-slate-200/60 p-2 overflow-x-auto flex scrollbar-none">
-        <div className="max-w-4xl mx-auto w-full flex justify-between items-center gap-1.5 sm:gap-3 py-1 font-sans text-xs">
-          {heroSlides.map((slide, idx) => {
-            const isActive = idx === activeIndex;
-            return (
-              <button
-                key={slide.id}
-                onClick={() => selectSlide(idx)}
-                className={`flex-1 min-w-[76px] sm:min-w-[100px] text-center py-2.5 px-2 rounded-xl transition-all duration-300 flex flex-col items-center gap-1 relative overflow-hidden cursor-pointer select-none ${
-                  isActive
-                    ? "bg-[#1a1a1a] text-white shadow-md font-bold scale-[1.01]"
-                    : "text-slate-500 hover:text-slate-800 hover:bg-slate-100 font-semibold"
-                }`}
-              >
-                <span className="truncate w-full text-[10px] sm:text-xs">
-                  {slide.tabLabel}
-                </span>
-                
-                {/* 30 Seconds Loading Progress Indicator inside Pill */}
-                {isActive && (
-                  <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-[#1a1a1a]/25">
-                    <div 
-                      className="h-full bg-sky-400 transition-all ease-linear"
-                      style={{ 
-                        width: `${progress}%`,
-                        transitionDuration: `${progressStep}ms`
-                      }}
-                    ></div>
-                  </div>
-                )}
-              </button>
-            );
-          })}
+      {/* 4. Bottom Tab Bar Navigation (Sleek Floating Pills) */}
+      <div className="absolute bottom-4 sm:bottom-8 left-0 right-0 w-full px-4 flex justify-center z-30 pointer-events-none">
+        <div className="bg-black/30 backdrop-blur-2xl border border-white/15 p-1.5 sm:p-2 rounded-full overflow-x-auto flex scrollbar-none max-w-[95%] sm:max-w-4xl pointer-events-auto shadow-[0_20px_40px_rgba(0,0,0,0.4)]">
+          <div className="flex items-center gap-1 sm:gap-2">
+            {heroSlides.map((slide, idx) => {
+              const isActive = idx === activeIndex;
+              return (
+                <button
+                  key={slide.id}
+                  onClick={() => selectSlide(idx)}
+                  className={`min-w-[80px] sm:min-w-[120px] text-center py-2 px-3 sm:py-2.5 sm:px-5 rounded-full transition-all duration-500 flex flex-col items-center gap-1 relative overflow-hidden cursor-pointer select-none ${isActive
+                      ? "bg-white text-black shadow-lg font-black scale-100"
+                      : "text-white/60 hover:text-white hover:bg-white/10 font-bold"
+                    }`}
+                >
+                  <span className="truncate w-full text-[10px] sm:text-xs tracking-wide">
+                    {slide.tabLabel}
+                  </span>
+
+                  {/* 30 Seconds Loading Progress Indicator inside Pill */}
+                  {isActive && (
+                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/10">
+                      <div
+                        className="h-full bg-black transition-all ease-linear"
+                        style={{
+                          width: `${progress}%`,
+                          transitionDuration: `${progressStep}ms`
+                        }}
+                      ></div>
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
     </section>

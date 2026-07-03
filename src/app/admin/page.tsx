@@ -1911,20 +1911,20 @@ export default function AdminPage() {
                     <Sparkles className="w-4 h-4 text-accent" />
                     شعار الموقع (Logo)
                   </h3>
-                  
+
                   <div className="flex flex-col sm:flex-row items-center gap-6">
                     <div className="w-32 h-32 rounded-2xl border-2 border-dashed border-slate-300 bg-white flex flex-col items-center justify-center relative overflow-hidden group">
                       {logoPreview ? (
                         <>
                           <img src={logoPreview} alt="Logo Preview" className="w-full h-full object-contain p-2" />
                           <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <Trash2 
-                              className="w-6 h-6 text-white cursor-pointer hover:text-rose-400" 
+                            <Trash2
+                              className="w-6 h-6 text-white cursor-pointer hover:text-rose-400"
                               onClick={() => {
                                 setLogoPreview(null);
                                 setLogoFile(null);
                                 setSettingsForm({ ...settingsForm, logo: { url: "" } });
-                              }} 
+                              }}
                             />
                           </div>
                         </>
@@ -1934,9 +1934,9 @@ export default function AdminPage() {
                           <span className="text-[10px] font-bold block">رفع الشعار</span>
                         </div>
                       )}
-                      <input 
-                        type="file" 
-                        accept="image/png, image/jpeg, image/svg+xml, image/webp" 
+                      <input
+                        type="file"
+                        accept="image/png, image/jpeg, image/svg+xml, image/webp"
                         onChange={(e) => {
                           const file = e.target.files?.[0];
                           if (file) {
@@ -1944,11 +1944,11 @@ export default function AdminPage() {
                             setLogoPreview(URL.createObjectURL(file));
                           }
                         }}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                         title="اختر صورة للشعار"
                       />
                     </div>
-                    
+
                     <div className="flex-1 space-y-2 text-right">
                       <p className="text-xs font-bold text-slate-700">قم برفع شعار للموقع بدقة عالية</p>
                       <p className="text-[10px] text-slate-500 leading-relaxed">
@@ -2829,7 +2829,7 @@ export default function AdminPage() {
                     type="text"
                     value={premiumShowcaseForm.title}
                     onChange={(e) => setPremiumShowcaseForm({ ...premiumShowcaseForm, title: e.target.value })}
-                    placeholder="مثال: مختارات الروان المميزة"
+                    placeholder="مثال: عروض الروان المميزة"
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs focus:border-accent focus:outline-none"
                   />
                 </div>
@@ -2902,7 +2902,7 @@ export default function AdminPage() {
                       <Sparkles className="h-3.5 w-3.5 text-accent" />
                       {premiumShowcaseForm.badge || "العروض الأقوى"}
                     </span>
-                    <h3 className="text-2xl font-black text-slate-950">{premiumShowcaseForm.title || "مختارات الروان المميزة"}</h3>
+                    <h3 className="text-2xl font-black text-slate-950">{premiumShowcaseForm.title || "عروض الروان المميزة"}</h3>
                     <p className="text-xs font-medium leading-6 text-slate-500">{premiumShowcaseForm.subtitle || "سيظهر هنا وصف القسم في الصفحة الرئيسية."}</p>
                   </div>
 
@@ -3356,15 +3356,15 @@ export default function AdminPage() {
                             key={cam.id}
                             onClick={() => setSelectedCampaignId(cam.id)}
                             className={`p-4 rounded-xl border transition-all cursor-pointer text-right space-y-2 relative group ${isSelected
-                                ? "bg-slate-900 border-slate-900 text-white shadow-md"
-                                : "bg-white border-slate-200 hover:border-slate-350"
+                              ? "bg-slate-900 border-slate-900 text-white shadow-md"
+                              : "bg-white border-slate-200 hover:border-slate-350"
                               }`}
                           >
                             <div className="flex justify-between items-start">
                               <h4 className="font-black text-xs sm:text-sm">{cam.name}</h4>
                               <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${cam.isActive
-                                  ? isSelected ? "bg-emerald-500/20 text-emerald-300" : "bg-emerald-50 text-emerald-600"
-                                  : isSelected ? "bg-white/10 text-white/50" : "bg-slate-150 text-slate-400"
+                                ? isSelected ? "bg-emerald-500/20 text-emerald-300" : "bg-emerald-50 text-emerald-600"
+                                : isSelected ? "bg-white/10 text-white/50" : "bg-slate-150 text-slate-400"
                                 }`}>
                                 {cam.isActive ? "نشط" : "متوقف"}
                               </span>
@@ -3837,8 +3837,8 @@ export default function AdminPage() {
                       <label
                         key={portItem.key}
                         className={`flex items-center justify-center gap-1.5 p-2 rounded-lg border text-[11px] font-bold cursor-pointer select-none transition-all duration-200 ${isChecked
-                            ? "bg-[#1a1a1a] border-[#1a1a1a] text-white shadow-xs"
-                            : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                          ? "bg-[#1a1a1a] border-[#1a1a1a] text-white shadow-xs"
+                          : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
                           }`}
                       >
                         <input

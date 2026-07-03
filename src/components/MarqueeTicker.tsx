@@ -14,8 +14,9 @@ export default function MarqueeTicker() {
   const doubledItems = [...marqueeSettings.items, ...marqueeSettings.items, ...marqueeSettings.items];
 
   return (
-    <div className="w-full bg-[#1a1a1a] text-white border-b border-slate-800 text-[11px] sm:text-xs font-bold py-2.5 px-4 relative overflow-hidden select-none z-40" dir="rtl">
-      <style dangerouslySetInnerHTML={{ __html: `
+    <div className="w-full bg-black/85 backdrop-blur-xl text-white border-b border-white/10 text-[11px] sm:text-xs font-bold py-2.5 px-4 relative overflow-hidden select-none z-50" dir="rtl">
+      <style dangerouslySetInnerHTML={{
+        __html: `
         @keyframes marquee {
           0% { transform: translate3d(0, 0, 0); }
           100% { transform: translate3d(-33.333%, 0, 0); }

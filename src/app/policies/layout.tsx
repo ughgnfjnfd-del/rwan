@@ -77,7 +77,6 @@ export default function PoliciesLayout({ children }: PolicyLayoutProps) {
             <Link href="/#categories" className="hover:text-accent transition-colors">موبايلات</Link>
             <Link href="/#categories" className="hover:text-accent transition-colors">ملحقات</Link>
             <Link href="/#repair" className="hover:text-accent transition-colors">صيانة</Link>
-            <Link href="/#about" className="hover:text-accent transition-colors">من نحن</Link>
             <PartnerSiteButton />
           </nav>
 

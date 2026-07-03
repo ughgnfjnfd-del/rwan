@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Monitor } from "lucide-react";
 import { PartnerSiteSettings, useApp } from "@/context/AppContext";
 
-type PartnerSiteButtonVariant = "desktop" | "mobile";
+type PartnerSiteButtonVariant = "desktop" | "mobile" | "header-premium";
 
 interface PartnerSiteButtonProps {
   variant?: PartnerSiteButtonVariant;
@@ -80,6 +80,24 @@ export default function PartnerSiteButton({ variant = "desktop" }: PartnerSiteBu
       >
         <Monitor className="h-5 w-5" />
         <span>{label}</span>
+      </a>
+    );
+  }
+
+  if (variant === "header-premium") {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={label}
+        className="group relative inline-flex items-center justify-center overflow-hidden rounded-full p-0.5 font-bold transition-all hover:scale-105"
+      >
+        <span className="absolute inset-0 bg-gradient-to-r from-sky-400 via-blue-500 to-sky-400 opacity-70 group-hover:opacity-100 animate-pulse"></span>
+        <div className="relative flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1.5 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs text-slate-800 transition-all group-hover:bg-transparent group-hover:text-white">
+          <Monitor className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+          <span className="whitespace-nowrap">{label}</span>
+        </div>
       </a>
     );
   }

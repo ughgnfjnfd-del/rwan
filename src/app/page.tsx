@@ -12,6 +12,7 @@ import {
   Cpu,
   Wrench,
   ChevronRight,
+  ChevronLeft,
   Shield,
   Star,
   Globe,
@@ -46,6 +47,9 @@ import PromoPopUp from "@/components/PromoPopUp";
 import PremiumShowcaseSection from "@/components/PremiumShowcaseSection";
 import GalleryShowcase from "@/components/GalleryShowcase";
 import PartnerSiteButton from "@/components/PartnerSiteButton";
+import BackToTop from "@/components/BackToTop";
+import SplashLoader from "@/components/SplashLoader";
+import ProductSkeleton from "@/components/ProductSkeleton";
 
 const getProductHighlights = (product: Product) => {
   if (product.image.startsWith("charger-")) {
@@ -344,8 +348,8 @@ function ProductDetailModal({ product, isOpen, onClose, onAddToCart, allProducts
                       onClick={() => setSelectedPort(port)}
                       type="button"
                       className={`relative px-4 py-2 text-xs font-bold rounded-xl border transition-all duration-200 active:scale-95 cursor-pointer ${isSelected
-                          ? "bg-[#1a1a1a] border-[#1a1a1a] text-white shadow-md scale-[1.02]"
-                          : "bg-slate-50/50 border-slate-200 text-slate-650 hover:bg-slate-50 hover:border-slate-350"
+                        ? "bg-[#1a1a1a] border-[#1a1a1a] text-white shadow-md scale-[1.02]"
+                        : "bg-slate-50/50 border-slate-200 text-slate-650 hover:bg-slate-50 hover:border-slate-350"
                         }`}
                     >
                       {port}
@@ -377,7 +381,7 @@ function ProductDetailModal({ product, isOpen, onClose, onAddToCart, allProducts
             </div>
           </div>
 
-          <div className="mt-auto rounded-2xl border border-slate-100 bg-slate-50 p-4">
+          <div className="mt-auto rounded-2xl border border-slate-200/60 bg-white/85 backdrop-blur-xl p-4 sticky bottom-4 z-30 shadow-[0_-20px_40px_-15px_rgba(0,0,0,0.05)]">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <span className="text-[10px] font-black uppercase tracking-wide text-slate-400">سعر اليوم</span>
@@ -522,6 +526,28 @@ export default function Home() {
   const [showAllProducts, setShowAllProducts] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Smart Navbar: track scroll position for dynamic transparency
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll(); // Initial check
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // Simulate product loading state
+  useEffect(() => {
+    if (products.length > 0) {
+      const timer = setTimeout(() => setIsLoading(false), 600);
+      return () => clearTimeout(timer);
+    }
+  }, [products]);
+
+
 
   // Cart Handlers
   const handleAddToCart = (
@@ -605,6 +631,14 @@ export default function Home() {
     }
   };
 
+  const handleScroll = (id: string, direction: 'left' | 'right') => {
+    const container = document.getElementById(id);
+    if (container) {
+      const scrollAmount = container.clientWidth * 0.75;
+      container.scrollBy({ left: direction === 'left' ? -scrollAmount : scrollAmount, behavior: 'smooth' });
+    }
+  };
+
   // Category Navigation Handler
   const handleCategoryClick = (categoryName: string) => {
     setActiveCategory(categoryName);
@@ -637,24 +671,53 @@ export default function Home() {
     ...uniqueFilteredCats.filter(cat => !defaultCatsOrder.includes(cat))
   ];
 
+  // Scroll Reveal Observer
+  useEffect(() => {
+    if (isLoading) return; // Wait until loaded
+    
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('opacity-100', 'translate-y-0');
+          entry.target.classList.remove('opacity-0', 'translate-y-12');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.05, rootMargin: '0px 0px -50px 0px' });
+
+    const elements = document.querySelectorAll('.reveal-on-scroll');
+    elements.forEach((el) => {
+      el.classList.add('opacity-0', 'translate-y-12', 'transition-all', 'duration-1000', 'ease-out');
+      observer.observe(el);
+    });
+
+    return () => observer.disconnect();
+  }, [isLoading, filteredProducts]);
+
   // Get actual product objects for wishlist items
   const wishlistProducts = wishlist
     .map((id) => products.find((p) => p.id === id))
     .filter((p): p is Product => !!p);
 
   return (
-    <div className="min-h-screen bg-white text-[#1a1a1a] flex flex-col font-sans">
+    <div className="min-h-screen bg-[#fcfcfc] text-slate-900 flex flex-col font-sans selection:bg-accent/20">
 
       <MarqueeTicker />
 
-      {/* 1. Header (Navigation) */}
-      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-card-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+      {/* 1. Header (Navigation) — Smart Navbar */}
+      <header className={`sticky top-0 z-40 transition-all duration-500 ease-out ${
+        isScrolled
+          ? "bg-white/85 backdrop-blur-xl border-b border-slate-200/60 shadow-[0_1px_20px_rgba(0,0,0,0.04)]"
+          : "bg-white/40 backdrop-blur-sm border-b border-transparent"
+      }`}>
+        <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between transition-all duration-500 ${
+          isScrolled ? "h-16" : "h-20"
+        }`}>
 
           {/* Right: Brand Logo */}
           <div className="flex items-center gap-3">
             {siteSettings?.logo?.url ? (
-              <img src={siteSettings.logo.url} alt="Logo" className="h-14 sm:h-16 w-auto object-contain" />
+              <img src={siteSettings.logo.url} alt="Logo" className={`w-auto object-contain transition-all duration-500 ${isScrolled ? "h-10 sm:h-12" : "h-14 sm:h-16"}`} />
             ) : (
               <>
                 <div className="text-right">
@@ -694,13 +757,14 @@ export default function Home() {
               ملحقات
             </a>
             <a href="#repair" className="hover:text-accent transition-colors">صيانة</a>
-            <a href="#about" className="hover:text-accent transition-colors">من نحن</a>
             <a href="#contact" className="hover:text-accent transition-colors">اتصل بنا</a>
-            <PartnerSiteButton />
           </nav>
 
           {/* Left: Actions (Desktop & Mobile) */}
           <div className="flex items-center gap-2 sm:gap-4">
+
+            {/* Premium Partner Site Button (Always Visible) */}
+            <PartnerSiteButton variant="header-premium" />
 
             {/* Search Bar - Desktop */}
             <div className="relative hidden md:block z-50">
@@ -866,7 +930,7 @@ export default function Home() {
             {/* Admin Dashboard Link */}
             <Link
               href="/admin"
-              className="p-2.5 rounded-full hover:bg-slate-50 border border-slate-100 transition-colors relative cursor-pointer group"
+              className="hidden md:flex p-2.5 rounded-full hover:bg-slate-50 border border-slate-100 transition-colors relative cursor-pointer group"
               title="لوحة الإدارة"
             >
               <Lock className="w-4 h-4 text-slate-600 group-hover:text-accent transition-colors" />
@@ -914,19 +978,25 @@ export default function Home() {
               <a href="#categories" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-accent">الأقسام</a>
               <a href="#products" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-accent">المنتجات</a>
               <a href="#repair" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-accent">مركز الصيانة</a>
-              <a href="#about" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-accent">من نحن</a>
               <a href="#contact" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-accent">اتصل بنا</a>
               
-              <div className="pt-2">
-                <PartnerSiteButton variant="mobile" />
-              </div>
+              <div className="h-px bg-slate-100 my-2 w-full" />
+              <Link href="/admin" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 text-slate-500 hover:text-slate-900 mt-2">
+                <div className="p-2 bg-slate-50 rounded-lg">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <span>لوحة الإدارة</span>
+              </Link>
             </nav>
           </div>
         </div>
       )}
 
+      {/* 2. Hero Section (Dynamic Sliding Banner Carousel) - Edge to Edge */}
+      <PromoCarousel onOpenRepairModal={() => setIsRepairOpen(true)} />
+
       {/* Main Content Area */}
-      <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full space-y-12">
+      <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12 w-full space-y-20 lg:space-y-28">
 
         {/* Mobile-Only Search Box (Prominent top item) */}
         <div className="md:hidden w-full relative z-30">
@@ -1061,11 +1131,9 @@ export default function Home() {
           )}
         </div>
 
-        {/* 2. Hero Section (Dynamic Sliding Banner Carousel) */}
-        <PromoCarousel onOpenRepairModal={() => setIsRepairOpen(true)} />
 
         {/* 3. Bento Grid Categories */}
-        <section id="categories" className="space-y-6">
+        <section id="categories" className="space-y-6 reveal-on-scroll">
           <div className="text-right">
             <h2 className="text-xl sm:text-2xl font-extrabold text-[#1a1a1a]">تصفح الأقسام الرئيسية</h2>
             <p className="text-xs text-slate-500">اختر القسم الذي ترغب في استكشافه أو طلب خدماته</p>
@@ -1221,10 +1289,12 @@ export default function Home() {
         />
 
         {/* Bundles Lookbook Section */}
-        <BundlesSection />
+        <div className="reveal-on-scroll">
+          <BundlesSection />
+        </div>
 
         {/* 4. Product Showcase Grid */}
-        <section id="products" className="space-y-6">
+        <section id="products" className="space-y-6 reveal-on-scroll">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-right">
             <div>
               <h2 className="text-xl sm:text-2xl font-extrabold text-[#1a1a1a]">
@@ -1252,7 +1322,24 @@ export default function Home() {
             </div>
           </div>
 
-          {filteredProducts.length === 0 ? (
+          {isLoading ? (
+            <div className="space-y-10">
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 border-b border-slate-100 pb-2">
+                  <div className="w-20 h-5 rounded bg-slate-100 animate-pulse" />
+                  <div className="w-8 h-4 rounded-full bg-slate-100 animate-pulse" />
+                </div>
+                <ProductSkeleton count={5} />
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 border-b border-slate-100 pb-2">
+                  <div className="w-16 h-5 rounded bg-slate-100 animate-pulse" />
+                  <div className="w-8 h-4 rounded-full bg-slate-100 animate-pulse" />
+                </div>
+                <ProductSkeleton count={4} />
+              </div>
+            </div>
+          ) : filteredProducts.length === 0 ? (
             <div className="p-12 border border-dashed border-slate-200 rounded-2xl text-center text-slate-400">
               لا توجد منتجات تطابق بحثك حالياً.
             </div>
@@ -1262,7 +1349,7 @@ export default function Home() {
                 const catProds = filteredProducts.filter(p => p.category === catName);
                 if (catProds.length === 0) return null;
                 return (
-                  <div key={catName} className="space-y-4">
+                  <div key={catName} className="space-y-4 relative group/row">
                     <div className="flex items-center gap-3 border-b border-slate-100 pb-2">
                       <h3 className="font-extrabold text-base sm:text-lg text-slate-800">
                         {catName}
@@ -1272,193 +1359,213 @@ export default function Home() {
                       </span>
                     </div>
 
-                    <div className="flex md:grid overflow-x-auto md:overflow-x-visible gap-4 sm:gap-6 pb-4 md:pb-0 px-4 -mx-4 md:px-0 md:mx-0 snap-x snap-mandatory scrollbar-none grid-cols-2 lg:grid-cols-4">
-                      {catProds.map((product) => {
-                        const discountPercent = getDiscountPercent(product);
-                        const highlights = getProductHighlights(product);
-                        const visibleColors = product.colors?.slice(0, 4) || [];
+                    <div className="relative">
+                      {/* Desktop Navigation Arrows */}
+                      <button
+                        onClick={(e) => { e.preventDefault(); handleScroll(`scroll-cat-${catName}`, 'right'); }}
+                        className="hidden md:flex absolute -right-5 lg:-right-6 top-[calc(50%-1.5rem)] -translate-y-1/2 z-20 w-11 h-11 bg-white/95 backdrop-blur-md shadow-lg border border-slate-200 rounded-full items-center justify-center text-slate-600 hover:text-accent hover:border-accent/30 hover:scale-105 opacity-0 group-hover/row:opacity-100 transition-all cursor-pointer"
+                        title="التالي"
+                      >
+                        <ChevronRight className="w-5 h-5 mr-0.5" />
+                      </button>
+                      <button
+                        onClick={(e) => { e.preventDefault(); handleScroll(`scroll-cat-${catName}`, 'left'); }}
+                        className="hidden md:flex absolute -left-5 lg:-left-6 top-[calc(50%-1.5rem)] -translate-y-1/2 z-20 w-11 h-11 bg-white/95 backdrop-blur-md shadow-lg border border-slate-200 rounded-full items-center justify-center text-slate-600 hover:text-accent hover:border-accent/30 hover:scale-105 opacity-0 group-hover/row:opacity-100 transition-all cursor-pointer"
+                        title="السابق"
+                      >
+                        <ChevronLeft className="w-5 h-5 ml-0.5" />
+                      </button>
 
-                        return (
-                          <div
-                            key={product.id}
-                            onClick={() => setSelectedProduct(product)}
-                            className="group flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-slate-300 hover:shadow-xl flex-shrink-0 w-[200px] xs:w-[220px] md:w-auto snap-start"
-                          >
-                            {/* Visual product preview box */}
-                            <div className="relative aspect-square overflow-hidden border-b border-slate-100 bg-gradient-to-b from-white via-sky-50 to-slate-100 p-4 sm:p-5">
-                              <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(14,165,233,0.07)_0_1px,transparent_1px_24px)] opacity-60" />
-                              <div className="absolute inset-x-6 top-5 h-px bg-gradient-to-l from-transparent via-sky-200 to-transparent" />
-                              <div className="absolute inset-x-5 bottom-5 h-10 rounded-2xl border border-white bg-white/70 shadow-[0_16px_40px_rgba(15,23,42,0.10)] backdrop-blur-md" />
-                              <div className="absolute bottom-9 left-1/2 h-2 w-24 -translate-x-1/2 rounded-full bg-gradient-to-l from-sky-200 via-white to-emerald-100" />
+                      <div id={`scroll-cat-${catName}`} className="flex overflow-x-auto gap-4 sm:gap-6 pb-6 px-4 -mx-4 md:px-2 md:-mx-2 snap-x snap-mandatory scrollbar-none scroll-smooth relative">
+                        {catProds.map((product) => {
+                          const discountPercent = getDiscountPercent(product);
+                          const highlights = getProductHighlights(product);
+                          const visibleColors = product.colors?.slice(0, 4) || [];
 
-                              {/* Add to Wishlist overlay */}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleWishlist(product.id);
-                                }}
-                                className="absolute top-2.5 left-2.5 z-20 flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-slate-500 shadow-sm backdrop-blur-md transition-all hover:scale-105 hover:text-rose-500 cursor-pointer"
-                                title="المفضلة"
-                              >
-                                <Heart className={`w-3.5 h-3.5 ${wishlist.includes(product.id) ? "fill-rose-500 text-rose-500" : ""}`} />
-                              </button>
+                          return (
+                            <div
+                              key={product.id}
+                              onClick={() => setSelectedProduct(product)}
+                              className="group flex cursor-pointer flex-col overflow-hidden rounded-3xl border border-slate-200/50 bg-white shadow-sm transition-all duration-500 ease-out hover:-translate-y-2 hover:border-slate-200 hover:shadow-[0_20px_40px_-10px_rgba(0,0,0,0.08)] flex-shrink-0 w-[200px] xs:w-[220px] md:w-[240px] lg:w-[260px] snap-start relative"
+                            >
+                              {/* Visual product preview box */}
+                              <div className="relative aspect-square overflow-hidden border-b border-slate-50 bg-[#fafafa] p-4 sm:p-5">
+                                {/* Dynamic Spotlight on Hover */}
+                                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,rgba(255,255,255,0.9)_0%,transparent_60%)] opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none z-0" />
+                                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_100%,rgba(14,165,233,0.04)_0%,transparent_50%)] pointer-events-none z-0" />
+                                
+                                <div className="absolute inset-x-5 bottom-5 h-10 rounded-2xl border border-white bg-white/70 shadow-[0_16px_40px_rgba(15,23,42,0.05)] backdrop-blur-md" />
+                                <div className="absolute bottom-9 left-1/2 h-2 w-24 -translate-x-1/2 rounded-full bg-gradient-to-l from-sky-100 via-white to-emerald-50 opacity-50" />
 
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedProduct(product);
-                                }}
-                                className="absolute bottom-2.5 left-2.5 z-20 flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-slate-700 shadow-sm backdrop-blur-md transition-all hover:scale-105 hover:text-slate-950 cursor-pointer"
-                                title="شاهد التفاصيل"
-                              >
-                                <Eye className="h-3.5 w-3.5" />
-                              </button>
+                                {/* Add to Wishlist overlay */}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleWishlist(product.id);
+                                  }}
+                                  className="absolute top-2.5 left-2.5 z-20 flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-slate-500 shadow-sm backdrop-blur-md transition-all hover:scale-105 hover:text-rose-500 cursor-pointer"
+                                  title="المفضلة"
+                                >
+                                  <Heart className={`w-3.5 h-3.5 ${wishlist.includes(product.id) ? "fill-rose-500 text-rose-500" : ""}`} />
+                                </button>
 
-                              {discountPercent > 0 ? (
-                                <span className="absolute top-2.5 right-2.5 z-20 rounded-lg bg-rose-600 px-2 py-1 text-[8px] font-black text-white shadow-sm sm:text-[9px]">
-                                  وفر {discountPercent}%
-                                </span>
-                              ) : product.isPopular && (
-                                <span className="absolute top-2.5 right-2.5 z-20 inline-flex items-center gap-1 rounded-lg bg-amber-400 px-2 py-1 text-[8px] font-black text-slate-950 shadow-sm sm:text-[9px]">
-                                  <Sparkles className="h-3 w-3" />
-                                  شائع
-                                </span>
-                              )}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedProduct(product);
+                                  }}
+                                  className="absolute bottom-2.5 left-2.5 z-20 flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-slate-700 shadow-sm backdrop-blur-md transition-all hover:scale-105 hover:text-slate-950 cursor-pointer"
+                                  title="شاهد التفاصيل"
+                                >
+                                  <Eye className="h-3.5 w-3.5" />
+                                </button>
 
-                              <div className="relative z-10 flex h-full items-center justify-center">
-                                <div className="absolute bottom-7 h-8 w-28 rounded-[100%] bg-slate-300/35 blur-xl transition-transform duration-300 group-hover:scale-110" />
-                                <div className="relative transition-transform duration-500 group-hover:-translate-y-1 group-hover:scale-105">
-                                  <ProductShowroomVisual
-                                    image={product.image}
-                                    name={product.name}
-                                    sizeClass="w-24 aspect-[9/18]"
-                                    imageClassName="max-h-32 max-w-32 rounded-xl"
-                                  />
-                                </div>
-                              </div>
-
-                              <div className="absolute bottom-2.5 right-2.5 z-20 flex items-center gap-1 rounded-lg border border-slate-200 bg-white/85 px-2 py-1 text-[8px] font-black text-slate-700 shadow-sm backdrop-blur-md">
-                                <BadgeCheck className="h-3 w-3 text-emerald-300" />
-                                أصلي
-                              </div>
-                            </div>
-
-                            {/* Info */}
-                            <div className="flex flex-1 flex-col justify-between gap-3 p-3 text-right sm:p-4">
-                              <div className="space-y-2">
-                                <div className="flex items-center justify-between gap-2 text-[9px] sm:text-[10px]">
-                                  <span className="truncate rounded-md bg-slate-100 px-2 py-0.5 font-black text-slate-500" title={product.category}>
-                                    {product.category}
+                                {discountPercent > 0 ? (
+                                  <span className="absolute top-2.5 right-2.5 z-20 rounded-lg bg-rose-600 px-2 py-1 text-[8px] font-black text-white shadow-sm sm:text-[9px]">
+                                    وفر {discountPercent}%
                                   </span>
-                                  <div className="flex items-center gap-0.5 text-amber-500">
-                                    <Star className="h-3 w-3 fill-amber-500" />
-                                    <span className="font-black text-slate-600">{(product.rating || 5).toFixed(1)}</span>
+                                ) : product.isPopular && (
+                                  <span className="absolute top-2.5 right-2.5 z-20 inline-flex items-center gap-1 rounded-lg bg-amber-400 px-2 py-1 text-[8px] font-black text-slate-950 shadow-sm sm:text-[9px]">
+                                    <Sparkles className="h-3 w-3" />
+                                    شائع
+                                  </span>
+                                )}
+
+                                <div className="relative z-10 flex h-full items-center justify-center">
+                                  <div className="absolute bottom-7 h-8 w-28 rounded-[100%] bg-slate-300/35 blur-xl transition-transform duration-300 group-hover:scale-110" />
+                                  <div className="relative transition-transform duration-500 group-hover:-translate-y-1 group-hover:scale-105">
+                                    <ProductShowroomVisual
+                                      image={product.image}
+                                      name={product.name}
+                                      sizeClass="w-24 aspect-[9/18]"
+                                      imageClassName="max-h-32 max-w-32 rounded-xl"
+                                    />
                                   </div>
                                 </div>
 
-                                <div>
-                                  {product.nameEn && (
-                                    <span className="block truncate text-[9px] font-bold uppercase tracking-wide text-slate-400" dir="ltr" title={product.nameEn}>
-                                      {product.nameEn}
-                                    </span>
-                                  )}
-                                  <h3 className="mt-1 min-h-[2.25rem] text-xs font-black leading-tight text-slate-900 transition-colors duration-200 group-hover:text-accent sm:text-sm">
-                                    {product.name}
-                                  </h3>
+                                <div className="absolute bottom-2.5 right-2.5 z-20 flex items-center gap-1 rounded-lg border border-slate-200 bg-white/85 px-2 py-1 text-[8px] font-black text-slate-700 shadow-sm backdrop-blur-md">
+                                  <BadgeCheck className="h-3 w-3 text-emerald-300" />
+                                  أصلي
                                 </div>
+                              </div>
 
-                                <div className="flex flex-wrap gap-1">
-                                  {highlights.slice(0, 2).map((item) => (
-                                    <span key={item} className="rounded-md bg-slate-50 px-2 py-1 text-[9px] font-black text-slate-500">
-                                      {item}
+                              {/* Info */}
+                              <div className="flex flex-1 flex-col justify-between gap-3 p-3 text-right sm:p-4">
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between gap-2 text-[9px] sm:text-[10px]">
+                                    <span className="truncate rounded-md bg-slate-100 px-2 py-0.5 font-black text-slate-500" title={product.category}>
+                                      {product.category}
                                     </span>
-                                  ))}
-                                </div>
+                                    <div className="flex items-center gap-0.5 text-amber-500">
+                                      <Star className="h-3 w-3 fill-amber-500" />
+                                      <span className="font-black text-slate-600">{(product.rating || 5).toFixed(1)}</span>
+                                    </div>
+                                  </div>
 
-                                {visibleColors.length > 0 && (
-                                  <div className="flex items-center gap-1.5">
-                                    {visibleColors.map((color, index) => (
-                                      <span
-                                        key={`${color.name}-${index}`}
-                                        className="h-3.5 w-3.5 rounded-full border border-black/10 ring-1 ring-slate-200"
-                                        style={{ backgroundColor: color.hex }}
-                                        title={color.name}
-                                      />
-                                    ))}
-                                    {(product.colors?.length || 0) > visibleColors.length && (
-                                      <span className="text-[9px] font-black text-slate-400">
-                                        +{(product.colors?.length || 0) - visibleColors.length}
+                                  <div>
+                                    {product.nameEn && (
+                                      <span className="block truncate text-[9px] font-bold uppercase tracking-wide text-slate-400" dir="ltr" title={product.nameEn}>
+                                        {product.nameEn}
                                       </span>
                                     )}
+                                    <h3 className="mt-1 min-h-[2.25rem] text-xs font-black leading-tight text-slate-900 transition-colors duration-200 group-hover:text-accent sm:text-sm">
+                                      {product.name}
+                                    </h3>
                                   </div>
-                                )}
-                              </div>
 
-                              <div className="border-t border-slate-100 pt-3">
-                                <div className="mb-3 flex min-h-9 items-end justify-between gap-2">
-                                  <div className="flex flex-col text-right">
-                                    {product.discountPrice ? (
-                                      <>
-                                        <span className="mb-0.5 font-mono text-[9px] leading-none text-slate-400 line-through">
+                                  <div className="flex flex-wrap gap-1">
+                                    {highlights.slice(0, 2).map((item) => (
+                                      <span key={item} className="rounded-md bg-slate-50 px-2 py-1 text-[9px] font-black text-slate-500">
+                                        {item}
+                                      </span>
+                                    ))}
+                                  </div>
+
+                                  {visibleColors.length > 0 && (
+                                    <div className="flex items-center gap-1.5">
+                                      {visibleColors.map((color, index) => (
+                                        <span
+                                          key={`${color.name}-${index}`}
+                                          className="h-3.5 w-3.5 rounded-full border border-black/10 ring-1 ring-slate-200"
+                                          style={{ backgroundColor: color.hex }}
+                                          title={color.name}
+                                        />
+                                      ))}
+                                      {(product.colors?.length || 0) > visibleColors.length && (
+                                        <span className="text-[9px] font-black text-slate-400">
+                                          +{(product.colors?.length || 0) - visibleColors.length}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="border-t border-slate-100 pt-3">
+                                  <div className="mb-3 flex min-h-9 items-end justify-between gap-2">
+                                    <div className="flex flex-col text-right">
+                                      {product.discountPrice ? (
+                                        <>
+                                          <span className="mb-0.5 font-mono text-[9px] leading-none text-slate-400 line-through">
+                                            {product.price.toLocaleString()} د.ع
+                                          </span>
+                                          <span className="font-mono text-sm font-black leading-none text-rose-600">
+                                            {product.discountPrice.toLocaleString()} د.ع
+                                          </span>
+                                        </>
+                                      ) : (
+                                        <span className="font-mono text-sm font-black text-slate-900">
                                           {product.price.toLocaleString()} د.ع
                                         </span>
-                                        <span className="font-mono text-sm font-black leading-none text-rose-600">
-                                          {product.discountPrice.toLocaleString()} د.ع
-                                        </span>
-                                      </>
+                                      )}
+                                    </div>
+                                    {product.isOutOfStock ? (
+                                      <span className="hidden rounded-md bg-rose-50 px-2 py-1 text-[9px] font-black text-rose-600 sm:inline-flex">
+                                        نفذت الكمية
+                                      </span>
                                     ) : (
-                                      <span className="font-mono text-sm font-black text-slate-900">
-                                        {product.price.toLocaleString()} د.ع
+                                      <span className="hidden rounded-md bg-emerald-50 px-2 py-1 text-[9px] font-black text-emerald-600 sm:inline-flex">
+                                        متوفر
                                       </span>
                                     )}
                                   </div>
-                                  {product.isOutOfStock ? (
-                                    <span className="hidden rounded-md bg-rose-50 px-2 py-1 text-[9px] font-black text-rose-600 sm:inline-flex">
-                                      نفذت الكمية
-                                    </span>
-                                  ) : (
-                                    <span className="hidden rounded-md bg-emerald-50 px-2 py-1 text-[9px] font-black text-emerald-600 sm:inline-flex">
-                                      متوفر
-                                    </span>
-                                  )}
-                                </div>
 
-                                <div className="grid grid-cols-[1fr_auto] gap-2">
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setSelectedProduct(product);
-                                    }}
-                                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[10px] font-black text-slate-700 transition-colors hover:bg-slate-50 cursor-pointer"
-                                  >
-                                    التفاصيل
-                                  </button>
-                                  {product.isOutOfStock ? (
-                                    <button
-                                      disabled
-                                      className="flex items-center justify-center gap-1 rounded-xl bg-slate-100 px-3 py-2 text-[10px] font-black text-slate-400 cursor-not-allowed"
-                                      title="نفذت الكمية"
-                                    >
-                                      <span className="px-1 text-[9px]">نفذ</span>
-                                    </button>
-                                  ) : (
+                                  <div className="grid grid-cols-[1fr_auto] gap-2">
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        handleAddToCart(product);
+                                        setSelectedProduct(product);
                                       }}
-                                      className="flex items-center justify-center gap-1 rounded-xl bg-[#1a1a1a] px-3 py-2 text-[10px] font-black text-white transition-colors hover:bg-slate-800 cursor-pointer"
-                                      title="أضف للسلة"
+                                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[10px] font-black text-slate-700 transition-colors hover:bg-slate-50 cursor-pointer"
                                     >
-                                      <ShoppingBag className="h-3.5 w-3.5" />
+                                      التفاصيل
                                     </button>
-                                  )}
+                                    {product.isOutOfStock ? (
+                                      <button
+                                        disabled
+                                        className="flex items-center justify-center gap-1 rounded-xl bg-slate-100 px-3 py-2 text-[10px] font-black text-slate-400 cursor-not-allowed"
+                                        title="نفذت الكمية"
+                                      >
+                                        <span className="px-1 text-[9px]">نفذ</span>
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleAddToCart(product);
+                                        }}
+                                        className="flex items-center justify-center gap-1 rounded-xl bg-[#1a1a1a] px-3 py-2 text-[10px] font-black text-white transition-colors hover:bg-slate-800 cursor-pointer"
+                                        title="أضف للسلة"
+                                      >
+                                        <ShoppingBag className="h-3.5 w-3.5" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 );
@@ -1660,106 +1767,207 @@ export default function Home() {
 
       </main>
 
-      {/* Footer */}
-      <footer id="contact" className="bg-slate-50 border-t border-card-border py-12 mt-12 text-right">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* Premium Apple-Style Footer */}
+      <footer id="contact" className="relative mt-12 text-right overflow-hidden">
+        {/* Gradient divider */}
+        <div className="footer-gradient-divider w-full" />
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        {/* Decorative background */}
+        <div className="relative bg-[#fafafa]">
+          {/* Subtle dot grid pattern */}
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_1px_1px,rgba(148,163,184,0.08)_1px,transparent_0)] bg-[length:24px_24px] pointer-events-none" />
+          {/* Ambient glow orbs */}
+          <div className="absolute top-0 right-[15%] w-72 h-72 bg-sky-100/20 rounded-full blur-[100px] pointer-events-none" />
+          <div className="absolute bottom-0 left-[10%] w-64 h-64 bg-emerald-100/15 rounded-full blur-[80px] pointer-events-none" />
 
-            {/* Column 1: Brand */}
-            <div className="space-y-4">
-              <div>
-                <span className="block text-lg font-extrabold text-[#1a1a1a]">مركز الروان</span>
-                <span className="block text-xs font-bold text-slate-400 uppercase font-mono">Rwan Center</span>
-              </div>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                مركز الروان المعتمد لبيع وشراء الهواتف الذكية وحافضاتها الأنيقة والعصرية، والمركز المعتمد الأسرع في الصيانة بالمنطقة.
-              </p>
+          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-16">
 
+            {/* Main footer grid */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-8 lg:gap-12">
 
-            </div>
-
-            {/* Column 2: Quick links */}
-            <div className="space-y-4">
-              <h4 className="font-extrabold text-sm text-[#1a1a1a]">روابط سريعة</h4>
-              <ul className="text-xs text-slate-500 space-y-2.5">
-                <li><a href="#" className="hover:text-accent">الرئيسية</a></li>
-                <li><a href="#categories" className="hover:text-accent">الأقسام الرئيسية</a></li>
-                <li><a href="#products" className="hover:text-accent">المنتجات المميزة</a></li>
-                <li><a href="#repair" className="hover:text-accent">خدمة الصيانة المعتمدة</a></li>
-              </ul>
-            </div>
-
-            {/* Column 3: Policy */}
-            <div className="space-y-4">
-              <h4 className="font-extrabold text-sm text-[#1a1a1a]">السياسات والضمان</h4>
-              <ul className="text-xs text-slate-500 space-y-2.5">
-                <li><Link href="/policies/return" className="hover:text-accent">سياسة الاسترجاع والتبديل</Link></li>
-                <li><Link href="/policies/warranty" className="hover:text-accent">تفاصيل ضمان الأجهزة والقطع</Link></li>
-                <li><Link href="/policies/repair-terms" className="hover:text-accent">شروط حجز موعد الصيانة</Link></li>
-                <li><Link href="/policies/shipping" className="hover:text-accent">خدمة التوصيل والشحن</Link></li>
-              </ul>
-            </div>
-
-            {/* Column 4: Premium Showroom Location Card */}
-            <div className="space-y-4">
-              <h4 className="font-extrabold text-sm text-[#1a1a1a]">المعرض الرئيسي</h4>
-              <div className="rounded-2xl border border-slate-200 bg-white/75 p-4 shadow-sm space-y-3 backdrop-blur-md">
-                <div className="flex items-start gap-2.5 justify-start">
-                  <div className="p-2 bg-sky-50 text-accent rounded-lg flex-shrink-0 mt-0.5">
-                    <MapPin className="w-4 h-4" />
-                  </div>
-                  <div className="text-right">
-                    <span className="block text-xs font-black text-slate-900">مركز الروان - الصالحية</span>
-                    <span className="block text-[11px] text-slate-500 mt-0.5 leading-relaxed">
-                      العراق، الناصرية، الصالحية، شارع التقاعد، قرب دائرة التقاعد.
-                    </span>
-                  </div>
+              {/* Column 1: Brand — spans 4 cols */}
+              <div className="md:col-span-4 space-y-5">
+                <div className="flex items-center gap-4 sm:gap-5">
+                  {siteSettings?.logo?.url ? (
+                    <>
+                      <img src={siteSettings.logo.url} alt="Logo" className="h-24 sm:h-28 w-auto object-contain drop-shadow-sm" />
+                      <span className="text-2xl sm:text-3xl font-black text-[#1a1a1a] tracking-tight uppercase">
+                      
+                      </span>
+                    </>
+                  ) : (
+                    <div>
+                      <span className="block text-2xl sm:text-3xl font-black text-[#1a1a1a] tracking-tight">
+                        مركز الروان
+                      </span>
+                      <span className="block text-sm font-bold text-slate-400 uppercase font-mono tracking-widest mt-1">
+                        Al-Rwan Center
+                      </span>
+                    </div>
+                  )}
                 </div>
+                <p className="text-[13px] text-slate-500 leading-relaxed max-w-sm">
+                  مركز الروان المعتمد لبيع وشراء الهواتف الذكية وحافظاتها الأنيقة والعصرية، والمركز المعتمد الأسرع في الصيانة بالمنطقة.
+                </p>
 
-                <div className="flex items-start gap-2.5 justify-start border-t border-slate-150/60 pt-3">
-                  <div className="p-2 bg-sky-50 text-accent rounded-lg flex-shrink-0 mt-0.5">
-                    <Clock className="w-4 h-4" />
-                  </div>
-                  <div className="text-right">
-                    <span className="block text-xs font-black text-slate-900">ساعات الاستقبال</span>
-                    <span className="block text-[11px] text-slate-500 mt-0.5">
-                      يومياً: 3:00 م - 12:00 م
-                    </span>
-                  </div>
+                {/* Social Icons Row */}
+                <div className="flex items-center gap-2.5 pt-1">
+                  {siteSettings.socials.map((social, index) => {
+                    // Map platform to SVG icon and hover color
+                    const getSocialIcon = (platform: string) => {
+                      const p = platform.toLowerCase();
+                      if (p.includes("facebook") || p.includes("فيسبوك")) return (
+                        <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                      );
+                      if (p.includes("instagram") || p.includes("إنستغرام") || p.includes("انستغرام") || p.includes("انستقرام")) return (
+                        <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
+                      );
+                      if (p.includes("whatsapp") || p.includes("واتساب") || p.includes("واتس")) return (
+                        <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                      );
+                      if (p.includes("tiktok") || p.includes("تيكتوك") || p.includes("تيك توك")) return (
+                        <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="currentColor"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>
+                      );
+                      if (p.includes("snapchat") || p.includes("سناب") || p.includes("سناب شات")) return (
+                        <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="currentColor"><path d="M12.017 0C5.396 0 .029 5.367.029 11.987c0 5.079 3.158 9.417 7.618 11.162-.105-.949-.199-2.403.041-3.439.219-.937 1.406-5.957 1.406-5.957s-.359-.72-.359-1.781c0-1.668.967-2.914 2.171-2.914 1.023 0 1.518.769 1.518 1.69 0 1.029-.655 2.568-.994 3.995-.283 1.194.599 2.169 1.777 2.169 2.133 0 3.772-2.249 3.772-5.495 0-2.873-2.064-4.882-5.012-4.882-3.414 0-5.418 2.561-5.418 5.207 0 1.031.397 2.138.893 2.738a.36.36 0 01.083.345l-.333 1.36c-.053.22-.174.267-.402.161-1.499-.698-2.436-2.889-2.436-4.649 0-3.785 2.75-7.262 7.929-7.262 4.163 0 7.398 2.967 7.398 6.931 0 4.136-2.607 7.464-6.227 7.464-1.216 0-2.359-.631-2.75-1.378l-.748 2.853c-.271 1.043-1.002 2.35-1.492 3.146C9.57 23.812 10.763 24 12.017 24c6.624 0 11.99-5.367 11.99-11.988C24.007 5.367 18.641.001 12.017.001z"/></svg>
+                      );
+                      if (p.includes("telegram") || p.includes("تليغرام") || p.includes("تلغرام") || p.includes("تيليجرام")) return (
+                        <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0a12 12 0 00-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+                      );
+                      if (p.includes("twitter") || p.includes("تويتر") || p === "x") return (
+                        <svg className="w-[16px] h-[16px]" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                      );
+                      if (p.includes("youtube") || p.includes("يوتيوب")) return (
+                        <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                      );
+                      // Default: globe icon
+                      return <Globe className="w-[16px] h-[16px]" />;
+                    };
+
+                    const getHoverColor = (platform: string) => {
+                      const p = platform.toLowerCase();
+                      if (p.includes("facebook") || p.includes("فيسبوك")) return "hover:text-[#1877F2] hover:border-[#1877F2]/30 hover:bg-blue-50/50";
+                      if (p.includes("instagram") || p.includes("إنستغرام") || p.includes("انستغرام") || p.includes("انستقرام")) return "hover:text-[#E4405F] hover:border-[#E4405F]/30 hover:bg-pink-50/50";
+                      if (p.includes("whatsapp") || p.includes("واتساب") || p.includes("واتس")) return "hover:text-[#25D366] hover:border-[#25D366]/30 hover:bg-emerald-50/50";
+                      if (p.includes("tiktok") || p.includes("تيكتوك")) return "hover:text-[#000000] hover:border-[#000]/20 hover:bg-slate-50";
+                      if (p.includes("snapchat") || p.includes("سناب")) return "hover:text-[#FFFC00] hover:border-[#FFFC00]/40 hover:bg-yellow-50/50";
+                      if (p.includes("telegram") || p.includes("تليغرام") || p.includes("تلغرام") || p.includes("تيليجرام")) return "hover:text-[#0088CC] hover:border-[#0088CC]/30 hover:bg-sky-50/50";
+                      if (p.includes("twitter") || p.includes("تويتر") || p === "x") return "hover:text-[#000000] hover:border-[#000]/20 hover:bg-slate-50";
+                      if (p.includes("youtube") || p.includes("يوتيوب")) return "hover:text-[#FF0000] hover:border-[#FF0000]/30 hover:bg-red-50/50";
+                      return "hover:text-accent hover:border-accent/30";
+                    };
+
+                    return (
+                      <a
+                        key={index}
+                        href={social.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`social-icon-glow flex items-center justify-center w-10 h-10 rounded-xl border border-slate-200/80 bg-white text-slate-400 shadow-sm ${getHoverColor(social.platform || social.name)}`}
+                        title={social.name}
+                      >
+                        {getSocialIcon(social.platform || social.name)}
+                      </a>
+                    );
+                  })}
                 </div>
+              </div>
 
-                <a
-                  href="https://maps.app.goo.gl/eaSEpATVXLuQzidh7?g_st=ic"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-2 w-full inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-250 bg-slate-50 py-2.5 text-xs font-black text-slate-700 shadow-sm transition-all hover:bg-[#1a1a1a] hover:text-white hover:border-[#1a1a1a] active:scale-[0.99] text-center"
-                >
-                  <Globe className="w-3.5 h-3.5" />
-                  <span>الاتجاهات في خرائط Google</span>
-                </a>
+              {/* Column 2: Quick links — spans 2 cols */}
+              <div className="md:col-span-2 space-y-4">
+                <h4 className="font-black text-sm text-[#1a1a1a] flex items-center gap-2">
+                  <span className="w-1 h-4 bg-accent rounded-full" />
+                  روابط سريعة
+                </h4>
+                <ul className="text-[13px] text-slate-500 space-y-3">
+                  <li><a href="#" className="hover:text-accent transition-colors duration-200 hover:translate-x-[-2px] inline-block">الرئيسية</a></li>
+                  <li><a href="#categories" className="hover:text-accent transition-colors duration-200 hover:translate-x-[-2px] inline-block">الأقسام الرئيسية</a></li>
+                  <li><a href="#products" className="hover:text-accent transition-colors duration-200 hover:translate-x-[-2px] inline-block">المنتجات المميزة</a></li>
+                  <li><a href="#repair" className="hover:text-accent transition-colors duration-200 hover:translate-x-[-2px] inline-block">خدمة الصيانة المعتمدة</a></li>
+                </ul>
+              </div>
+
+              {/* Column 3: Policy — spans 2 cols */}
+              <div className="md:col-span-2 space-y-4">
+                <h4 className="font-black text-sm text-[#1a1a1a] flex items-center gap-2">
+                  <span className="w-1 h-4 bg-emerald-400 rounded-full" />
+                  السياسات والضمان
+                </h4>
+                <ul className="text-[13px] text-slate-500 space-y-3">
+                  <li><Link href="/policies/return" className="hover:text-accent transition-colors duration-200">سياسة الاسترجاع</Link></li>
+                  <li><Link href="/policies/warranty" className="hover:text-accent transition-colors duration-200">ضمان الأجهزة والقطع</Link></li>
+                  <li><Link href="/policies/repair-terms" className="hover:text-accent transition-colors duration-200">شروط موعد الصيانة</Link></li>
+                  <li><Link href="/policies/shipping" className="hover:text-accent transition-colors duration-200">خدمة التوصيل والشحن</Link></li>
+                </ul>
+              </div>
+
+              {/* Column 4: Premium Showroom Location Card — spans 4 cols */}
+              <div className="md:col-span-4 space-y-4">
+                <h4 className="font-black text-sm text-[#1a1a1a] flex items-center gap-2">
+                  <span className="w-1 h-4 bg-amber-400 rounded-full" />
+                  المعرض الرئيسي
+                </h4>
+                <div className="rounded-[20px] border border-slate-200/80 bg-white p-5 shadow-[0_4px_24px_rgba(0,0,0,0.03)] space-y-4">
+                  <div className="flex items-start gap-3 justify-start">
+                    <div className="p-2.5 bg-gradient-to-br from-sky-50 to-sky-100/50 text-accent rounded-xl flex-shrink-0 mt-0.5 shadow-sm">
+                      <MapPin className="w-4 h-4" />
+                    </div>
+                    <div className="text-right">
+                      <span className="block text-[13px] font-black text-slate-900">مركز الروان - الصالحية</span>
+                      <span className="block text-[12px] text-slate-500 mt-1 leading-relaxed">
+                        العراق، الناصرية، الصالحية، شارع التقاعد، قرب دائرة التقاعد.
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="h-px bg-gradient-to-l from-transparent via-slate-200 to-transparent" />
+
+                  <div className="flex items-start gap-3 justify-start">
+                    <div className="p-2.5 bg-gradient-to-br from-emerald-50 to-emerald-100/50 text-emerald-500 rounded-xl flex-shrink-0 mt-0.5 shadow-sm">
+                      <Clock className="w-4 h-4" />
+                    </div>
+                    <div className="text-right">
+                      <span className="block text-[13px] font-black text-slate-900">ساعات الاستقبال</span>
+                      <span className="block text-[12px] text-slate-500 mt-1">
+                        يومياً: 3:00 م - 12:00 م
+                      </span>
+                    </div>
+                  </div>
+
+                  <a
+                    href="https://maps.app.goo.gl/eaSEpATVXLuQzidh7?g_st=ic"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-1 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#1a1a1a] py-3 text-[12px] font-black text-white shadow-md transition-all hover:bg-slate-800 hover:shadow-lg active:scale-[0.99] text-center"
+                  >
+                    <Globe className="w-3.5 h-3.5" />
+                    <span>الاتجاهات في خرائط Google</span>
+                  </a>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Bottom bar */}
+            <div className="mt-12 pt-8 relative">
+              {/* Gradient line separator */}
+              <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-l from-transparent via-slate-300/50 to-transparent" />
+
+              <div className="flex flex-col sm:flex-row items-center justify-between text-center gap-4">
+                <div className="text-[12px] text-slate-400 font-medium">
+                  &copy; {new Date().getFullYear()} مركز الروان (Rwan Center). جميع الحقوق محفوظة.
+                </div>
+                <div className="flex items-center gap-3 text-[11px] text-slate-400">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="font-bold">المتجر متاح الآن</span>
+                  </span>
+                  <span className="text-slate-300">•</span>
+                  <span className="font-bold">توصيل لجميع المحافظات</span>
+                </div>
               </div>
             </div>
 
-          </div>
-
-          <div className="border-t border-slate-200 mt-8 pt-8 flex flex-col sm:flex-row items-center justify-between text-center gap-4 text-xs text-slate-400">
-            <div>
-              &copy; {new Date().getFullYear()} مركز الروان (Rwan Center). جميع الحقوق محفوظة.
-            </div>
-            <div className="flex gap-4">
-              {siteSettings.socials.map((social, index) => (
-                <a
-                  key={index}
-                  href={social.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-[#1a1a1a] transition-colors"
-                >
-                  {social.name}
-                </a>
-              ))}
-            </div>
           </div>
         </div>
       </footer>
@@ -1825,6 +2033,12 @@ export default function Home() {
 
       {/* Promotional Pop-up Modal */}
       <PromoPopUp />
+
+      {/* Splash Loading Screen */}
+      <SplashLoader />
+
+      {/* Back to Top Button */}
+      <BackToTop />
 
       {/* Premium Floating WhatsApp Button */}
       <a

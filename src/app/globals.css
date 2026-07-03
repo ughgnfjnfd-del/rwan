@@ -71,3 +71,59 @@ body {
 .animate-slide-down {
   animation: slideDown 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* Skeleton Shimmer Animation */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.skeleton-shimmer {
+  overflow: hidden;
+  position: relative;
+}
+
+.skeleton-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.4) 50%,
+    transparent 100%
+  );
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+/* Premium text selection */
+::selection {
+  background-color: rgba(56, 189, 248, 0.18);
+  color: inherit;
+}
+
+/* Footer gradient divider */
+.footer-gradient-divider {
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(56, 189, 248, 0.25) 20%,
+    rgba(16, 185, 129, 0.2) 50%,
+    rgba(56, 189, 248, 0.25) 80%,
+    transparent 100%
+  );
+}
+
+/* Social icon hover glow */
+.social-icon-glow {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.social-icon-glow:hover {
+  filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.3));
+  transform: translateY(-2px);
+}

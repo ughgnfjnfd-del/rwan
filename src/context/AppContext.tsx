@@ -253,7 +253,7 @@ export interface PremiumShowcase {
 export const DEFAULT_PREMIUM_SHOWCASE: PremiumShowcase = {
   isEnabled: true,
   badge: "العروض الأقوى",
-  title: "مختارات الروان المميزة",
+  title: "عروض الروان المميزة",
   subtitle: "منتجات مختارة بعروض قوية وتجربة عرض مرتبة مثل واجهات المتاجر العالمية.",
   heroProductId: "",
   productIds: [],
@@ -697,8 +697,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (existing) {
       updated = cartItems.map((item) =>
         item.product.id === product.id &&
-        (!selectedColor || item.selectedColor?.name === selectedColor.name) &&
-        (!selectedPort || item.selectedPort === selectedPort)
+          (!selectedColor || item.selectedColor?.name === selectedColor.name) &&
+          (!selectedPort || item.selectedPort === selectedPort)
           ? { ...item, quantity: item.quantity + 1 }
           : item
       );
@@ -728,8 +728,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
     const updated = cartItems.map((item) =>
       item.product.id === productId &&
-      (!selectedColorName || item.selectedColor?.name === selectedColorName) &&
-      (!selectedPort || item.selectedPort === selectedPort)
+        (!selectedColorName || item.selectedColor?.name === selectedColorName) &&
+        (!selectedPort || item.selectedPort === selectedPort)
         ? { ...item, quantity }
         : item
     );
@@ -1274,10 +1274,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const nextCodes = latestCodes.map((item) =>
       item.code.toUpperCase() === normalizedCode
         ? {
-            ...item,
-            usedCount: (item.usedCount || 0) + 1,
-            lastUsedAt: new Date().toISOString(),
-          }
+          ...item,
+          usedCount: (item.usedCount || 0) + 1,
+          lastUsedAt: new Date().toISOString(),
+        }
         : item
     );
 
@@ -1415,7 +1415,7 @@ function ToastNotification({
 
   return (
     <div className="fixed top-6 left-4 right-4 md:left-auto md:right-6 md:w-96 z-[9999] bg-white/95 backdrop-blur-md border border-slate-200/80 rounded-2xl shadow-2xl p-4 flex items-center gap-3.5 transition-all duration-300 animate-slide-down text-right" dir="rtl">
-      
+
       {/* Product visual */}
       <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center p-1 overflow-hidden flex-shrink-0">
         {toast.productImage ? (
@@ -1444,7 +1444,7 @@ function ToastNotification({
       </div>
 
       {/* Close button */}
-      <button 
+      <button
         onClick={onClose}
         className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
       >

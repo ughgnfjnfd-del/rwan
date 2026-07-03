@@ -73,17 +73,15 @@ export default function CartDrawer({
     <>
       {/* Backdrop */}
       <div
-        className={`fixed inset-0 z-50 bg-black/40 backdrop-blur-sm transition-opacity duration-300 ${
-          isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-        }`}
+        className={`fixed inset-0 z-50 bg-black/40 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+          }`}
         onClick={onClose}
       />
 
       {/* Drawer Container */}
       <div
-        className={`fixed top-0 bottom-0 left-0 z-50 w-full max-w-md bg-white shadow-2xl border-r border-card-border transition-transform duration-300 transform ${
-          isOpen ? "translate-x-0" : "-translate-x-full"
-        } flex flex-col`}
+        className={`fixed top-0 bottom-0 left-0 z-50 w-full max-w-md bg-white shadow-2xl border-r border-card-border transition-transform duration-300 transform ${isOpen ? "translate-x-0" : "-translate-x-full"
+          } flex flex-col`}
       >
         {/* Header */}
         <div className="p-5 border-b border-card-border flex items-center justify-between">

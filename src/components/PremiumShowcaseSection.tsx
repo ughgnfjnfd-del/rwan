@@ -187,7 +187,7 @@ export default function PremiumShowcaseSection({ onSelectProduct, onAddToCart }:
 
             <div className="space-y-3">
               <h2 className="text-3xl font-black leading-tight text-slate-950 sm:text-4xl lg:text-5xl">
-                {premiumShowcase.title || "مختارات الروان المميزة"}
+                {premiumShowcase.title || "عروض الروان المميزة"}
               </h2>
               <p className="max-w-xl text-sm font-bold leading-7 text-slate-500">
                 {premiumShowcase.subtitle || "منتجات مختارة بعروض قوية وتجربة عرض مرتبة مثل واجهات المتاجر العالمية."}

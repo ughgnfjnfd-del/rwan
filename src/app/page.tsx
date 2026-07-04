@@ -539,6 +539,13 @@ export default function Home() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // Listen for custom open-cart event from MobileBottomNav
+  useEffect(() => {
+    const handleOpenCart = () => setIsCartOpen(true);
+    window.addEventListener("open-cart", handleOpenCart);
+    return () => window.removeEventListener("open-cart", handleOpenCart);
+  }, []);
+
   // Simulate product loading state
   useEffect(() => {
     if (products.length > 0) {
@@ -725,7 +732,7 @@ export default function Home() {
                     مركز الروان
                   </span>
                   <span className="block text-[10px] sm:text-xs font-semibold tracking-wider text-slate-400 uppercase -mt-1 font-mono">
-                    Rwan Center
+                    Al-Rwan Center
                   </span>
                 </div>
                 <div className="w-1.5 h-8 bg-accent rounded-full hidden sm:block"></div>
@@ -941,7 +948,7 @@ export default function Home() {
             {/* Mobile Hamburg Menu Button */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="p-2.5 md:hidden rounded-full hover:bg-slate-50 border border-slate-100 transition-colors cursor-pointer"
+              className="p-2.5 hidden rounded-full hover:bg-slate-50 border border-slate-100 transition-colors cursor-pointer"
               aria-label="Menu"
             >
               {isMobileMenuOpen ? <X className="w-4 h-4 text-slate-600" /> : <Menu className="w-4 h-4 text-slate-600" />}
@@ -962,7 +969,7 @@ export default function Home() {
               ) : (
                 <div>
                   <span className="block text-md font-extrabold">مركز الروان</span>
-                  <span className="block text-[9px] font-bold text-slate-400 uppercase font-mono">Rwan Center</span>
+                  <span className="block text-[9px] font-bold text-slate-400 uppercase font-mono">Al-Rwan Center</span>
                 </div>
               )}
               <button
@@ -1955,7 +1962,7 @@ export default function Home() {
 
               <div className="flex flex-col sm:flex-row items-center justify-between text-center gap-4">
                 <div className="text-[12px] text-slate-400 font-medium">
-                  &copy; {new Date().getFullYear()} مركز الروان (Rwan Center). جميع الحقوق محفوظة.
+                  &copy; {new Date().getFullYear()} مركز الروان (Al-Rwan Center). جميع الحقوق محفوظة.
                 </div>
                 <div className="flex items-center gap-3 text-[11px] text-slate-400">
                   <span className="flex items-center gap-1.5">
@@ -2045,7 +2052,7 @@ export default function Home() {
         href={`https://wa.me/${siteSettings?.phone ? siteSettings.phone.replace(/[^\d+]/g, '') : ''}`}
         target="_blank"
         rel="noopener noreferrer"
-        className="fixed bottom-6 right-6 z-50 flex items-center justify-center w-14 h-14 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95 group cursor-pointer"
+        className="fixed bottom-6 right-6 z-50 hidden md:flex items-center justify-center w-14 h-14 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95 group cursor-pointer"
         aria-label="تواصل معنا عبر واتساب"
         title="تواصل معنا مباشرة عبر واتساب"
       >

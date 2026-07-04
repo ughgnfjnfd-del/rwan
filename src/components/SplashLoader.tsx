@@ -74,7 +74,7 @@ export default function SplashLoader() {
               مركز الروان
             </span>
             <span className="block text-sm font-bold tracking-[0.3em] text-slate-400 uppercase mt-1 font-mono">
-              Rwan Center
+              Al-Rwan Center
             </span>
           </div>
         )}

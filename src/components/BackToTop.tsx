@@ -24,7 +24,7 @@ export default function BackToTop() {
       onClick={scrollToTop}
       aria-label="العودة للأعلى"
       title="العودة للأعلى"
-      className={`fixed bottom-6 left-6 z-50 flex items-center justify-center w-12 h-12 rounded-full border border-slate-200/80 bg-white/90 text-slate-700 shadow-[0_8px_30px_rgba(0,0,0,0.08)] backdrop-blur-xl cursor-pointer transition-all duration-500 hover:bg-[#1a1a1a] hover:text-white hover:border-transparent hover:shadow-[0_12px_35px_rgba(0,0,0,0.15)] hover:scale-110 active:scale-95 group ${
+      className={`fixed bottom-24 md:bottom-6 left-6 z-50 flex items-center justify-center w-12 h-12 rounded-full border border-slate-200/80 bg-white/90 text-slate-700 shadow-[0_8px_30px_rgba(0,0,0,0.08)] backdrop-blur-xl cursor-pointer transition-all duration-500 hover:bg-[#1a1a1a] hover:text-white hover:border-transparent hover:shadow-[0_12px_35px_rgba(0,0,0,0.15)] hover:scale-110 active:scale-95 group ${
         isVisible
           ? "translate-y-0 opacity-100 scale-100"
           : "translate-y-4 opacity-0 scale-75 pointer-events-none"

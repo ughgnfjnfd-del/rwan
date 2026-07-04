@@ -65,7 +65,7 @@ export default function PoliciesLayout({ children }: PolicyLayoutProps) {
                 مركز الروان
               </span>
               <span className="block text-[10px] sm:text-xs font-semibold tracking-wider text-slate-400 uppercase -mt-1 font-mono">
-                Rwan Center
+                Al-Rwan Center
               </span>
             </div>
             <div className="w-1.5 h-8 bg-accent rounded-full"></div>
@@ -111,7 +111,7 @@ export default function PoliciesLayout({ children }: PolicyLayoutProps) {
             <div className="flex items-center justify-between border-b border-card-border pb-4">
               <div>
                 <span className="block text-md font-extrabold">مركز الروان</span>
-                <span className="block text-[9px] font-bold text-slate-400 uppercase font-mono">Rwan Center</span>
+                <span className="block text-[9px] font-bold text-slate-400 uppercase font-mono">Al-Rwan Center</span>
               </div>
               <button onClick={() => setIsMobileMenuOpen(false)} className="p-1 rounded-full hover:bg-slate-100 text-slate-400">
                 <X className="w-5 h-5" />
@@ -226,7 +226,7 @@ export default function PoliciesLayout({ children }: PolicyLayoutProps) {
             <Link href="/#repair" className="hover:text-accent transition-colors">حجز الصيانة</Link>
           </div>
           <div>
-            &copy; {new Date().getFullYear()} مركز الروان (Rwan Center). جميع الحقوق محفوظة.
+            &copy; {new Date().getFullYear()} مركز الروان (Al-Rwan Center). جميع الحقوق محفوظة.
           </div>
         </div>
       </footer>

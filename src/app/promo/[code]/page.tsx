@@ -59,7 +59,7 @@ export default function PromoLandingPage() {
           <div className="space-y-1 text-right w-full flex justify-between items-center border-b border-white/5 pb-4">
             <div>
               <span className="block text-sm font-black text-white">مركز الروان</span>
-              <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider font-mono">Rwan Center</span>
+              <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider font-mono">Al-Rwan Center</span>
             </div>
             <span className="inline-flex items-center gap-1.5 px-3 py-1 text-[10px] font-black text-sky-400 bg-sky-500/10 rounded-full border border-sky-500/25 shadow-sm">
               <Sparkles className="w-3.5 h-3.5" />

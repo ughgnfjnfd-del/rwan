@@ -151,7 +151,7 @@ export default function PromoCarousel({ onOpenRepairModal }: PromoCarouselProps)
       {/* Main Slide Panel */}
       <div className={`w-full bg-gradient-to-br ${activeSlide.bgStyle} transition-all duration-1000 ease-in-out flex flex-col lg:flex-row items-center justify-center relative overflow-hidden min-h-[85vh] lg:min-h-[90vh]`}>
 
-        <div className={`max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 flex flex-col lg:flex-row items-center justify-between ${isCustomVisual ? "gap-5 sm:gap-7 lg:gap-6" : "gap-8 sm:gap-12"} z-10`}>
+        <div className={`max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pb-28 sm:pb-32 lg:pb-0 pt-8 lg:pt-0 flex flex-col lg:flex-row items-center justify-between ${isCustomVisual ? "gap-5 sm:gap-7 lg:gap-6" : "gap-8 sm:gap-12"} z-10`}>
 
         {/* Glow ambient effects */}
         <div className={`absolute -top-1/2 -right-1/4 w-96 h-96 rounded-full blur-[100px] pointer-events-none opacity-40 transition-all duration-700 ${activeSlide.theme === 'dark' ? 'bg-sky-500' : 'bg-blue-300'}`}></div>

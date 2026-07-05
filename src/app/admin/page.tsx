@@ -1932,6 +1932,7 @@ export default function AdminPage() {
                         <div className="text-center text-slate-400">
                           <Upload className="w-8 h-8 mx-auto mb-2 opacity-50" />
                           <span className="text-[10px] font-bold block">رفع الشعار</span>
+                          <span className="text-[9px] font-medium block mt-1">الأبعاد المقترحة: 512x512</span>
                         </div>
                       )}
                       <input
@@ -3108,6 +3109,7 @@ export default function AdminPage() {
                           />
                           <Upload className="w-6 h-6 text-slate-400 group-hover:text-accent transition-colors mb-1" />
                           <span className="text-[10px] font-bold text-slate-500">اختر صورة مخصصة لرفعها</span>
+                          <span className="text-[9px] text-slate-400 mt-0.5 block text-center leading-tight">الأبعاد المقترحة: 1080x1080</span>
                           <span className="text-[8px] text-slate-400 mt-0.5">JPG, PNG بنسبة 4:5 (مثل 800×1000)</span>
                         </div>
                       )}
@@ -3714,6 +3716,7 @@ export default function AdminPage() {
                     <Upload className="w-8 h-8 text-slate-400 group-hover:text-accent transition-colors mb-2" />
                     <span className="text-xs text-slate-500 font-medium">اسحب الصورة هنا أو اضغط للتصفح</span>
                     <span className="text-[10px] text-slate-400 mt-1">يدعم PNG, JPG, WebP (سيتم تصغيرها وضغطها تلقائياً)</span>
+                    <span className="text-[10px] font-bold text-slate-500 mt-0.5">الأبعاد المقترحة: 1080x1080</span>
                   </div>
 
                   {imagePreview && (
@@ -3916,7 +3919,7 @@ export default function AdminPage() {
                         </span>
 
                         {/* Color Image Upload */}
-                        <div className="relative w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer overflow-hidden flex-shrink-0" title="رفع صورة مخصصة للون">
+                        <div className="relative w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer overflow-hidden flex-shrink-0" title="رفع صورة مخصصة للون (1080x1080)">
                           {color.file || color.image ? (
                             <img
                               src={color.file ? URL.createObjectURL(color.file) : color.image || ""}
@@ -4250,6 +4253,7 @@ export default function AdminPage() {
                       />
                       <Upload className="w-6 h-6 text-slate-400 group-hover:text-accent transition-colors mb-1" />
                       <span className="text-[11px] text-slate-500 font-medium">اختر ملف صورة من جهازك</span>
+                      <span className="text-[9px] text-slate-400 mt-0.5 block text-center leading-tight">الأبعاد المقترحة: 1080x1080 (بخلفية شفافة)</span>
                     </div>
 
                     {slideImagePreview && (

@@ -325,17 +325,15 @@ export default function RepairModal({ isOpen, onClose }: RepairModalProps) {
                   return (
                     <div
                       key={item.id}
-                      className={`flex items-center gap-3 rounded-2xl border p-3 transition-all ${
-                        isActive
+                      className={`flex items-center gap-3 rounded-2xl border p-3 transition-all ${isActive
                           ? "border-accent/40 bg-white/[0.11]"
                           : isDone
                             ? "border-emerald-400/20 bg-emerald-400/[0.08]"
                             : "border-white/10 bg-white/[0.04]"
-                      }`}
+                        }`}
                     >
-                      <div className={`flex h-10 w-10 items-center justify-center rounded-full ${
-                        isDone ? "bg-emerald-400 text-slate-950" : isActive ? "bg-accent text-white" : "bg-white/10 text-slate-300"
-                      }`}>
+                      <div className={`flex h-10 w-10 items-center justify-center rounded-full ${isDone ? "bg-emerald-400 text-slate-950" : isActive ? "bg-accent text-white" : "bg-white/10 text-slate-300"
+                        }`}>
                         {isDone ? <CheckCircle2 className="h-5 w-5" /> : <StepIcon className="h-5 w-5" />}
                       </div>
                       <div>
@@ -517,15 +515,13 @@ export default function RepairModal({ isOpen, onClose }: RepairModalProps) {
                               setFormData({ ...formData, issueType: issue.value });
                               setError("");
                             }}
-                            className={`flex items-center gap-3 rounded-[22px] border p-4 text-right transition-all duration-200 active:scale-[0.99] cursor-pointer ${
-                              isSelected
+                            className={`flex items-center gap-3 rounded-[22px] border p-4 text-right transition-all duration-200 active:scale-[0.99] cursor-pointer ${isSelected
                                 ? "border-slate-950 bg-slate-950 text-white shadow-md"
                                 : "border-slate-200 bg-slate-50/70 text-slate-800 hover:border-slate-300 hover:bg-white"
-                            }`}
+                              }`}
                           >
-                            <span className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl ${
-                              isSelected ? "bg-white text-slate-950" : "bg-white text-slate-600"
-                            }`}>
+                            <span className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl ${isSelected ? "bg-white text-slate-950" : "bg-white text-slate-600"
+                              }`}>
                               <IssueIcon className="h-5 w-5" />
                             </span>
                             <span className="min-w-0">

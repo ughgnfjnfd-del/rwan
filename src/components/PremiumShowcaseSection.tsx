@@ -1,16 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  ArrowLeft,
-  BadgeCheck,
-  ChevronLeft,
-  ChevronRight,
-  Eye,
-  ShieldCheck,
-  ShoppingBag,
-  Sparkles,
-} from "lucide-react";
+import { Eye, ShoppingBag, Zap } from "lucide-react";
 import { Product, useApp } from "@/context/AppContext";
 import ProductMockup from "@/components/ProductMockup";
 
@@ -20,85 +11,43 @@ interface PremiumShowcaseSectionProps {
 }
 
 const presetImages = [
-  "iphone",
-  "samsung",
-  "cases",
-  "headphones",
-  "earbuds",
-  "cable",
-  "smartwatch",
-  "powerbank",
-  "screen-protector",
+  "iphone", "samsung", "cases", "headphones", "earbuds", "cable", "smartwatch", "powerbank", "screen-protector",
 ];
 
 const themeStyles = {
   titanium: {
-    section: "border-slate-200/80 bg-[linear-gradient(135deg,#ffffff_0%,#f8fafc_46%,#edf7ff_100%)]",
-    badge: "border-slate-200 bg-white text-slate-900",
-    accent: "from-slate-900 via-sky-500 to-emerald-300",
-    highlight: "text-sky-600",
-    soft: "bg-slate-950 text-white",
+    container: "bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900",
+    accent: "text-indigo-600",
+    btnPrimary: "text-indigo-900",
   },
   aqua: {
-    section: "border-cyan-100 bg-[linear-gradient(135deg,#ffffff_0%,#f0fdff_48%,#eefcf5_100%)]",
-    badge: "border-cyan-200 bg-white text-cyan-800",
-    accent: "from-cyan-500 via-sky-400 to-emerald-300",
-    highlight: "text-cyan-700",
-    soft: "bg-cyan-700 text-white",
+    container: "bg-gradient-to-br from-cyan-900 via-blue-950 to-slate-900",
+    accent: "text-cyan-600",
+    btnPrimary: "text-cyan-900",
   },
   blush: {
-    section: "border-rose-100 bg-[linear-gradient(135deg,#ffffff_0%,#fff7f7_48%,#f5fbff_100%)]",
-    badge: "border-rose-200 bg-white text-rose-700",
-    accent: "from-rose-500 via-sky-400 to-amber-300",
-    highlight: "text-rose-600",
-    soft: "bg-rose-600 text-white",
+    container: "bg-gradient-to-br from-rose-900 via-pink-950 to-purple-950",
+    accent: "text-rose-600",
+    btnPrimary: "text-rose-900",
   },
 };
 
-const isPresetProductVisual = (image: string) => (
-  presetImages.includes(image) || image.startsWith("charger-")
-);
-
-const hasRealDiscount = (product: Product) => (
-  Boolean(product.discountPrice && product.discountPrice > 0 && product.discountPrice < product.price)
-);
-
+const isPresetProductVisual = (image: string) => presetImages.includes(image) || image.startsWith("charger-");
+const hasRealDiscount = (product: Product) => Boolean(product.discountPrice && product.discountPrice > 0 && product.discountPrice < product.price);
 const getCurrentPrice = (product: Product) => product.discountPrice || product.price;
-
-const getDiscountPercent = (product: Product) => (
-  hasRealDiscount(product)
-    ? Math.round((1 - (getCurrentPrice(product) / product.price)) * 100)
-    : 0
-);
-
+const getDiscountPercent = (product: Product) => hasRealDiscount(product) ? Math.round((1 - (getCurrentPrice(product) / product.price)) * 100) : 0;
 const getSaving = (product: Product) => Math.max(0, product.price - getCurrentPrice(product));
+const uniqueProducts = (items: Product[]) => Array.from(new Map(items.map((item) => [item.id, item])).values());
 
-const uniqueProducts = (items: Product[]) => (
-  Array.from(new Map(items.map((item) => [item.id, item])).values())
-);
-
-function PremiumProductVisual({
-  product,
-  sizeClass,
-  imageClassName,
-  eager = false,
-}: {
-  product: Product;
-  sizeClass: string;
-  imageClassName: string;
-  eager?: boolean;
-}) {
+function PremiumProductVisual({ product, className }: { product: Product, className: string }) {
   if (isPresetProductVisual(product.image)) {
-    return <ProductMockup image={product.image} name={product.name} sizeClass={sizeClass} />;
+    return <ProductMockup image={product.image} name={product.name} sizeClass={className} />;
   }
-
   return (
-    <img
-      src={product.image}
-      alt={product.name}
-      loading={eager ? "eager" : "lazy"}
-      decoding="async"
-      className={`${imageClassName} object-contain drop-shadow-[0_26px_38px_rgba(15,23,42,0.18)]`}
+    <img 
+      src={product.image} 
+      alt={product.name} 
+      className={`${className} object-contain mix-blend-multiply transition-transform duration-700 group-hover:scale-110`} 
     />
   );
 }
@@ -108,15 +57,10 @@ export default function PremiumShowcaseSection({ onSelectProduct, onAddToCart }:
   const [activeIndex, setActiveIndex] = useState(0);
 
   const showcaseData = useMemo(() => {
-    const discountedProducts = [...products]
-      .filter(hasRealDiscount)
-      .sort((a, b) => getSaving(b) - getSaving(a));
-
-    const configuredProducts = premiumShowcase.productIds
-      .map((id) => products.find((product) => product.id === id))
-      .filter(Boolean) as Product[];
-
+    const discountedProducts = [...products].filter(hasRealDiscount).sort((a, b) => getSaving(b) - getSaving(a));
+    const configuredProducts = premiumShowcase.productIds.map((id) => products.find((product) => product.id === id)).filter(Boolean) as Product[];
     const preferredHero = products.find((product) => product.id === premiumShowcase.heroProductId);
+    
     const fallbackProducts = uniqueProducts([
       ...(preferredHero ? [preferredHero] : []),
       ...discountedProducts,
@@ -124,273 +68,157 @@ export default function PremiumShowcaseSection({ onSelectProduct, onAddToCart }:
     ]);
 
     const baseRotationProducts = configuredProducts.length > 0 ? configuredProducts : fallbackProducts;
-    const preferredHeroIndex = preferredHero
-      ? baseRotationProducts.findIndex((product) => product.id === preferredHero.id)
-      : -1;
-    const rotationProducts = preferredHeroIndex > 0
-      ? [
-        baseRotationProducts[preferredHeroIndex],
-        ...baseRotationProducts.slice(0, preferredHeroIndex),
-        ...baseRotationProducts.slice(preferredHeroIndex + 1),
-      ]
-      : baseRotationProducts;
-
-    if (rotationProducts.length === 0) {
-      return null;
-    }
-
-    return { rotationProducts, discountedProducts };
+    
+    // Limit to 5 products for a clean dock switcher
+    return baseRotationProducts.length > 0 ? baseRotationProducts.slice(0, 5) : null;
   }, [premiumShowcase.heroProductId, premiumShowcase.productIds, products]);
 
-  const rotationProducts = showcaseData?.rotationProducts || [];
-
+  const rotationProducts = showcaseData || [];
 
   useEffect(() => {
     if (!premiumShowcase.isEnabled || rotationProducts.length <= 1) return;
-
     const intervalId = window.setInterval(() => {
-      setActiveIndex((currentIndex) => (currentIndex + 1) % rotationProducts.length);
-    }, 60000);
-
+      setActiveIndex((curr) => (curr + 1) % rotationProducts.length);
+    }, 6000); // 6 seconds dynamic rotation
     return () => window.clearInterval(intervalId);
   }, [premiumShowcase.isEnabled, rotationProducts.length]);
 
   if (!premiumShowcase.isEnabled || rotationProducts.length === 0) return null;
 
-  const safeActiveIndex = activeIndex % rotationProducts.length;
-  const heroProduct = rotationProducts[safeActiveIndex];
-  const supportProducts = rotationProducts
-    .filter((product) => product.id !== heroProduct.id)
-    .slice(0, 3);
+  const heroProduct = rotationProducts[activeIndex];
   const theme = themeStyles[premiumShowcase.theme] || themeStyles.titanium;
   const heroPrice = getCurrentPrice(heroProduct);
   const heroDiscount = getDiscountPercent(heroProduct);
 
-
   return (
-    <section
-      id="premium-offers"
-      dir="rtl"
-      className={`relative isolate overflow-hidden rounded-[32px] border px-4 py-6 text-right shadow-[0_28px_80px_rgba(15,23,42,0.08)] sm:px-7 sm:py-8 lg:px-10 lg:py-10 ${theme.section}`}
-    >
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(15,23,42,0.04)_1px,transparent_1px),linear-gradient(180deg,rgba(15,23,42,0.035)_1px,transparent_1px)] bg-[size:42px_42px]" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-l from-transparent via-white to-transparent" />
-      <div className="pointer-events-none absolute inset-x-8 bottom-0 h-px bg-gradient-to-l from-transparent via-sky-200 to-transparent" />
+    <section id="premium-offers" dir="rtl" className="px-4 py-8 max-w-7xl mx-auto w-full">
+      <div className={`relative overflow-hidden rounded-[40px] shadow-[0_30px_80px_rgba(0,0,0,0.15)] ${theme.container}`}>
+        
+        {/* Animated Background Orbs */}
+        <div className="absolute -top-32 -right-32 w-[500px] h-[500px] bg-white/10 blur-[120px] rounded-full mix-blend-overlay animate-pulse pointer-events-none" />
+        <div className="absolute -bottom-32 -left-32 w-[500px] h-[500px] bg-white/5 blur-[120px] rounded-full mix-blend-overlay pointer-events-none" />
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10 mix-blend-overlay pointer-events-none" />
 
-      <div className="relative grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
-        <div className="order-2 space-y-6 lg:order-1">
-          <div className="space-y-4">
-            <span className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-[11px] font-black shadow-sm ${theme.badge}`}>
-              <Sparkles className="h-4 w-4" />
-              {premiumShowcase.badge || "العروض الأقوى"}
-            </span>
-
-            <div className="space-y-3">
-              <h2 className="text-3xl font-black leading-tight text-slate-950 sm:text-4xl lg:text-5xl">
+        <div className="relative z-10 flex flex-col lg:flex-row items-center p-6 sm:p-10 md:p-16 gap-12 lg:gap-20">
+          
+          {/* Text Content */}
+          <div className="flex-1 w-full text-center lg:text-right space-y-6 lg:space-y-8 order-2 lg:order-1">
+            
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/20 bg-white/10 backdrop-blur-md shadow-lg">
+               <Zap className="h-4 w-4 text-yellow-400 fill-yellow-400 animate-pulse" />
+               <span className="text-xs font-bold text-white tracking-wide">{premiumShowcase.badge || "عرض حصري وخاص"}</span>
+            </div>
+            
+            <div className="space-y-4">
+              <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white leading-[1.15] tracking-tight drop-shadow-md">
                 {premiumShowcase.title || "عروض الروان المميزة"}
               </h2>
-              <p className="max-w-xl text-sm font-bold leading-7 text-slate-500">
+              <p className="text-base sm:text-lg text-white/70 max-w-lg mx-auto lg:mx-0 font-medium leading-relaxed">
                 {premiumShowcase.subtitle || "منتجات مختارة بعروض قوية وتجربة عرض مرتبة مثل واجهات المتاجر العالمية."}
               </p>
             </div>
-          </div>
 
-
-
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <button
-              type="button"
-              onClick={() => onSelectProduct(heroProduct)}
-              className={`inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-black shadow-lg transition-transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer ${theme.soft}`}
-            >
-              <Eye className="h-4 w-4" />
-              {premiumShowcase.ctaText || "شاهد العرض"}
-            </button>
-            <button
-              type="button"
-              onClick={() => onAddToCart(heroProduct)}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-900 shadow-sm transition-transform hover:-translate-y-0.5 hover:border-slate-300 active:translate-y-0 cursor-pointer"
-            >
-              <ShoppingBag className="h-4 w-4" />
-              أضف للسلة
-            </button>
-          </div>
-
-
-        </div>
-
-        <div className="order-1 lg:order-2">
-          <div className="relative min-h-[390px] rounded-[30px] border border-white bg-white/70 p-4 shadow-[0_26px_70px_rgba(15,23,42,0.12)] backdrop-blur-md sm:min-h-[470px] sm:p-6 lg:min-h-[540px]">
-            <div className="absolute inset-4 rounded-[26px] border border-slate-200/60 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(248,250,252,0.78)_100%)]" />
-            <div className={`absolute inset-x-10 bottom-12 h-3 rounded-full bg-gradient-to-l ${theme.accent}`} />
-            <div className="absolute inset-x-8 bottom-8 h-20 rounded-[28px] border border-white bg-white/80 shadow-[0_18px_55px_rgba(15,23,42,0.12)]" />
-            <div className="absolute inset-x-14 bottom-20 h-12 rounded-[100%] bg-slate-300/45 blur-xl" />
-
-            <div
-              key={heroProduct.id}
-              className="relative z-10 flex h-[300px] items-center justify-center animate-in fade-in-50 slide-in-from-bottom-3 duration-500 sm:h-[370px] lg:h-[420px]"
-            >
-              <PremiumProductVisual
-                product={heroProduct}
-                sizeClass="w-40 aspect-[9/18] sm:w-48 lg:w-56"
-                imageClassName="max-h-[92%] max-w-[92%] rounded-3xl"
-                eager
-              />
-            </div>
-
-            {/* Navigation Arrows inside Product Card */}
-            {rotationProducts.length > 1 && (
-              <>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setActiveIndex((curr) => (curr - 1 + rotationProducts.length) % rotationProducts.length);
-                  }}
-                  className="absolute left-3 sm:left-4 top-[40%] -translate-y-1/2 p-2 rounded-full backdrop-blur-md border border-slate-200 bg-white/90 shadow-md hover:bg-white hover:scale-105 active:scale-95 z-25 cursor-pointer text-slate-700 transition-all"
-                  aria-label="السابق"
-                >
-                  <ChevronLeft className="w-4.5 h-4.5 sm:w-5 h-5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setActiveIndex((curr) => (curr + 1) % rotationProducts.length);
-                  }}
-                  className="absolute right-3 sm:right-4 top-[40%] -translate-y-1/2 p-2 rounded-full backdrop-blur-md border border-slate-200 bg-white/90 shadow-md hover:bg-white hover:scale-105 active:scale-95 z-25 cursor-pointer text-slate-700 transition-all"
-                  aria-label="التالي"
-                >
-                  <ChevronRight className="w-4.5 h-4.5 sm:w-5 h-5" />
-                </button>
-              </>
-            )}
-
-            <div className="relative z-10 mt-3 flex flex-col gap-3 rounded-3xl border border-slate-200 bg-white/90 p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0">
-                <div className="mb-1 flex flex-wrap items-center gap-2">
-                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-black ${theme.soft}`}>
-                    {heroProduct.category}
-                  </span>
-                  {heroDiscount > 0 && (
-                    <span className="rounded-full border border-rose-100 bg-rose-50 px-2.5 py-1 text-[10px] font-black text-rose-600">
-                      خصم {heroDiscount}%
+            {/* Pricing Section */}
+            <div className="flex flex-col sm:flex-row items-center lg:items-end justify-center lg:justify-start gap-4 sm:gap-6 pt-4">
+               <div className="flex flex-col items-center lg:items-start bg-black/20 px-6 py-4 rounded-3xl border border-white/10 shadow-inner">
+                  {hasRealDiscount(heroProduct) && (
+                    <span className="text-white/50 text-sm line-through decoration-rose-500 decoration-2 font-mono mb-1">
+                      {heroProduct.price.toLocaleString()} د.ع
                     </span>
                   )}
-                </div>
-                <h3 className="truncate text-lg font-black text-slate-950 sm:text-xl">
-                  {heroProduct.name}
-                </h3>
-                {heroProduct.nameEn && (
-                  <p className="truncate font-mono text-[11px] font-bold uppercase text-slate-400" dir="ltr">
-                    {heroProduct.nameEn}
-                  </p>
-                )}
-              </div>
-
-              <div className="flex flex-shrink-0 items-end gap-2 sm:flex-col sm:items-start">
-                {hasRealDiscount(heroProduct) && (
-                  <span className="font-mono text-xs font-black text-slate-400 line-through">
-                    {heroProduct.price.toLocaleString()} د.ع
+                  <span className="text-3xl sm:text-4xl font-black text-white font-mono drop-shadow-lg">
+                    {heroPrice.toLocaleString()} د.ع
                   </span>
-                )}
-                <span className="font-mono text-2xl font-black text-slate-950">
-                  {heroPrice.toLocaleString()} د.ع
-                </span>
-              </div>
+               </div>
+               
+               {heroDiscount > 0 && (
+                  <div className="bg-gradient-to-r from-rose-500 to-pink-600 text-white px-5 py-2.5 rounded-2xl font-black shadow-[0_10px_20px_rgba(244,63,94,0.4)] rotate-3 hover:rotate-0 transition-transform cursor-default">
+                     خصم جبار {heroDiscount}%
+                  </div>
+               )}
             </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-4 pt-4 w-full justify-center lg:justify-start">
+               <button
+                 onClick={() => onAddToCart(heroProduct)}
+                 className={`group relative overflow-hidden bg-white px-8 py-4 rounded-2xl font-black shadow-[0_15px_30px_rgba(255,255,255,0.2)] hover:scale-105 transition-all duration-300 flex items-center justify-center gap-3 w-full sm:w-auto ${theme.btnPrimary}`}
+               >
+                 <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                 <ShoppingBag className="w-5 h-5 relative z-10" />
+                 <span className="relative z-10">أضف للسلة الآن</span>
+               </button>
+               <button
+                 onClick={() => onSelectProduct(heroProduct)}
+                 className="bg-white/10 text-white border border-white/20 backdrop-blur-md px-8 py-4 rounded-2xl font-bold hover:bg-white/20 hover:scale-105 transition-all duration-300 flex items-center justify-center gap-3 w-full sm:w-auto"
+               >
+                 <Eye className="w-5 h-5" />
+                 شاهد التفاصيل
+               </button>
+            </div>
+            
+            {/* Minimalist Dock Switcher */}
+            {rotationProducts.length > 1 && (
+              <div className="pt-6 flex items-center justify-center lg:justify-start gap-3">
+                {rotationProducts.map((p, idx) => (
+                  <button 
+                    key={p.id}
+                    onClick={() => setActiveIndex(idx)}
+                    className={`relative w-12 h-12 sm:w-14 sm:h-14 rounded-2xl overflow-hidden border-2 transition-all duration-300 cursor-pointer ${
+                      idx === activeIndex 
+                        ? 'border-white scale-110 shadow-[0_0_20px_rgba(255,255,255,0.4)] z-10' 
+                        : 'border-white/20 opacity-50 hover:opacity-100 hover:scale-105'
+                    }`}
+                  >
+                    <div className="absolute inset-0 bg-white" />
+                    <img src={p.image} className="absolute inset-0 w-full h-full object-contain mix-blend-multiply p-1.5" alt={p.name} />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        </div>
-      </div>
 
-      {rotationProducts.length > 1 && (
-        <div className="relative mt-5 flex items-center justify-center gap-2">
-          {rotationProducts.map((product, index) => (
-            <button
-              key={product.id}
-              type="button"
-              onClick={() => setActiveIndex(index)}
-              className={`h-2 rounded-full transition-all cursor-pointer ${index === safeActiveIndex
-                ? `w-9 bg-gradient-to-l ${theme.accent}`
-                : "w-2 bg-slate-300 hover:bg-slate-400"
-                }`}
-              title={product.name}
-            />
-          ))}
-        </div>
-      )}
+          {/* The Floating Pedestal (Image Area) */}
+          <div className="w-full lg:w-[45%] relative perspective-1000 order-1 lg:order-2">
+             
+             {/* Decorative spinning ring behind pedestal */}
+             <div className="absolute inset-4 border border-white/20 rounded-full animate-[spin_20s_linear_infinite] pointer-events-none" />
+             <div className="absolute inset-0 border border-white/10 rounded-full animate-[spin_15s_linear_infinite_reverse] pointer-events-none" />
+             
+             {/* The White Pedestal Container */}
+             <div 
+               key={`pedestal-${heroProduct.id}`}
+               className="group relative bg-white rounded-[40px] shadow-[0_40px_80px_rgba(0,0,0,0.5)] p-6 sm:p-10 overflow-hidden transform hover:-translate-y-2 transition-all duration-500 border border-white/40 animate-in fade-in zoom-in-95 duration-700"
+             >
+                {/* Soft inner shadow for 3D depth */}
+                <div className="absolute inset-0 shadow-[inset_0_-20px_50px_rgba(0,0,0,0.06)] pointer-events-none rounded-[40px]" />
+                
+                {/* Floor shadow under the product to avoid square drop-shadows on white images */}
+                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-[70%] h-12 bg-black/15 blur-2xl rounded-full transition-transform duration-700 group-hover:scale-90 group-hover:bg-black/10" />
 
-      {supportProducts.length > 0 && (
-        <div className="relative mt-6 flex md:grid overflow-x-auto md:overflow-x-visible gap-3 pb-3 md:pb-0 px-4 -mx-4 md:px-0 md:mx-0 scrollbar-none snap-x snap-mandatory md:grid-cols-3">
-          {supportProducts.map((product) => {
-            const productDiscount = getDiscountPercent(product);
-            const productIndex = rotationProducts.findIndex((item) => item.id === product.id);
-            return (
-              <button
-                key={product.id}
-                type="button"
-                onClick={() => setActiveIndex(Math.max(productIndex, 0))}
-                className="group grid min-h-[132px] grid-cols-[96px_1fr] gap-3 rounded-3xl border border-slate-200/80 bg-white/80 p-3 text-right shadow-sm backdrop-blur-md transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg cursor-pointer flex-shrink-0 w-[280px] md:w-auto snap-start"
-              >
-                <div className="relative flex h-full min-h-[108px] items-center justify-center overflow-hidden rounded-2xl border border-slate-100 bg-slate-50">
-                  <div className={`absolute inset-x-4 bottom-3 h-1.5 rounded-full bg-gradient-to-l ${theme.accent}`} />
-                  <PremiumProductVisual
-                    product={product}
-                    sizeClass="w-16 aspect-[9/18]"
-                    imageClassName="relative z-10 max-h-[82%] max-w-[82%] rounded-xl"
-                  />
+                {/* The Image */}
+                <div className="relative h-[220px] sm:h-[300px] lg:h-[350px] flex items-center justify-center">
+                   <PremiumProductVisual
+                     product={heroProduct}
+                     className="max-h-full w-auto max-w-full z-10"
+                   />
                 </div>
 
-                <div className="flex min-w-0 flex-col justify-between gap-2">
-                  <div className="space-y-1">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {productDiscount > 0 ? (
-                        <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[9px] font-black text-rose-600">
-                          وفر {productDiscount}%
-                        </span>
-                      ) : (
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-black text-slate-500">
-                          اختيار مميز
-                        </span>
-                      )}
-                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-black text-emerald-700">
-                        متوفر
-                      </span>
-                    </div>
-                    <h3 className="line-clamp-2 text-sm font-black leading-5 text-slate-900 group-hover:text-sky-700">
-                      {product.name}
-                    </h3>
-                  </div>
-
-                  <div className="flex items-end justify-between gap-2">
-                    <div>
-                      {hasRealDiscount(product) && (
-                        <span className="block font-mono text-[10px] font-bold text-slate-400 line-through">
-                          {product.price.toLocaleString()} د.ع
-                        </span>
-                      )}
-                      <strong className="block font-mono text-sm font-black text-slate-950">
-                        {getCurrentPrice(product).toLocaleString()} د.ع
-                      </strong>
-                    </div>
-                    <ArrowLeft className={`h-4 w-4 flex-shrink-0 transition-transform group-hover:-translate-x-1 ${theme.highlight}`} />
-                  </div>
+                {/* Pedestal Title (adds a nice touch) */}
+                <div className="absolute top-6 left-6 right-6 flex justify-between items-center opacity-40 pointer-events-none">
+                   <span className="font-black text-slate-900 text-xl tracking-widest uppercase truncate">{heroProduct.category}</span>
+                   <span className="font-mono text-slate-900 font-bold">0{activeIndex + 1}</span>
                 </div>
-              </button>
-            );
-          })}
-        </div>
-      )}
+             </div>
+             
+             {/* Floating Promo Badge */}
+             <div className="absolute -top-6 -right-2 sm:-right-6 bg-gradient-to-tr from-amber-300 to-yellow-100 text-amber-900 font-black px-4 sm:px-6 py-3 sm:py-4 rounded-3xl shadow-2xl rotate-12 animate-bounce flex flex-col items-center justify-center border-4 border-white z-20">
+                <span className="text-[10px] sm:text-xs uppercase tracking-wider opacity-80">ترشيح المركز</span>
+                <span className="text-sm sm:text-lg">الأكثر طلباً!</span>
+             </div>
+          </div>
 
-      <div className="relative mt-5 flex flex-wrap items-center gap-2 text-[10px] font-black text-slate-500">
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/70 px-3 py-1.5">
-          <BadgeCheck className={`h-3.5 w-3.5 ${theme.highlight}`} />
-          منتجات أصلية
-        </span>
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/70 px-3 py-1.5">
-          <ShieldCheck className={`h-3.5 w-3.5 ${theme.highlight}`} />
-          ضمان حقيقي
-        </span>
+        </div>
       </div>
     </section>
   );

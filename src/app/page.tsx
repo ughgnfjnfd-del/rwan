@@ -1956,10 +1956,50 @@ export default function Home() {
               {/* Gradient line separator */}
               <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-l from-transparent via-slate-300/50 to-transparent" />
 
-              <div className="flex flex-col sm:flex-row items-center justify-between text-center gap-4">
+              <div className="flex flex-col lg:flex-row items-center justify-between text-center gap-4">
                 <div className="text-[12px] text-slate-400 font-medium">
                   &copy; {new Date().getFullYear()} مركز الروان (Al-Rwan Center). جميع الحقوق محفوظة.
                 </div>
+                
+                {/* Developer Info */}
+                <a 
+                  href="https://med-pc.vercel.app/" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 group transition-all hover:scale-105"
+                  title="مطور الموقع Mohammed.N"
+                >
+                  <span className="text-[11px] text-slate-400 group-hover:text-accent transition-colors font-medium">
+                    تطوير وتصميم
+                  </span>
+                  <div className="w-7 h-7 rounded-lg overflow-hidden bg-slate-200/50 flex items-center justify-center text-slate-500 group-hover:ring-2 ring-accent transition-all">
+                    {/* 
+                      أضف الشعار الخاص بك في مجلد public 
+                      باسم developer-logo.png
+                      وإذا كان الامتداد يختلف قم بتغييره أدناه
+                    */}
+                    <img 
+                      src="/developer-logo.png" 
+                      alt="Mohammed.N Logo" 
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        // في حال لم يتم وضع الشعار بعد، نعرض أيقونة افتراضية
+                        e.currentTarget.style.display = 'none';
+                        e.currentTarget.parentElement?.classList.add('p-1.5');
+                        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                        svg.setAttribute('viewBox', '0 0 24 24');
+                        svg.setAttribute('fill', 'none');
+                        svg.setAttribute('stroke', 'currentColor');
+                        svg.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />';
+                        e.currentTarget.parentElement?.appendChild(svg);
+                      }}
+                    />
+                  </div>
+                  <span className="text-[12px] font-bold text-slate-500 group-hover:text-accent transition-colors">
+                    Mohammed.N
+                  </span>
+                </a>
+
                 <div className="flex items-center gap-3 text-[11px] text-slate-400">
                   <span className="flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />

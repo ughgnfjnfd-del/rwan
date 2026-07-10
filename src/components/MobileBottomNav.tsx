@@ -3,9 +3,12 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Home, Grid, Wrench, ShoppingBag, MessageCircle } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useApp } from "@/context/AppContext";
 
 export default function MobileBottomNav() {
+  const pathname = usePathname();
+  const isRepairPage = pathname === "/repair";
   const [activeTab, setActiveTab] = useState("home");
   const [isVisible, setIsVisible] = useState(true);
   const lastScrollYRef = useRef(0);
@@ -24,6 +27,10 @@ export default function MobileBottomNav() {
   }, []);
 
   useEffect(() => {
+    if (isRepairPage) {
+      return;
+    }
+
     // Initial offset calculation after a short delay to ensure DOM is ready
     const timer = setTimeout(updateOffsets, 1000);
     window.addEventListener("resize", updateOffsets);
@@ -67,14 +74,14 @@ export default function MobileBottomNav() {
       window.removeEventListener("scroll", handleScroll);
       window.removeEventListener("resize", updateOffsets);
     };
-  }, [updateOffsets]);
+  }, [isRepairPage, updateOffsets]);
 
   const navItems = [
-    { id: "home", label: "الرئيسية", icon: Home, href: "#" },
-    { id: "categories", label: "الأقسام", icon: Grid, href: "#categories" },
+    { id: "home", label: "الرئيسية", icon: Home, href: "/" },
+    { id: "categories", label: "الأقسام", icon: Grid, href: "/#categories" },
     { id: "whatsapp", label: "", icon: MessageCircle, href: `https://wa.me/${siteSettings?.phone?.replace(/[^\d+]/g, '') || ''}` },
     { id: "cart", label: "السلة", icon: ShoppingBag, href: "#" },
-    { id: "repair", label: "الصيانة", icon: Wrench, href: "#repair" },
+    { id: "repair", label: "الصيانة", icon: Wrench, href: "/repair" },
   ];
 
   const handleNavClick = (id: string, e: React.MouseEvent) => {
@@ -83,6 +90,9 @@ export default function MobileBottomNav() {
       window.dispatchEvent(new Event("open-cart"));
     } else if (id === "whatsapp") {
       // Allow default link behavior
+    } else if (id === "repair" || isRepairPage) {
+      setActiveTab(id);
+      // Route navigation is handled by Next.js Link.
     } else {
       setActiveTab(id);
       // Smooth scroll manually to avoid instant jump & URL hash change
@@ -96,12 +106,13 @@ export default function MobileBottomNav() {
   };
 
   // Pre-calculate bubble position index
-  const activeIndex = navItems.findIndex(item => item.id === activeTab);
-  const showBubble = activeTab !== 'whatsapp' && activeTab !== 'cart';
+  const displayedActiveTab = isRepairPage ? "repair" : activeTab;
+  const activeIndex = navItems.findIndex(item => item.id === displayedActiveTab);
+  const showBubble = displayedActiveTab !== 'whatsapp' && displayedActiveTab !== 'cart';
 
   return (
     <div
-      className={`md:hidden fixed bottom-4 inset-x-0 z-40 px-4 ${isVisible ? "translate-y-0" : "translate-y-28"
+      className={`md:hidden fixed bottom-4 inset-x-0 z-40 px-4 ${isVisible || isRepairPage ? "translate-y-0" : "translate-y-28"
         }`}
       style={{
         transition: "transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
@@ -126,7 +137,7 @@ export default function MobileBottomNav() {
         />
 
         {navItems.map((item) => {
-          const isActive = activeTab === item.id;
+          const isActive = displayedActiveTab === item.id;
           const isWhatsApp = item.id === "whatsapp";
           const Icon = item.icon;
 

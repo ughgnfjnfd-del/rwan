@@ -1,7 +1,18 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element */
+
 import React, { useEffect, useMemo, useState } from "react";
-import { Eye, ShoppingBag, Zap } from "lucide-react";
+import {
+  ArrowLeft,
+  BadgeCheck,
+  Eye,
+  PackageCheck,
+  ShieldCheck,
+  ShoppingBag,
+  Sparkles,
+  Zap,
+} from "lucide-react";
 import { Product, useApp } from "@/context/AppContext";
 import ProductMockup from "@/components/ProductMockup";
 
@@ -11,43 +22,84 @@ interface PremiumShowcaseSectionProps {
 }
 
 const presetImages = [
-  "iphone", "samsung", "cases", "headphones", "earbuds", "cable", "smartwatch", "powerbank", "screen-protector",
+  "iphone",
+  "samsung",
+  "cases",
+  "headphones",
+  "earbuds",
+  "cable",
+  "smartwatch",
+  "powerbank",
+  "screen-protector",
 ];
 
 const themeStyles = {
   titanium: {
-    container: "bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900",
-    accent: "text-indigo-600",
-    btnPrimary: "text-indigo-900",
+    shell: "from-white via-slate-50 to-slate-200",
+    accent: "bg-slate-950 text-white",
+    subtle: "text-slate-500",
+    meter: "from-slate-950 via-slate-700 to-slate-400",
+    tint: "bg-slate-950",
   },
   aqua: {
-    container: "bg-gradient-to-br from-cyan-900 via-blue-950 to-slate-900",
-    accent: "text-cyan-600",
-    btnPrimary: "text-cyan-900",
+    shell: "from-white via-cyan-50 to-slate-100",
+    accent: "bg-cyan-950 text-white",
+    subtle: "text-cyan-700/70",
+    meter: "from-cyan-950 via-cyan-700 to-sky-300",
+    tint: "bg-cyan-600",
   },
   blush: {
-    container: "bg-gradient-to-br from-rose-900 via-pink-950 to-purple-950",
-    accent: "text-rose-600",
-    btnPrimary: "text-rose-900",
+    shell: "from-white via-rose-50 to-slate-100",
+    accent: "bg-rose-950 text-white",
+    subtle: "text-rose-700/70",
+    meter: "from-rose-950 via-rose-700 to-pink-300",
+    tint: "bg-rose-500",
   },
 };
 
 const isPresetProductVisual = (image: string) => presetImages.includes(image) || image.startsWith("charger-");
 const hasRealDiscount = (product: Product) => Boolean(product.discountPrice && product.discountPrice > 0 && product.discountPrice < product.price);
 const getCurrentPrice = (product: Product) => product.discountPrice || product.price;
-const getDiscountPercent = (product: Product) => hasRealDiscount(product) ? Math.round((1 - (getCurrentPrice(product) / product.price)) * 100) : 0;
+const getDiscountPercent = (product: Product) => (
+  hasRealDiscount(product)
+    ? Math.round((1 - (getCurrentPrice(product) / product.price)) * 100)
+    : 0
+);
 const getSaving = (product: Product) => Math.max(0, product.price - getCurrentPrice(product));
 const uniqueProducts = (items: Product[]) => Array.from(new Map(items.map((item) => [item.id, item])).values());
 
-function PremiumProductVisual({ product, className }: { product: Product, className: string }) {
+function PremiumProductVisual({ product }: { product: Product }) {
   if (isPresetProductVisual(product.image)) {
-    return <ProductMockup image={product.image} name={product.name} sizeClass={className} />;
+    return (
+      <div className="relative z-10 flex h-full w-full items-center justify-center scale-[1.75] sm:scale-[2.15] lg:scale-[2.35]">
+        <ProductMockup image={product.image} name={product.name} sizeClass="w-28 aspect-[9/18]" />
+      </div>
+    );
   }
+
   return (
-    <img 
-      src={product.image} 
-      alt={product.name} 
-      className={`${className} object-contain mix-blend-multiply transition-transform duration-700 group-hover:scale-110`} 
+    <img
+      src={product.image}
+      alt={product.name}
+      className="relative z-10 max-h-[86%] max-w-[86%] object-contain drop-shadow-[0_30px_45px_rgba(15,23,42,0.18)] transition-transform duration-700 group-hover:-translate-y-2 group-hover:scale-[1.03]"
+    />
+  );
+}
+
+function ProductThumb({ product }: { product: Product }) {
+  if (isPresetProductVisual(product.image)) {
+    return (
+      <div className="scale-[0.65]">
+        <ProductMockup image={product.image} name={product.name} sizeClass="w-12 aspect-[9/18]" />
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={product.image}
+      alt={product.name}
+      className="h-full w-full object-contain"
     />
   );
 }
@@ -56,11 +108,13 @@ export default function PremiumShowcaseSection({ onSelectProduct, onAddToCart }:
   const { products, premiumShowcase } = useApp();
   const [activeIndex, setActiveIndex] = useState(0);
 
-  const showcaseData = useMemo(() => {
+  const rotationProducts = useMemo(() => {
     const discountedProducts = [...products].filter(hasRealDiscount).sort((a, b) => getSaving(b) - getSaving(a));
-    const configuredProducts = premiumShowcase.productIds.map((id) => products.find((product) => product.id === id)).filter(Boolean) as Product[];
+    const configuredProducts = premiumShowcase.productIds
+      .map((id) => products.find((product) => product.id === id))
+      .filter(Boolean) as Product[];
     const preferredHero = products.find((product) => product.id === premiumShowcase.heroProductId);
-    
+
     const fallbackProducts = uniqueProducts([
       ...(preferredHero ? [preferredHero] : []),
       ...discountedProducts,
@@ -68,156 +122,187 @@ export default function PremiumShowcaseSection({ onSelectProduct, onAddToCart }:
     ]);
 
     const baseRotationProducts = configuredProducts.length > 0 ? configuredProducts : fallbackProducts;
-    
-    // Limit to 5 products for a clean dock switcher
-    return baseRotationProducts.length > 0 ? baseRotationProducts.slice(0, 5) : null;
+    return baseRotationProducts.slice(0, 5);
   }, [premiumShowcase.heroProductId, premiumShowcase.productIds, products]);
-
-  const rotationProducts = showcaseData || [];
 
   useEffect(() => {
     if (!premiumShowcase.isEnabled || rotationProducts.length <= 1) return;
+
     const intervalId = window.setInterval(() => {
-      setActiveIndex((curr) => (curr + 1) % rotationProducts.length);
-    }, 6000); // 6 seconds dynamic rotation
+      setActiveIndex((current) => (current + 1) % rotationProducts.length);
+    }, 6500);
+
     return () => window.clearInterval(intervalId);
   }, [premiumShowcase.isEnabled, rotationProducts.length]);
 
   if (!premiumShowcase.isEnabled || rotationProducts.length === 0) return null;
 
-  const heroProduct = rotationProducts[activeIndex];
+  const safeActiveIndex = activeIndex % rotationProducts.length;
+  const heroProduct = rotationProducts[safeActiveIndex] || rotationProducts[0];
   const theme = themeStyles[premiumShowcase.theme] || themeStyles.titanium;
   const heroPrice = getCurrentPrice(heroProduct);
   const heroDiscount = getDiscountPercent(heroProduct);
+  const saving = getSaving(heroProduct);
+  const productLabel = heroProduct.nameEn || heroProduct.category;
 
   return (
-    <section id="premium-offers" dir="rtl" className="px-4 py-8 max-w-7xl mx-auto w-full">
-      <div className={`relative overflow-hidden rounded-[40px] shadow-[0_30px_80px_rgba(0,0,0,0.15)] ${theme.container}`}>
-        
-        {/* Animated Background Orbs */}
-        <div className="absolute -top-32 -right-32 w-[500px] h-[500px] bg-white/10 blur-[120px] rounded-full mix-blend-overlay animate-pulse pointer-events-none" />
-        <div className="absolute -bottom-32 -left-32 w-[500px] h-[500px] bg-white/5 blur-[120px] rounded-full mix-blend-overlay pointer-events-none" />
-        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10 mix-blend-overlay pointer-events-none" />
+    <section id="premium-offers" dir="rtl" className="w-full py-8 sm:py-12">
+      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className={`relative overflow-hidden rounded-[30px] border border-slate-200/80 bg-gradient-to-br ${theme.shell} shadow-[0_28px_70px_rgba(15,23,42,0.09)]`}>
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(110deg,rgba(255,255,255,0.96)_0%,rgba(255,255,255,0.72)_48%,rgba(255,255,255,0.12)_72%)]" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white" />
 
-        <div className="relative z-10 flex flex-col lg:flex-row items-center p-6 sm:p-10 md:p-16 gap-12 lg:gap-20">
-          
-          {/* Text Content */}
-          <div className="flex-1 w-full text-center lg:text-right space-y-6 lg:space-y-8 order-2 lg:order-1">
-            
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/20 bg-white/10 backdrop-blur-md shadow-lg">
-               <Zap className="h-4 w-4 text-yellow-400 fill-yellow-400 animate-pulse" />
-               <span className="text-xs font-bold text-white tracking-wide">{premiumShowcase.badge || "عرض حصري وخاص"}</span>
-            </div>
-            
-            <div className="space-y-4">
-              <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white leading-[1.15] tracking-tight drop-shadow-md">
-                {premiumShowcase.title || "عروض الروان المميزة"}
-              </h2>
-              <p className="text-base sm:text-lg text-white/70 max-w-lg mx-auto lg:mx-0 font-medium leading-relaxed">
-                {premiumShowcase.subtitle || "منتجات مختارة بعروض قوية وتجربة عرض مرتبة مثل واجهات المتاجر العالمية."}
-              </p>
-            </div>
-
-            {/* Pricing Section */}
-            <div className="flex flex-col sm:flex-row items-center lg:items-end justify-center lg:justify-start gap-4 sm:gap-6 pt-4">
-               <div className="flex flex-col items-center lg:items-start bg-black/20 px-6 py-4 rounded-3xl border border-white/10 shadow-inner">
-                  {hasRealDiscount(heroProduct) && (
-                    <span className="text-white/50 text-sm line-through decoration-rose-500 decoration-2 font-mono mb-1">
-                      {heroProduct.price.toLocaleString()} د.ع
+          <div className="relative z-10 grid grid-cols-1 lg:min-h-[570px] lg:grid-cols-[1.03fr_0.97fr]">
+            <div className="order-2 flex flex-col justify-between gap-7 p-6 text-right sm:p-9 lg:order-1 lg:p-11 xl:p-14">
+              <div>
+                <div className="mb-7 flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-2 rounded-full border border-slate-200/70 bg-white/85 px-4 py-2 text-[11px] font-black text-slate-800 shadow-sm backdrop-blur-xl">
+                    <Sparkles className="h-4 w-4 text-accent" />
+                    {premiumShowcase.badge || "العروض الأقوى"}
+                  </span>
+                  {heroDiscount > 0 && (
+                    <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50/90 px-4 py-2 text-[11px] font-black text-emerald-700">
+                      <Zap className="h-4 w-4" />
+                      وفر {saving.toLocaleString()} د.ع
                     </span>
                   )}
-                  <span className="text-3xl sm:text-4xl font-black text-white font-mono drop-shadow-lg">
-                    {heroPrice.toLocaleString()} د.ع
-                  </span>
-               </div>
-               
-               {heroDiscount > 0 && (
-                  <div className="bg-gradient-to-r from-rose-500 to-pink-600 text-white px-5 py-2.5 rounded-2xl font-black shadow-[0_10px_20px_rgba(244,63,94,0.4)] rotate-3 hover:rotate-0 transition-transform cursor-default">
-                     خصم جبار {heroDiscount}%
-                  </div>
-               )}
-            </div>
+                </div>
 
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 pt-4 w-full justify-center lg:justify-start">
-               <button
-                 onClick={() => onAddToCart(heroProduct)}
-                 className={`group relative overflow-hidden bg-white px-8 py-4 rounded-2xl font-black shadow-[0_15px_30px_rgba(255,255,255,0.2)] hover:scale-105 transition-all duration-300 flex items-center justify-center gap-3 w-full sm:w-auto ${theme.btnPrimary}`}
-               >
-                 <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                 <ShoppingBag className="w-5 h-5 relative z-10" />
-                 <span className="relative z-10">أضف للسلة الآن</span>
-               </button>
-               <button
-                 onClick={() => onSelectProduct(heroProduct)}
-                 className="bg-white/10 text-white border border-white/20 backdrop-blur-md px-8 py-4 rounded-2xl font-bold hover:bg-white/20 hover:scale-105 transition-all duration-300 flex items-center justify-center gap-3 w-full sm:w-auto"
-               >
-                 <Eye className="w-5 h-5" />
-                 شاهد التفاصيل
-               </button>
-            </div>
-            
-            {/* Minimalist Dock Switcher */}
-            {rotationProducts.length > 1 && (
-              <div className="pt-6 flex items-center justify-center lg:justify-start gap-3">
-                {rotationProducts.map((p, idx) => (
-                  <button 
-                    key={p.id}
-                    onClick={() => setActiveIndex(idx)}
-                    className={`relative w-12 h-12 sm:w-14 sm:h-14 rounded-2xl overflow-hidden border-2 transition-all duration-300 cursor-pointer ${
-                      idx === activeIndex 
-                        ? 'border-white scale-110 shadow-[0_0_20px_rgba(255,255,255,0.4)] z-10' 
-                        : 'border-white/20 opacity-50 hover:opacity-100 hover:scale-105'
-                    }`}
-                  >
-                    <div className="absolute inset-0 bg-white" />
-                    <img src={p.image} className="absolute inset-0 w-full h-full object-contain mix-blend-multiply p-1.5" alt={p.name} />
-                  </button>
-                ))}
+                <div className="max-w-xl">
+                  <p className="mb-3 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400" dir="ltr">
+                    AL-RWAN SIGNATURE SELECTION
+                  </p>
+                  <h2 className="text-[clamp(2.5rem,4.5vw,4.6rem)] font-black leading-[0.98] text-slate-950">
+                    {premiumShowcase.title || "عروض الروان المميزة"}
+                  </h2>
+                  <p className="mt-5 max-w-lg text-sm font-semibold leading-7 text-slate-500 sm:text-base">
+                    {premiumShowcase.subtitle || "منتجات مختارة بعروض قوية وتجربة عرض مرتبة مثل واجهات المتاجر العالمية."}
+                  </p>
+                </div>
+
+                <div className="mt-7 flex max-w-xl flex-wrap items-center gap-x-5 gap-y-3 border-y border-slate-200/80 py-4">
+                  {[
+                    { icon: BadgeCheck, label: "منتج أصلي" },
+                    { icon: ShieldCheck, label: "ضمان المركز" },
+                    { icon: PackageCheck, label: "تسليم سريع" },
+                  ].map((item) => (
+                    <span key={item.label} className="inline-flex items-center gap-2 text-xs font-black text-slate-700">
+                      <item.icon className="h-4 w-4 text-slate-950" />
+                      {item.label}
+                    </span>
+                  ))}
+                </div>
               </div>
-            )}
-          </div>
 
-          {/* The Floating Pedestal (Image Area) */}
-          <div className="w-full lg:w-[45%] relative perspective-1000 order-1 lg:order-2">
-             
-             {/* Decorative spinning ring behind pedestal */}
-             <div className="absolute inset-4 border border-white/20 rounded-full animate-[spin_20s_linear_infinite] pointer-events-none" />
-             <div className="absolute inset-0 border border-white/10 rounded-full animate-[spin_15s_linear_infinite_reverse] pointer-events-none" />
-             
-             {/* The White Pedestal Container */}
-             <div 
-               key={`pedestal-${heroProduct.id}`}
-               className="group relative bg-white rounded-[40px] shadow-[0_40px_80px_rgba(0,0,0,0.5)] p-6 sm:p-10 overflow-hidden transform hover:-translate-y-2 transition-all duration-500 border border-white/40 animate-in fade-in zoom-in-95 duration-700"
-             >
-                {/* Soft inner shadow for 3D depth */}
-                <div className="absolute inset-0 shadow-[inset_0_-20px_50px_rgba(0,0,0,0.06)] pointer-events-none rounded-[40px]" />
-                
-                {/* Floor shadow under the product to avoid square drop-shadows on white images */}
-                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-[70%] h-12 bg-black/15 blur-2xl rounded-full transition-transform duration-700 group-hover:scale-90 group-hover:bg-black/10" />
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+                <div className="flex items-end gap-4">
+                  <div>
+                    <span className="block text-[10px] font-black text-slate-400">السعر الخاص</span>
+                    <div className="mt-1 flex items-baseline gap-2">
+                      <span className="font-mono text-4xl font-black tracking-normal text-slate-950">
+                        {heroPrice.toLocaleString()}
+                      </span>
+                      <span className="text-xs font-black text-slate-500">د.ع</span>
+                    </div>
+                    {hasRealDiscount(heroProduct) && (
+                      <span className="mt-1 block font-mono text-xs font-bold text-slate-400 line-through decoration-rose-500 decoration-2">
+                        {heroProduct.price.toLocaleString()} د.ع
+                      </span>
+                    )}
+                  </div>
 
-                {/* The Image */}
-                <div className="relative h-[220px] sm:h-[300px] lg:h-[350px] flex items-center justify-center">
-                   <PremiumProductVisual
-                     product={heroProduct}
-                     className="max-h-full w-auto max-w-full z-10"
-                   />
+                  {heroDiscount > 0 && (
+                    <span className={`mb-1 rounded-full px-3 py-1.5 text-xs font-black shadow-sm ${theme.accent}`}>
+                      -{heroDiscount}%
+                    </span>
+                  )}
                 </div>
 
-                {/* Pedestal Title (adds a nice touch) */}
-                <div className="absolute top-6 left-6 right-6 flex justify-between items-center opacity-40 pointer-events-none">
-                   <span className="font-black text-slate-900 text-xl tracking-widest uppercase truncate">{heroProduct.category}</span>
-                   <span className="font-mono text-slate-900 font-bold">0{activeIndex + 1}</span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => onAddToCart(heroProduct)}
+                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-slate-950 px-6 text-sm font-black text-white shadow-[0_16px_30px_rgba(15,23,42,0.18)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-slate-800 active:scale-[0.98] cursor-pointer"
+                  >
+                    <ShoppingBag className="h-4 w-4" />
+                    <span>أضف للسلة</span>
+                  </button>
+                  <button
+                    onClick={() => onSelectProduct(heroProduct)}
+                    aria-label={premiumShowcase.ctaText || "شاهد التفاصيل"}
+                    title={premiumShowcase.ctaText || "شاهد التفاصيل"}
+                    className="inline-flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white/80 text-slate-800 shadow-sm backdrop-blur-xl transition-all duration-300 hover:-translate-y-0.5 hover:bg-white active:scale-[0.98] cursor-pointer"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </button>
                 </div>
-             </div>
-             
-             {/* Floating Promo Badge */}
-             <div className="absolute -top-6 -right-2 sm:-right-6 bg-gradient-to-tr from-amber-300 to-yellow-100 text-amber-900 font-black px-4 sm:px-6 py-3 sm:py-4 rounded-3xl shadow-2xl rotate-12 animate-bounce flex flex-col items-center justify-center border-4 border-white z-20">
-                <span className="text-[10px] sm:text-xs uppercase tracking-wider opacity-80">ترشيح المركز</span>
-                <span className="text-sm sm:text-lg">الأكثر طلباً!</span>
-             </div>
+              </div>
+            </div>
+
+            <div className="relative order-1 flex min-h-[440px] flex-col overflow-hidden border-b border-white/80 bg-white/35 p-5 sm:min-h-[520px] sm:p-7 lg:order-2 lg:min-h-0 lg:border-b-0 lg:border-r">
+              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(145deg,rgba(255,255,255,0.88),rgba(255,255,255,0.18)_55%,rgba(255,255,255,0.72))]" />
+              <span className="pointer-events-none absolute left-5 top-16 select-none text-[clamp(5rem,11vw,9rem)] font-black leading-none text-slate-900/[0.035]" dir="ltr">
+                RWAN
+              </span>
+
+              <div className="relative z-20 flex items-start justify-between gap-4">
+                <div className="min-w-0 text-right">
+                  <span className="block text-[10px] font-black text-slate-400">اختيار اليوم</span>
+                  <h3 className="mt-1 truncate text-lg font-black text-slate-950">{heroProduct.name}</h3>
+                  <p className={`mt-1 truncate text-[11px] font-bold ${theme.subtle}`} dir={heroProduct.nameEn ? "ltr" : "rtl"}>
+                    {productLabel}
+                  </p>
+                </div>
+                <span className="font-mono text-xs font-black text-slate-400" dir="ltr">
+                  {String(safeActiveIndex + 1).padStart(2, "0")} / {String(rotationProducts.length).padStart(2, "0")}
+                </span>
+              </div>
+
+              <div className="relative z-10 flex flex-1 items-center justify-center py-3">
+                <div className="group relative flex h-[300px] w-full max-w-[520px] items-center justify-center sm:h-[385px] lg:h-[400px]">
+                  <div className="absolute bottom-5 h-10 w-[66%] rounded-[100%] bg-slate-400/35 blur-2xl" />
+                  <div className="absolute bottom-2 h-14 w-[72%] rounded-[50%] border border-white/90 bg-white/60 shadow-[0_20px_45px_rgba(15,23,42,0.12)] backdrop-blur-md" />
+                  <div className={`absolute bottom-9 h-1 w-24 rounded-full bg-gradient-to-l ${theme.meter}`} />
+                  <PremiumProductVisual product={heroProduct} />
+                </div>
+              </div>
+
+              <div className="relative z-20 flex items-end justify-between gap-3">
+                {rotationProducts.length > 1 && (
+                  <div className="flex items-center gap-1.5 rounded-full border border-white bg-white/75 p-1.5 shadow-sm backdrop-blur-xl">
+                    {rotationProducts.map((product, index) => {
+                      const isActive = index === safeActiveIndex;
+
+                      return (
+                        <button
+                          key={product.id}
+                          onClick={() => setActiveIndex(index)}
+                          aria-label={product.name}
+                          className={`relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border transition-all duration-300 cursor-pointer sm:h-12 sm:w-12 ${
+                            isActive
+                              ? "scale-105 border-slate-950 bg-white shadow-md"
+                              : "border-transparent bg-slate-100/80 opacity-65 hover:border-slate-300 hover:opacity-100"
+                          }`}
+                          title={product.name}
+                        >
+                          <ProductThumb product={product} />
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <button
+                  onClick={() => onSelectProduct(heroProduct)}
+                  className="group inline-flex min-h-10 items-center justify-center gap-2 rounded-full px-3 text-[11px] font-black text-slate-500 transition-colors hover:text-slate-950 cursor-pointer"
+                >
+                  <span className="hidden sm:inline">المواصفات</span>
+                  <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
+                </button>
+              </div>
+            </div>
           </div>
 
+          <div className={`absolute bottom-0 right-0 h-[3px] w-full ${theme.tint} opacity-80`} />
         </div>
       </div>
     </section>

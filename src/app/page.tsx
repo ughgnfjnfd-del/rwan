@@ -50,6 +50,7 @@ import PartnerSiteButton from "@/components/PartnerSiteButton";
 import BackToTop from "@/components/BackToTop";
 import SplashLoader from "@/components/SplashLoader";
 import ProductSkeleton from "@/components/ProductSkeleton";
+import RepairPortalBanner from "@/components/RepairPortalBanner";
 
 const getProductHighlights = (product: Product) => {
   if (product.image.startsWith("charger-")) {
@@ -713,8 +714,8 @@ export default function Home() {
 
       {/* 1. Header (Navigation) — Smart Navbar */}
       <header className={`sticky top-0 z-40 transition-all duration-500 ease-out ${isScrolled
-          ? "bg-white/85 backdrop-blur-xl border-b border-slate-200/60 shadow-[0_1px_20px_rgba(0,0,0,0.04)]"
-          : "bg-white/40 backdrop-blur-sm border-b border-transparent"
+        ? "bg-white/85 backdrop-blur-xl border-b border-slate-200/60 shadow-[0_1px_20px_rgba(0,0,0,0.04)]"
+        : "bg-white/40 backdrop-blur-sm border-b border-transparent"
         }`}>
         <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between transition-all duration-500 ${isScrolled ? "h-16" : "h-20"
           }`}>
@@ -761,7 +762,7 @@ export default function Home() {
             >
               ملحقات
             </a>
-            <a href="#repair" className="hover:text-accent transition-colors">صيانة</a>
+            <Link href="/repair" className="hover:text-accent transition-colors">صيانة</Link>
             <a href="#contact" className="hover:text-accent transition-colors">اتصل بنا</a>
           </nav>
 
@@ -982,7 +983,7 @@ export default function Home() {
               <a href="#" onClick={() => setIsMobileMenuOpen(false)} className="text-accent">الرئيسية</a>
               <a href="#categories" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-accent">الأقسام</a>
               <a href="#products" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-accent">المنتجات</a>
-              <a href="#repair" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-accent">مركز الصيانة</a>
+              <Link href="/repair" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-accent">مركز الصيانة</Link>
               <a href="#contact" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-accent">اتصل بنا</a>
 
               <div className="h-px bg-slate-100 my-2 w-full" />
@@ -1595,138 +1596,6 @@ export default function Home() {
         {/* Flash Sale Countdown Deal */}
         <FlashSaleBanner />
 
-        {/* 5. Authorized Repair Center section */}
-        <section id="repair" className="relative overflow-hidden rounded-[32px] border border-slate-200 bg-[#f5f5f7] text-slate-950 shadow-[0_30px_90px_rgba(15,23,42,0.08)]">
-          <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(241,245,249,0.82)_48%,rgba(226,232,240,0.7)),linear-gradient(90deg,rgba(56,189,248,0.12),transparent_32%,rgba(16,185,129,0.1)_100%)]" />
-          <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(120deg,transparent_0%,rgba(255,255,255,0.72)_46%,transparent_58%)]" />
-
-          <div className="relative z-10 grid grid-cols-1 gap-8 p-5 sm:p-8 lg:grid-cols-12 lg:gap-10 lg:p-12">
-            <div className="lg:col-span-7 text-right">
-              <div className="mb-5 flex flex-wrap items-center justify-start gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/80 px-3 py-1.5 text-[11px] font-black text-slate-700 shadow-sm backdrop-blur-md">
-                  <Sparkles className="h-3.5 w-3.5 text-accent" />
-                  تجربة صيانة بمعايير فاخرة
-                </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-[11px] font-black text-emerald-700">
-                  <BadgeCheck className="h-3.5 w-3.5" />
-                  فحص أولي مجاني
-                </span>
-              </div>
-
-              <h2 className="max-w-3xl text-3xl font-black leading-tight tracking-tight text-slate-950 sm:text-4xl lg:text-5xl">
-                صيانة تشعر معها أن جهازك عاد جديدًا.
-              </h2>
-              <p className="mt-4 max-w-3xl text-sm font-medium leading-7 text-slate-500 sm:text-base">
-                تجربة صيانة هادئة وواضحة من لحظة الفحص حتى التسليم: تشخيص دقيق، قطع أصلية، تحديث حالة الجهاز، وضمان حقيقي على القطع المستبدلة.
-              </p>
-
-              <div className="mt-7 grid gap-3 sm:grid-cols-3">
-                {[
-                  { icon: Eye, title: "تشخيص شفاف", desc: "نعرض سبب العطل قبل البدء" },
-                  { icon: Cable, title: "قطع أصلية", desc: "شاشات، بطاريات ومنافذ معتمدة" },
-                  { icon: ShieldCheck, title: "ضمان موثق", desc: "3 أيام على الصيانة والقطع" },
-                ].map((item) => (
-                  <div key={item.title} className="rounded-2xl border border-white bg-white/72 p-4 shadow-sm backdrop-blur-xl transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
-                    <div className="mb-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-slate-950 text-white shadow-sm">
-                      <item.icon className="h-4 w-4" />
-                    </div>
-                    <h3 className="text-sm font-black text-slate-950">{item.title}</h3>
-                    <p className="mt-1 text-[11px] font-semibold leading-5 text-slate-500">{item.desc}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-7 grid gap-3 rounded-[24px] border border-white bg-white/68 p-3 shadow-sm backdrop-blur-xl sm:grid-cols-4">
-                {[
-                  { value: "01", label: "استلام الجهاز" },
-                  { value: "02", label: "فحص العطل" },
-                  { value: "03", label: "تأكيد الكلفة" },
-                  { value: "04", label: "تسليم بضمان" },
-                ].map((step) => (
-                  <div key={step.value} className="flex items-center gap-3 rounded-2xl bg-slate-50/80 p-3">
-                    <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-slate-950 font-mono text-[11px] font-black text-white">
-                      {step.value}
-                    </span>
-                    <span className="text-xs font-black text-slate-700">{step.label}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
-                <button
-                  onClick={() => setIsRepairOpen(true)}
-                  className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-7 py-3.5 text-sm font-black text-white shadow-[0_16px_35px_rgba(15,23,42,0.18)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-slate-800 active:scale-[0.99] cursor-pointer"
-                >
-                  <Wrench className="h-4 w-4" />
-                  <span>احجز صيانة الآن</span>
-                </button>
-
-                <a
-                  href={`https://wa.me/${siteSettings?.phone ? siteSettings.phone.replace(/[^\d+]/g, '') : ''}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-6 py-3.5 text-sm font-black text-slate-800 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-200 hover:text-emerald-700 active:scale-[0.99] cursor-pointer"
-                >
-                  <MessageCircle className="h-4 w-4" />
-                  <span>استشارة عبر واتساب</span>
-                </a>
-              </div>
-            </div>
-
-            <div className="lg:col-span-5">
-              <div className="relative mx-auto flex min-h-[460px] max-w-[430px] items-center justify-center">
-                <div className="relative z-10 w-full rounded-[32px] border border-white bg-white/78 p-4 shadow-[0_28px_80px_rgba(15,23,42,0.14)] backdrop-blur-2xl">
-                  <div className="rounded-[26px] border border-slate-200 bg-slate-950 p-4 text-white shadow-inner">
-                    <div className="mb-4 flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2">
-                        <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_0_5px_rgba(52,211,153,0.14)]" />
-                        <span className="text-[11px] font-black text-slate-300">Live Diagnostics</span>
-                      </div>
-                      <span className="rounded-full border border-white/10 px-2.5 py-1 font-mono text-[10px] font-black text-slate-400">RWAN OS</span>
-                    </div>
-
-                    <div className="relative mx-auto mb-5 flex h-[235px] w-[128px] items-center justify-center rounded-[32px] border-[7px] border-slate-800 bg-gradient-to-b from-slate-900 via-slate-950 to-black shadow-[0_30px_55px_rgba(0,0,0,0.42)]">
-                      <div className="absolute top-2 h-1.5 w-12 rounded-full bg-slate-800" />
-                      <Smartphone className="h-16 w-16 text-accent/80" strokeWidth={1.5} />
-                      <div className="absolute bottom-5 left-5 right-5 h-1.5 rounded-full bg-slate-800">
-                        <div className="h-full w-[76%] rounded-full bg-accent" />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      {[
-                        { icon: Cpu, label: "المعالج", value: "مستقر" },
-                        { icon: Zap, label: "الشحن", value: "جاهز" },
-                        { icon: Lock, label: "البيانات", value: "محمي" },
-                        { icon: Clock, label: "الوقت", value: "30 دقيقة" },
-                      ].map((item) => (
-                        <div key={item.label} className="rounded-2xl border border-white/10 bg-white/[0.06] p-3">
-                          <item.icon className="mb-2 h-4 w-4 text-accent" />
-                          <span className="block text-[10px] font-bold text-slate-400">{item.label}</span>
-                          <span className="block text-xs font-black text-white">{item.value}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="mt-3 grid grid-cols-3 gap-2">
-                    {[
-                      { value: "3 يوم", label: "ضمان" },
-                      { value: "4 مراحل", label: "متابعة" },
-                      { value: "أصلي", label: "قطع" },
-                    ].map((stat) => (
-                      <div key={stat.label} className="rounded-2xl bg-slate-50 p-3 text-center">
-                        <span className="block text-sm font-black text-slate-950">{stat.value}</span>
-                        <span className="block text-[10px] font-bold text-slate-500">{stat.label}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
         {/* Dynamic Custom Promo Banner */}
         {siteSettings.promoBanner?.isEnabled && (
           <section
@@ -1761,7 +1630,7 @@ export default function Home() {
             {/* Left Side: Call to action button */}
             <div className="z-10 w-full md:w-auto flex justify-start md:justify-end">
               <a
-                href={siteSettings.promoBanner.buttonLink}
+                href={siteSettings.promoBanner.buttonLink === "#repair" ? "/repair" : siteSettings.promoBanner.buttonLink}
                 className="w-full md:w-auto text-center bg-white text-slate-900 font-extrabold text-xs sm:text-sm px-8 py-4 rounded-2xl shadow-lg hover:bg-slate-100 active:scale-[0.99] transition-all duration-200 uppercase tracking-wide block hover:scale-[1.02]"
               >
                 {siteSettings.promoBanner.buttonText}
@@ -1769,6 +1638,8 @@ export default function Home() {
             </div>
           </section>
         )}
+
+        <RepairPortalBanner />
 
       </main>
 
@@ -1888,7 +1759,7 @@ export default function Home() {
                   <li><a href="#" className="hover:text-accent transition-colors duration-200 hover:translate-x-[-2px] inline-block">الرئيسية</a></li>
                   <li><a href="#categories" className="hover:text-accent transition-colors duration-200 hover:translate-x-[-2px] inline-block">الأقسام الرئيسية</a></li>
                   <li><a href="#products" className="hover:text-accent transition-colors duration-200 hover:translate-x-[-2px] inline-block">المنتجات المميزة</a></li>
-                  <li><a href="#repair" className="hover:text-accent transition-colors duration-200 hover:translate-x-[-2px] inline-block">خدمة الصيانة المعتمدة</a></li>
+                  <li><Link href="/repair" className="hover:text-accent transition-colors duration-200 hover:translate-x-[-2px] inline-block">خدمة الصيانة المعتمدة</Link></li>
                 </ul>
               </div>
 
@@ -1960,11 +1831,11 @@ export default function Home() {
                 <div className="text-[12px] text-slate-400 font-medium">
                   &copy; {new Date().getFullYear()} مركز الروان (Al-Rwan Center). جميع الحقوق محفوظة.
                 </div>
-                
+
                 {/* Developer Info */}
-                <a 
-                  href="https://med-pc.vercel.app/" 
-                  target="_blank" 
+                <a
+                  href="https://med-pc.vercel.app/"
+                  target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 group transition-all hover:scale-105"
                   title="مطور الموقع Mohammed.N"
@@ -1978,9 +1849,9 @@ export default function Home() {
                       باسم developer-logo.png
                       وإذا كان الامتداد يختلف قم بتغييره أدناه
                     */}
-                    <img 
-                      src="/developer-logo.png" 
-                      alt="Mohammed.N Logo" 
+                    <img
+                      src="/developer-logo.png"
+                      alt="Mohammed.N Logo"
                       className="w-full h-full object-cover"
                       onError={(e) => {
                         // في حال لم يتم وضع الشعار بعد، نعرض أيقونة افتراضية

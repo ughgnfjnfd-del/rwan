@@ -9,7 +9,6 @@ import {
   X,
   Smartphone,
   Headphones,
-  Cpu,
   Wrench,
   ChevronRight,
   ChevronLeft,
@@ -23,10 +22,6 @@ import {
   Cable,
   Eye,
   BadgeCheck,
-  CheckCircle2,
-  Palette,
-  PackageCheck,
-  ShieldCheck,
   Sparkles,
   MessageCircle
 } from "lucide-react";
@@ -51,6 +46,7 @@ import BackToTop from "@/components/BackToTop";
 import SplashLoader from "@/components/SplashLoader";
 import ProductSkeleton from "@/components/ProductSkeleton";
 import RepairPortalBanner from "@/components/RepairPortalBanner";
+import ProductFocusModal from "@/components/ProductFocusModal";
 
 const getProductHighlights = (product: Product) => {
   if (product.image.startsWith("charger-")) {
@@ -100,381 +96,6 @@ function ProductShowroomVisual({
       alt={name}
       className={`${imageClassName} object-contain mix-blend-multiply drop-shadow-[0_26px_28px_rgba(15,23,42,0.18)] transition-transform duration-500 group-hover:scale-105`}
     />
-  );
-}
-
-interface ProductDetailModalProps {
-  product: Product;
-  isOpen: boolean;
-  onClose: () => void;
-  onAddToCart: (
-    product: Product,
-    selectedColor?: { name: string; hex: string; image?: string | null } | null,
-    selectedPort?: string | null
-  ) => void;
-  allProducts: Product[];
-  onSelectProduct: (product: Product) => void;
-}
-
-function ProductDetailModal({ product, isOpen, onClose, onAddToCart, allProducts, onSelectProduct }: ProductDetailModalProps) {
-  const [qty, setQty] = useState(1);
-  const [selectedColor, setSelectedColor] = useState<{ name: string; hex: string; image?: string | null } | null>(
-    () => product.colors?.[0] || null
-  );
-  const [selectedPort, setSelectedPort] = useState<string | null>(
-    () => product.ports?.[0] || null
-  );
-
-  // Lock body scroll when modal is open
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
-    }
-    return () => {
-      document.body.style.overflow = "unset";
-    };
-  }, [isOpen]);
-
-  if (!isOpen) return null;
-
-  const isPreset = ["iphone", "samsung", "cases", "headphones", "earbuds", "cable", "smartwatch", "powerbank", "screen-protector"].includes(product.image) || product.image.startsWith("charger-");
-
-  // Generate default description based on categories/image presets
-  const defaultDesc = product.description || (
-    product.category === "موبايلات"
-      ? `هاتف ذكي راقٍ يتميز بأقوى أداء وكاميرات احترافية مع بطارية تدوم طويلاً وتصميم فاخر مقاوم للصدمات.`
-      : product.category === "ملحقات"
-        ? `ملحق أصلي ذو جودة عالية مصمم خصيصاً ليتناسب مع جهازك ويوفر له الكفاءة المثالية والاستخدام الطويل.`
-        : `قطعة غيار أصلية ومضمونة توفر لجهازك الأداء المثالي للتشغيل والاستقرار.`
-  );
-
-  // Generate default specifications
-  const defaultSpecs = product.specs ? product.specs.split("\n") : (
-    product.image.startsWith("charger-")
-      ? [
-        "قوة الشحن الفائقة والذكية",
-        "منفذ USB-C قوي يدعم تقنية الشحن السريع PD",
-        "حماية متكاملة ضد الجهد الزائد وحرارة الشحن",
-        "ضمان حقيقي لمدة 6 أشهر من الوكيل"
-      ]
-      : product.image === "iphone" || product.image === "samsung"
-        ? [
-          "شاشة أوليد فائقة الوضوح مع تردد 120 هرتز",
-          "معالج متطور يدعم تقنيات الذكاء الاصطناعي والألعاب القوية",
-          "نظام كاميرات ثلاثي العدسات بتقريب بصري ممتاز",
-          "مقاومة كاملة للماء والغبار بمعيار IP68"
-        ]
-        : [
-          "جودة تصنيع ممتازة بمواد صديقة للبيئة",
-          "تصميم عصري وخفيف الوزن لسهولة الاستخدام",
-          "توافق كامل مع مختلف الأجهزة والأنظمة",
-          "ضمان الجودة والأداء المثالي من مركز الروان"
-        ]
-  );
-
-
-  // Related products (same category, excluding current)
-  const related = allProducts
-    .filter((p) => p.category === product.category && p.id !== product.id)
-    .slice(0, 3);
-  const highlights = getProductHighlights(product);
-  const discountPercent = getDiscountPercent(product);
-  const currentPrice = product.discountPrice || product.price;
-  const colorCount = product.colors?.length || 0;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5" dir="rtl">
-      <div className="fixed inset-0 bg-black/65 backdrop-blur-md transition-opacity" onClick={onClose}></div>
-
-      <div className="relative z-10 grid w-full max-w-6xl max-h-[92vh] overflow-y-auto rounded-[28px] border border-white/20 bg-white shadow-2xl animate-in fade-in-50 zoom-in-95 duration-200 lg:grid-cols-[0.95fr_1.05fr]">
-        <button
-          onClick={onClose}
-          className="absolute top-4 left-4 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-white/90 text-slate-500 shadow-sm backdrop-blur-md transition-all hover:bg-white hover:text-slate-900 cursor-pointer"
-          title="إغلاق"
-        >
-          <X className="w-5 h-5" />
-        </button>
-
-        <div className="relative min-h-[360px] overflow-hidden bg-gradient-to-b from-white via-sky-50/70 to-slate-100 p-5 sm:p-8 lg:min-h-full">
-          <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(14,165,233,0.08)_0_1px,transparent_1px_28px)] opacity-60" />
-          <div className="absolute inset-x-8 top-8 h-px bg-gradient-to-l from-transparent via-sky-200 to-transparent" />
-          <div className="absolute inset-x-8 bottom-8 h-px bg-gradient-to-l from-transparent via-emerald-200 to-transparent" />
-
-          <div className="relative z-10 flex min-h-[320px] flex-col justify-between gap-5 lg:min-h-[620px]">
-            <div className="flex items-center justify-between gap-3">
-              <span className="inline-flex items-center gap-2 rounded-lg border border-sky-200 bg-white/80 px-3 py-1.5 text-[10px] font-extrabold text-sky-700 shadow-sm backdrop-blur-md">
-                <Sparkles className="h-3.5 w-3.5" />
-                معرض المنتج
-              </span>
-              {isPreset && (
-                <span className="rounded-lg border border-slate-200 bg-white/80 px-3 py-1.5 font-mono text-[9px] font-black uppercase text-slate-500 shadow-sm backdrop-blur-md">
-                  {product.image}
-                </span>
-              )}
-            </div>
-
-            <div className="flex flex-1 items-center justify-center py-8">
-              <div className="group relative flex h-[285px] w-full max-w-[430px] items-center justify-center sm:h-[360px]">
-                <div className="absolute inset-x-4 top-0 h-14 rounded-2xl border border-white bg-white/70 shadow-[0_20px_60px_rgba(14,165,233,0.12)] backdrop-blur-md" />
-                <div className="absolute bottom-10 h-12 w-[78%] rounded-[100%] bg-slate-300/45 blur-2xl" />
-                <div className="absolute bottom-0 h-20 w-[86%] rounded-[32px] border border-white bg-white/80 shadow-[0_24px_70px_rgba(15,23,42,0.14)] backdrop-blur-md" />
-                <div className="absolute bottom-9 h-2 w-[56%] rounded-full bg-gradient-to-l from-sky-300 via-white to-emerald-200" />
-
-                <div className={`${isPreset ? "scale-[1.55] sm:scale-[1.9]" : "h-full w-full"} relative z-10 flex items-center justify-center transition-transform duration-500 group-hover:-translate-y-1`}>
-                  <ProductShowroomVisual
-                    image={selectedColor?.image || product.image}
-                    name={product.name}
-                    sizeClass="w-32 aspect-[9/18]"
-                    imageClassName="max-h-[76%] max-w-[76%] rounded-2xl"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2">
-              <div className="rounded-xl border border-slate-200 bg-white/80 p-3 text-center shadow-sm backdrop-blur-md">
-                <BadgeCheck className="mx-auto mb-1 h-4 w-4 text-emerald-300" />
-                <span className="text-[10px] font-extrabold text-slate-800">أصلي</span>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-white/80 p-3 text-center shadow-sm backdrop-blur-md">
-                <ShieldCheck className="mx-auto mb-1 h-4 w-4 text-sky-300" />
-                <span className="text-[10px] font-extrabold text-slate-800">ضمان</span>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-white/80 p-3 text-center shadow-sm backdrop-blur-md">
-                <PackageCheck className="mx-auto mb-1 h-4 w-4 text-amber-300" />
-                <span className="text-[10px] font-extrabold text-slate-800">متوفر</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-6 p-5 text-right sm:p-8">
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <span className="inline-flex items-center rounded-lg bg-accent/10 px-3 py-1.5 text-xs font-black text-accent">
-                {product.category}
-              </span>
-              <div className="flex items-center gap-1.5 text-amber-500">
-                <Star className="w-4 h-4 fill-amber-500" />
-                <span className="text-xs font-black text-slate-700">
-                  {(product.rating || 5).toFixed(1)}
-                </span>
-                <span className="text-[11px] font-bold text-slate-400">
-                  ({product.reviewsCount || 24} تقييم)
-                </span>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <h2 className="text-2xl font-black leading-tight text-slate-950 sm:text-3xl">
-                {product.name}
-              </h2>
-              {product.nameEn && (
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-400" dir="ltr">
-                  {product.nameEn}
-                </p>
-              )}
-            </div>
-
-            <div className="grid grid-cols-3 gap-2">
-              {highlights.map((item) => (
-                <div key={item} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5">
-                  <CheckCircle2 className="mb-1 h-4 w-4 text-emerald-500" />
-                  <span className="block text-[11px] font-black leading-4 text-slate-700">{item}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {product.colors && product.colors.length > 0 && (
-            <div className="space-y-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <span className="inline-flex items-center gap-2 text-xs font-black text-slate-800">
-                  <Palette className="h-4 w-4 text-slate-500" />
-                  اختر اللون
-                </span>
-                <span className="rounded-lg bg-slate-100 px-3 py-1 text-[11px] font-black text-slate-700">
-                  {selectedColor?.name || `${colorCount} ألوان`}
-                </span>
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-                {product.colors.map((color, idx) => {
-                  const isSelected = selectedColor?.name === color.name;
-                  return (
-                    <button
-                      key={idx}
-                      onClick={() => setSelectedColor(color)}
-                      className={`relative h-10 w-10 rounded-full p-0.5 transition-all duration-300 active:scale-95 cursor-pointer ${isSelected
-                        ? "ring-2 ring-slate-900 ring-offset-2 scale-110 shadow-md"
-                        : "border border-slate-200 hover:scale-105 hover:border-slate-400"
-                        }`}
-                      title={color.name}
-                    >
-                      <span
-                        className="block h-full w-full rounded-full border border-black/10"
-                        style={{ backgroundColor: color.hex }}
-                      />
-                      {isSelected && (
-                        <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/10 text-[11px] font-bold text-white drop-shadow-sm">
-                          ✓
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-          {product.ports && product.ports.length > 0 && (
-            <div className="space-y-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <span className="inline-flex items-center gap-2 text-xs font-black text-slate-800">
-                  <Cpu className="h-4 w-4 text-slate-500" />
-                  اختر نوع المنفذ (Port Type)
-                </span>
-                <span className="rounded-lg bg-sky-50 border border-sky-100 text-sky-600 px-3 py-1 text-[10px] font-extrabold">
-                  {selectedPort || "غير محدد"}
-                </span>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {product.ports.map((port, idx) => {
-                  const isSelected = selectedPort === port;
-                  return (
-                    <button
-                      key={idx}
-                      onClick={() => setSelectedPort(port)}
-                      type="button"
-                      className={`relative px-4 py-2 text-xs font-bold rounded-xl border transition-all duration-200 active:scale-95 cursor-pointer ${isSelected
-                        ? "bg-[#1a1a1a] border-[#1a1a1a] text-white shadow-md scale-[1.02]"
-                        : "bg-slate-50/50 border-slate-200 text-slate-650 hover:bg-slate-50 hover:border-slate-350"
-                        }`}
-                    >
-                      {port}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div className="space-y-2">
-              <h4 className="text-sm font-black text-slate-900">وصف المنتج</h4>
-              <p className="text-xs font-medium leading-6 text-slate-500">
-                {defaultDesc}
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <h4 className="text-sm font-black text-slate-900">المواصفات الفنية</h4>
-              <ul className="space-y-2">
-                {defaultSpecs.slice(0, 4).map((spec, index) => (
-                  <li key={index} className="flex items-start gap-2 text-[11px] font-bold leading-5 text-slate-500">
-                    <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-accent" />
-                    <span>{spec}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-
-          <div className="mt-auto rounded-2xl border border-slate-200/60 bg-white/85 backdrop-blur-xl p-4 sticky bottom-4 z-30 shadow-[0_-20px_40px_-15px_rgba(0,0,0,0.05)]">
-            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <span className="text-[10px] font-black uppercase tracking-wide text-slate-400">سعر اليوم</span>
-                <div className="mt-1 flex flex-wrap items-end gap-2">
-                  <span className="font-mono text-2xl font-black text-slate-950">
-                    {(currentPrice * qty).toLocaleString()} د.ع
-                  </span>
-                  {product.discountPrice && (
-                    <>
-                      <span className="font-mono text-xs font-bold text-slate-400 line-through">
-                        {(product.price * qty).toLocaleString()} د.ع
-                      </span>
-                      <span className="rounded-lg bg-rose-600 px-2 py-1 text-[10px] font-black text-white">
-                        وفر {discountPercent}%
-                      </span>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex items-center overflow-hidden rounded-xl border border-slate-200 bg-white">
-                <button
-                  onClick={() => setQty(Math.max(1, qty - 1))}
-                  className="px-4 py-3 text-slate-500 transition-colors hover:bg-slate-100 font-black cursor-pointer"
-                >
-                  -
-                </button>
-                <span className="min-w-10 px-3 text-center text-sm font-black text-slate-900 font-mono">
-                  {qty}
-                </span>
-                <button
-                  onClick={() => setQty(qty + 1)}
-                  className="px-4 py-3 text-slate-500 transition-colors hover:bg-slate-100 font-black cursor-pointer"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-
-            {product.isOutOfStock ? (
-              <button
-                disabled
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-100 border border-slate-200 px-6 py-4 text-sm font-black text-slate-400 cursor-not-allowed"
-              >
-                المنتج نفذ من المخزون حالياً
-              </button>
-            ) : (
-              <button
-                onClick={() => {
-                  for (let i = 0; i < qty; i++) {
-                    onAddToCart(product, selectedColor, selectedPort);
-                  }
-                  onClose();
-                }}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#1a1a1a] px-6 py-4 text-sm font-black text-white shadow-lg shadow-slate-900/15 transition-all hover:bg-slate-800 active:scale-[0.99] cursor-pointer"
-              >
-                <ShoppingBag className="w-4 h-4" />
-                أضف للسلة الآن
-              </button>
-            )}
-          </div>
-
-          {related.length > 0 && (
-            <div className="space-y-3 border-t border-slate-100 pt-4">
-              <h4 className="text-sm font-black text-slate-900">كمّل اختيارك</h4>
-              <div className="grid grid-cols-3 gap-3">
-                {related.map((p) => (
-                  <div
-                    key={p.id}
-                    onClick={() => {
-                      onSelectProduct(p);
-                      setQty(1);
-                    }}
-                    className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-slate-100 bg-white p-2.5 text-center transition-all hover:border-slate-200 hover:shadow-md"
-                  >
-                    <div className="my-1 scale-75">
-                      <ProductMockup image={p.image} name={p.name} sizeClass="w-12 aspect-[9/18]" />
-                    </div>
-                    <span className="w-full truncate text-[10px] font-black text-slate-700" title={p.name}>
-                      {p.name}
-                    </span>
-                    <span className="font-mono text-[9px] font-black text-slate-500">
-                      {(p.discountPrice || p.price).toLocaleString()} د.ع
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -546,6 +167,25 @@ export default function Home() {
     window.addEventListener("open-cart", handleOpenCart);
     return () => window.removeEventListener("open-cart", handleOpenCart);
   }, []);
+
+  useEffect(() => {
+    const handleBuyNow = () => {
+      setIsCartOpen(false);
+      setIsCheckoutOpen(true);
+    };
+    window.addEventListener("buy-now", handleBuyNow);
+    return () => window.removeEventListener("buy-now", handleBuyNow);
+  }, []);
+
+  useEffect(() => {
+    if (products.length === 0 || typeof window === "undefined") return;
+    const productId = new URL(window.location.href).searchParams.get("product");
+    if (!productId) return;
+    const linkedProduct = products.find((item) => item.id === productId);
+    if (!linkedProduct) return;
+    const timer = window.setTimeout(() => setSelectedProduct(linkedProduct), 0);
+    return () => window.clearTimeout(timer);
+  }, [products]);
 
   // Simulate product loading state
   useEffect(() => {
@@ -1930,9 +1570,9 @@ export default function Home() {
         couponDiscount={couponDiscount}
       />
 
-      {/* Product Detail Modal */}
+      {/* Product Focus Modal */}
       {selectedProduct && (
-        <ProductDetailModal
+        <ProductFocusModal
           key={selectedProduct.id}
           product={selectedProduct}
           isOpen={!!selectedProduct}
@@ -1940,8 +1580,6 @@ export default function Home() {
           onAddToCart={(prod, color, port) => {
             handleAddToCart(prod, color, port);
           }}
-          allProducts={products}
-          onSelectProduct={(prod) => setSelectedProduct(prod)}
         />
       )}
 

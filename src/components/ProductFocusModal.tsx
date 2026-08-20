@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   BadgeCheck,
   Cpu,
+  HardDrive,
   Maximize2,
   Minus,
   PackageCheck,
@@ -20,7 +21,7 @@ import {
   Truck,
   X,
 } from "lucide-react";
-import { Product } from "@/context/AppContext";
+import { Product, isMobileProduct } from "@/context/AppContext";
 import ProductMockup from "@/components/ProductMockup";
 
 interface ProductFocusModalProps {
@@ -31,6 +32,7 @@ interface ProductFocusModalProps {
     product: Product,
     selectedColor?: { name: string; hex: string; image?: string | null } | null,
     selectedPort?: string | null,
+    selectedStorage?: string | null,
   ) => void;
 }
 
@@ -70,10 +72,13 @@ function ProductVisual({ image, name }: { image: string; name: string }) {
 export default function ProductFocusModal({ product, isOpen, onClose, onAddToCart }: ProductFocusModalProps) {
   const [qty, setQty] = useState(1);
   const [selectedColor, setSelectedColor] = useState<{ name: string; hex: string; image?: string | null } | null>(
-    () => product.colors?.length === 1 ? product.colors[0] : null,
+    () => (product.colors?.length === 1 ? product.colors[0] : null),
   );
   const [selectedPort, setSelectedPort] = useState<string | null>(
-    () => product.ports?.length === 1 ? product.ports[0] : null,
+    () => (product.ports?.length === 1 ? product.ports[0] : null),
+  );
+  const [selectedStorage, setSelectedStorage] = useState<string | null>(
+    () => (product.storages && product.storages.length > 0 ? product.storages[0] : null),
   );
   const [activeTab, setActiveTab] = useState<ProductTab>("overview");
   const [isInspecting, setIsInspecting] = useState(false);
@@ -96,14 +101,18 @@ export default function ProductFocusModal({ product, isOpen, onClose, onAddToCar
     };
   }, [isInspecting, isOpen, onClose]);
 
-  const currentPrice = product.discountPrice || product.price;
-  const discountPercent = product.discountPrice && product.discountPrice < product.price
+  const isMobile = isMobileProduct(product);
+  // Mobiles strictly do NOT have discount prices
+  const currentPrice = isMobile ? product.price : (product.discountPrice || product.price);
+  const discountPercent = !isMobile && product.discountPrice && product.discountPrice < product.price
     ? Math.round((1 - product.discountPrice / product.price) * 100)
     : 0;
+
   const selectedImage = selectedColor?.image || product.image;
   const needsColor = Boolean(product.colors && product.colors.length > 1 && !selectedColor);
   const needsPort = Boolean(product.ports && product.ports.length > 1 && !selectedPort);
-  const selectionMissing = needsColor || needsPort;
+  const needsStorage = Boolean(product.storages && product.storages.length > 1 && !selectedStorage);
+  const selectionMissing = needsColor || needsPort || needsStorage;
 
   const description = product.description || (
     product.category === "موبايلات"
@@ -130,7 +139,7 @@ export default function ProductFocusModal({ product, isOpen, onClose, onAddToCar
 
   const addSelectedQuantity = () => {
     if (selectionMissing || product.isOutOfStock) return false;
-    for (let index = 0; index < qty; index += 1) onAddToCart(product, selectedColor, selectedPort);
+    for (let index = 0; index < qty; index += 1) onAddToCart(product, selectedColor, selectedPort, selectedStorage);
     return true;
   };
 
@@ -297,6 +306,41 @@ export default function ProductFocusModal({ product, isOpen, onClose, onAddToCar
               )}
             </div>
 
+            {product.storages && product.storages.length > 0 && (
+              <div className="mt-8 border-t border-slate-200 pt-6">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="inline-flex items-center gap-2 text-xs font-black text-slate-900">
+                    <HardDrive className="h-4 w-4 text-sky-600" />
+                    سعة الذاكرة والتخزين
+                  </span>
+                  <span className={`text-[10px] font-black ${needsStorage ? "text-rose-600" : "text-slate-500"}`}>
+                    {selectedStorage || "اختر السعة"}
+                  </span>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {product.storages.map((storage) => {
+                    const selected = selectedStorage === storage;
+                    return (
+                      <button
+                        key={storage}
+                        onClick={() => setSelectedStorage(storage)}
+                        className={`min-h-11 rounded-2xl border px-4 py-2 text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                          selected
+                            ? "border-slate-950 bg-slate-950 text-white shadow-sm scale-[1.02]"
+                            : "border-slate-200 text-slate-700 hover:border-slate-400 bg-white"
+                        }`}
+                      >
+                        <span>{storage}</span>
+                        <span className={`text-[9px] font-normal ${selected ? "text-slate-300" : "text-slate-400"}`}>
+                          {storage === "1TB" ? "1 تيرابايت" : `${storage.replace("GB", "")} جيجا`}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {product.colors && product.colors.length > 0 && (
               <div className="mt-8 border-t border-slate-200 pt-6">
                 <div className="flex items-center justify-between gap-3">
@@ -335,7 +379,9 @@ export default function ProductFocusModal({ product, isOpen, onClose, onAddToCar
           <div className="absolute inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/94 p-4 shadow-[0_-18px_45px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:p-5">
             <div className="flex items-end justify-between gap-4">
               <div>
-                <span className="block text-[9px] font-black text-slate-400">سعر اليوم</span>
+                <span className="block text-[9px] font-black text-slate-400">
+                  {isMobile ? "السعر الرسمي المعتمد" : "سعر اليوم"}
+                </span>
                 <div className="mt-1 flex flex-wrap items-baseline gap-2">
                   <strong className="font-mono text-2xl font-black text-slate-950">{(currentPrice * qty).toLocaleString()}</strong>
                   <span className="text-[10px] font-black text-slate-500">د.ع</span>
@@ -349,7 +395,15 @@ export default function ProductFocusModal({ product, isOpen, onClose, onAddToCar
               </div>
             </div>
 
-            {selectionMissing && <p className="mt-2 text-[10px] font-black text-rose-600">{needsColor ? "اختر اللون قبل المتابعة" : "اختر نوع المنفذ قبل المتابعة"}</p>}
+            {selectionMissing && (
+              <p className="mt-2 text-[10px] font-black text-rose-600">
+                {needsColor
+                  ? "اختر اللون قبل المتابعة"
+                  : needsStorage
+                    ? "اختر سعة الذاكرة قبل المتابعة"
+                    : "اختر نوع المنفذ قبل المتابعة"}
+              </p>
+            )}
 
             <div className="mt-4 grid grid-cols-[1fr_auto] gap-2 sm:grid-cols-2">
               <button

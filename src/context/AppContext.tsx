@@ -5,6 +5,22 @@ import { supabase, deleteImageFromSupabase } from "@/lib/supabase";
 import { CheckCircle2, ShoppingBag, X } from "lucide-react";
 import ProductMockup from "@/components/ProductMockup";
 
+// Helper to check if a product is a mobile device
+export const isMobileProduct = (product: Product | { category?: string } | null | undefined): boolean => {
+  if (!product || !product.category) return false;
+  const cat = product.category.trim().toLowerCase();
+  return (
+    cat === "موبايلات" ||
+    cat === "موبايل" ||
+    cat === "هواتف" ||
+    cat === "هاتف" ||
+    cat === "mobiles" ||
+    cat === "mobile" ||
+    cat === "phones" ||
+    cat === "phone"
+  );
+};
+
 // Types
 export interface Product {
   id: string;
@@ -18,6 +34,7 @@ export interface Product {
   specs?: string;
   isPopular?: boolean;
   colors?: Array<{ name: string; hex: string; image?: string | null }> | null;
+  storages?: string[] | null;
   rating?: number | null;
   reviewsCount?: number | null;
   ports?: string[] | null;
@@ -37,6 +54,7 @@ const mapDBProduct = (dbProd: any): Product => ({
   specs: dbProd.specs || "",
   isPopular: dbProd.is_popular || dbProd.isPopular || false,
   colors: dbProd.colors || null,
+  storages: dbProd.storages || null,
   rating: dbProd.rating !== undefined && dbProd.rating !== null ? Number(dbProd.rating) : 5,
   reviewsCount: dbProd.reviews_count !== undefined && dbProd.reviews_count !== null ? Number(dbProd.reviews_count) : 24,
   ports: dbProd.ports || null,
@@ -58,6 +76,7 @@ const mapLocalProductToDB = (prod: Partial<Product>) => {
   if (prod.specs !== undefined) dbProd.specs = prod.specs;
   if (prod.isPopular !== undefined) dbProd.is_popular = prod.isPopular;
   if (prod.colors !== undefined) dbProd.colors = prod.colors;
+  if (prod.storages !== undefined) dbProd.storages = prod.storages;
   if (prod.rating !== undefined) dbProd.rating = prod.rating;
   if (prod.reviewsCount !== undefined) dbProd.reviews_count = prod.reviewsCount;
   if (prod.ports !== undefined) dbProd.ports = prod.ports;
@@ -98,6 +117,7 @@ export interface CartItem {
   quantity: number;
   selectedColor?: { name: string; hex: string; image?: string | null } | null;
   selectedPort?: string | null;
+  selectedStorage?: string | null;
 }
 
 export interface Appointment {
@@ -302,9 +322,25 @@ interface AppContextType {
   addAppointment: (appointment: Omit<Appointment, "id" | "status" | "createdAt">) => void;
   updateAppointmentStatus: (id: string, status: Appointment["status"]) => void;
   deleteAppointment: (id: string) => void;
-  addToCart: (product: Product, selectedColor?: { name: string; hex: string; image?: string | null } | null, selectedPort?: string | null) => void;
-  removeFromCart: (productId: string, selectedColorName?: string | null, selectedPort?: string | null) => void;
-  updateCartQuantity: (productId: string, quantity: number, selectedColorName?: string | null, selectedPort?: string | null) => void;
+  addToCart: (
+    product: Product,
+    selectedColor?: { name: string; hex: string; image?: string | null } | null,
+    selectedPort?: string | null,
+    selectedStorage?: string | null
+  ) => void;
+  removeFromCart: (
+    productId: string,
+    selectedColorName?: string | null,
+    selectedPort?: string | null,
+    selectedStorage?: string | null
+  ) => void;
+  updateCartQuantity: (
+    productId: string,
+    quantity: number,
+    selectedColorName?: string | null,
+    selectedPort?: string | null,
+    selectedStorage?: string | null
+  ) => void;
   clearCart: () => void;
   toggleWishlist: (productId: string) => void;
   updateSiteSettings: (settings: Partial<SiteSettings>) => Promise<void>;
@@ -315,9 +351,9 @@ interface AppContextType {
   updatePromoPopUp: (popup: PromoPopUp) => Promise<void>;
   updatePremiumShowcase: (settings: PremiumShowcase) => Promise<void>;
   updateCoupons: (campaigns: CouponCampaign[], codes: CouponCode[]) => Promise<void>;
-  applyCoupon: (code: string, appliesTo: CouponAppliesTo, subtotal?: number) => CouponValidationResult;
-  validateCoupon: (code: string, appliesTo: CouponAppliesTo, subtotal?: number) => CouponValidationResult;
-  validateCouponLive: (code: string, appliesTo: CouponAppliesTo, subtotal?: number) => Promise<CouponValidationResult>;
+  applyCoupon: (code: string, appliesTo: CouponAppliesTo, subtotal?: number, eligibleSubtotal?: number) => CouponValidationResult;
+  validateCoupon: (code: string, appliesTo: CouponAppliesTo, subtotal?: number, eligibleSubtotal?: number) => CouponValidationResult;
+  validateCouponLive: (code: string, appliesTo: CouponAppliesTo, subtotal?: number, eligibleSubtotal?: number) => Promise<CouponValidationResult>;
   clearAppliedCoupon: () => void;
   recordCouponScan: (code: string) => Promise<void>;
   recordCouponUse: (code: string, appliesTo: CouponAppliesTo, subtotal?: number) => Promise<void>;
@@ -686,50 +722,76 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const addToCart = (
     product: Product,
     selectedColor?: { name: string; hex: string; image?: string | null } | null,
-    selectedPort?: string | null
+    selectedPort?: string | null,
+    selectedStorage?: string | null
   ) => {
     let updated: CartItem[];
     const existing = cartItems.find((item) =>
       item.product.id === product.id &&
       (!selectedColor || item.selectedColor?.name === selectedColor.name) &&
-      (!selectedPort || item.selectedPort === selectedPort)
+      (!selectedPort || item.selectedPort === selectedPort) &&
+      (!selectedStorage || item.selectedStorage === selectedStorage)
     );
     if (existing) {
       updated = cartItems.map((item) =>
         item.product.id === product.id &&
           (!selectedColor || item.selectedColor?.name === selectedColor.name) &&
-          (!selectedPort || item.selectedPort === selectedPort)
+          (!selectedPort || item.selectedPort === selectedPort) &&
+          (!selectedStorage || item.selectedStorage === selectedStorage)
           ? { ...item, quantity: item.quantity + 1 }
           : item
       );
     } else {
-      updated = [...cartItems, { product, quantity: 1, selectedColor: selectedColor || null, selectedPort: selectedPort || null }];
+      updated = [
+        ...cartItems,
+        {
+          product,
+          quantity: 1,
+          selectedColor: selectedColor || null,
+          selectedPort: selectedPort || null,
+          selectedStorage: selectedStorage || null,
+        },
+      ];
     }
     setCartItems(updated);
     saveCartToStorage(updated);
     triggerToast(product.name, product.image, "تمت إضافة المنتج إلى السلة بنجاح!");
   };
 
-  const removeFromCart = (productId: string, selectedColorName?: string | null, selectedPort?: string | null) => {
+  const removeFromCart = (
+    productId: string,
+    selectedColorName?: string | null,
+    selectedPort?: string | null,
+    selectedStorage?: string | null
+  ) => {
     const updated = cartItems.filter((item) =>
-      !(item.product.id === productId &&
+      !(
+        item.product.id === productId &&
         (!selectedColorName || item.selectedColor?.name === selectedColorName) &&
-        (!selectedPort || item.selectedPort === selectedPort)
+        (!selectedPort || item.selectedPort === selectedPort) &&
+        (!selectedStorage || item.selectedStorage === selectedStorage)
       )
     );
     setCartItems(updated);
     saveCartToStorage(updated);
   };
 
-  const updateCartQuantity = (productId: string, quantity: number, selectedColorName?: string | null, selectedPort?: string | null) => {
+  const updateCartQuantity = (
+    productId: string,
+    quantity: number,
+    selectedColorName?: string | null,
+    selectedPort?: string | null,
+    selectedStorage?: string | null
+  ) => {
     if (quantity <= 0) {
-      removeFromCart(productId, selectedColorName, selectedPort);
+      removeFromCart(productId, selectedColorName, selectedPort, selectedStorage);
       return;
     }
     const updated = cartItems.map((item) =>
       item.product.id === productId &&
         (!selectedColorName || item.selectedColor?.name === selectedColorName) &&
-        (!selectedPort || item.selectedPort === selectedPort)
+        (!selectedPort || item.selectedPort === selectedPort) &&
+        (!selectedStorage || item.selectedStorage === selectedStorage)
         ? { ...item, quantity }
         : item
     );
@@ -941,15 +1003,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       : `خصم ${coupon.discountValue.toLocaleString()} د.ع`
   );
 
-  const calculateCouponDiscount = (coupon: CouponCode, subtotal = 0) => {
+  const calculateCouponDiscount = (coupon: CouponCode, subtotal = 0, eligibleSubtotal?: number) => {
+    const baseAmount = eligibleSubtotal !== undefined ? eligibleSubtotal : subtotal;
+    if (baseAmount <= 0) return 0;
     if (coupon.discountType === "percent") {
-      return Math.min(subtotal, Math.round(subtotal * (coupon.discountValue / 100)));
+      return Math.min(baseAmount, Math.round(baseAmount * (coupon.discountValue / 100)));
     }
 
-    return Math.min(subtotal, coupon.discountValue);
+    return Math.min(baseAmount, coupon.discountValue);
   };
 
-  const validateCoupon = (rawCode: string, appliesTo: CouponAppliesTo, subtotal = 0): CouponValidationResult => {
+  const validateCoupon = (rawCode: string, appliesTo: CouponAppliesTo, subtotal = 0, eligibleSubtotal?: number): CouponValidationResult => {
     const normalizedCode = rawCode.trim().toUpperCase();
     const coupon = couponCodes.find((item) => item.code.toUpperCase() === normalizedCode);
 
@@ -1046,7 +1110,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       };
     }
 
-    const discountAmount = calculateCouponDiscount(coupon, subtotal);
+    // If eligibleSubtotal is provided and equals 0 (e.g. only mobile phones in cart), discounts do NOT apply to mobiles
+    if (appliesTo !== "repair" && eligibleSubtotal !== undefined && eligibleSubtotal <= 0 && subtotal > 0) {
+      return {
+        isValid: false,
+        message: "عذراً، كوبونات الخصم لا تشمل أجهزة الموبايل (تشمل الملحقات وخدمات الصيانة فقط).",
+        coupon,
+        discountAmount: 0,
+        label: getCouponLabel(coupon),
+      };
+    }
+
+    const discountAmount = calculateCouponDiscount(coupon, subtotal, eligibleSubtotal);
 
     return {
       isValid: true,
@@ -1057,8 +1132,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   };
 
-  const applyCoupon = (rawCode: string, appliesTo: CouponAppliesTo, subtotal = 0): CouponValidationResult => {
-    const result = validateCoupon(rawCode, appliesTo, subtotal);
+  const applyCoupon = (rawCode: string, appliesTo: CouponAppliesTo, subtotal = 0, eligibleSubtotal?: number): CouponValidationResult => {
+    const result = validateCoupon(rawCode, appliesTo, subtotal, eligibleSubtotal);
 
     if (result.isValid && result.coupon) {
       const nextAppliedCoupon: AppliedCoupon = {
@@ -1099,7 +1174,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await persistCouponData(couponCampaigns, nextCodes);
   };
 
-  const validateCouponLive = async (rawCode: string, appliesTo: CouponAppliesTo, subtotal = 0): Promise<CouponValidationResult> => {
+  const validateCouponLive = async (rawCode: string, appliesTo: CouponAppliesTo, subtotal = 0, eligibleSubtotal?: number): Promise<CouponValidationResult> => {
     try {
       const { data: settingsData, error } = await supabase
         .from("site_settings")
@@ -1216,7 +1291,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           };
         }
 
-        const discountAmount = calculateCouponDiscount(coupon, subtotal);
+        // If eligibleSubtotal is provided and equals 0 (e.g. only mobile phones in cart), discounts do NOT apply to mobiles
+        if (appliesTo !== "repair" && eligibleSubtotal !== undefined && eligibleSubtotal <= 0 && subtotal > 0) {
+          return {
+            isValid: false,
+            message: "عذراً، كوبونات الخصم لا تشمل أجهزة الموبايل (تشمل الملحقات وخدمات الصيانة فقط).",
+            coupon,
+            discountAmount: 0,
+            label: getCouponLabel(coupon),
+          };
+        }
+
+        const discountAmount = calculateCouponDiscount(coupon, subtotal, eligibleSubtotal);
 
         return {
           isValid: true,

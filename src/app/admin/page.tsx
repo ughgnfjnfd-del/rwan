@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { useApp, Product, Appointment, SlideItem, MarqueeSettings, FlashSale, PromoPopUp, ProductBundle, PremiumShowcase, DEFAULT_PREMIUM_SHOWCASE, GalleryShowcase, DEFAULT_GALLERY_SHOWCASE } from "@/context/AppContext";
+import { useApp, Product, Appointment, SlideItem, MarqueeSettings, FlashSale, PromoPopUp, ProductBundle, PremiumShowcase, DEFAULT_PREMIUM_SHOWCASE, GalleryShowcase, DEFAULT_GALLERY_SHOWCASE, isMobileProduct } from "@/context/AppContext";
 import { supabase, deleteImageFromSupabase } from "@/lib/supabase";
 import ProductMockup from "@/components/ProductMockup";
 import { matchProduct } from "@/lib/search";
@@ -38,8 +38,27 @@ import {
   Gift,
   BarChart2,
   Copy,
-  Monitor
+  Monitor,
+  Smartphone,
+  Percent,
+  Calculator
 } from "lucide-react";
+
+// Preset storage capacities for mobile phones
+const PRESET_STORAGES = ["128GB", "256GB", "512GB", "1TB"];
+
+// Preset phone colors for 1-click addition
+const PRESET_PHONE_COLORS = [
+  { name: "أسود تيتانيوم", hex: "#1f2022" },
+  { name: "أبيض ناصع", hex: "#f5f5f7" },
+  { name: "تيتانيوم طبيعي", hex: "#9a958e" },
+  { name: "أزرق ليلي", hex: "#2d3b4e" },
+  { name: "ذهبي صحراوي", hex: "#d4af37" },
+  { name: "بنفسجي داكن", hex: "#483c46" },
+  { name: "أخضر زيتي", hex: "#4e5851" },
+  { name: "وردي ناعم", hex: "#f9d8d6" },
+  { name: "فضي كلاسيكي", hex: "#e2e4e6" },
+];
 
 // Helper function to compress and resize images on client side
 const compressAndResizeImage = (file: File, maxWidth = 800, maxHeight = 800, quality = 0.8): Promise<Blob> => {
@@ -381,8 +400,8 @@ export default function AdminPage() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Tab State: "overview", "products", "repairs", "settings", "flash", "slides", "premium", "bundles", "coupons" | "gallery"
-  const [activeTab, setActiveTab] = useState<"overview" | "products" | "repairs" | "settings" | "flash" | "slides" | "premium" | "bundles" | "coupons" | "gallery">("overview");
+  // Tab State: "overview", "products", "devices", "repairs", "settings", "flash", "slides", "premium", "bundles", "coupons" | "gallery"
+  const [activeTab, setActiveTab] = useState<"overview" | "products" | "devices" | "repairs" | "settings" | "flash" | "slides" | "premium" | "bundles" | "coupons" | "gallery">("overview");
 
   // Coupon/Campaign Management States
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
@@ -468,6 +487,11 @@ export default function AdminPage() {
       return;
     }
 
+    if (codeForm.discountType === "percent" && (codeForm.discountValue <= 0 || codeForm.discountValue > 100)) {
+      alert("يرجى إدخال نسبة مئوية صحيحة بين 1% و 100%");
+      return;
+    }
+
     const cleanCode = codeForm.code.trim().toUpperCase();
     const isDuplicate = couponCodes.some(c => c.code.toUpperCase() === cleanCode);
     if (isDuplicate) {
@@ -519,6 +543,7 @@ export default function AdminPage() {
     rating: 5,
     reviewsCount: 24,
     ports: [] as string[],
+    storages: [] as string[],
   });
 
   const [productColors, setProductColors] = useState<Array<{ name: string; hex: string; image?: string | null; file?: File | null }>>([]);
@@ -1037,8 +1062,35 @@ export default function AdminPage() {
     await supabase.auth.signOut();
   };
 
-  // Open Add Product Form
+  // Open Add Product Form (General)
   const handleOpenAdd = () => {
+    setEditingProductId(null);
+    setSelectedFile(null);
+    setImagePreview(null);
+    setProductForm({
+      name: "",
+      nameEn: "",
+      price: 0,
+      discountPrice: 0,
+      category: "ملحقات",
+      imageType: "preset",
+      imagePreset: "headphones",
+      imageUrl: "",
+      description: "",
+      specs: "",
+      isPopular: false,
+      isOutOfStock: false,
+      rating: 5,
+      reviewsCount: 24,
+      ports: [],
+      storages: [],
+    });
+    setProductColors([]);
+    setIsProductModalOpen(true);
+  };
+
+  // Open Add Mobile Device Form (Dedicated for Smart Devices)
+  const handleOpenAddDevice = () => {
     setEditingProductId(null);
     setSelectedFile(null);
     setImagePreview(null);
@@ -1051,15 +1103,20 @@ export default function AdminPage() {
       imageType: "preset",
       imagePreset: "iphone",
       imageUrl: "",
-      description: "",
-      specs: "",
-      isPopular: false,
+      description: "هاتف ذكي أصلي بأعلى مواصفات وأداء فائق مع ضمان مركز الروان المعتمد.",
+      specs: "شاشة Super Retina OLED عالية الدقة\nمعالج فائق السرعة والكفاءة\nنظام كاميرات احترافي متطور\nبطارية تدوم طوال اليوم\nشحن سريع وضمان استبدال معتمد",
+      isPopular: true,
       isOutOfStock: false,
       rating: 5,
-      reviewsCount: 24,
+      reviewsCount: 36,
       ports: [],
+      storages: ["128GB", "256GB", "512GB"],
     });
-    setProductColors([]);
+    setProductColors([
+      { name: "أسود تيتانيوم", hex: "#1f2022", image: null, file: null },
+      { name: "تيتانيوم طبيعي", hex: "#9a958e", image: null, file: null },
+      { name: "أبيض ناصع", hex: "#f5f5f7", image: null, file: null },
+    ]);
     setIsProductModalOpen(true);
   };
 
@@ -1072,11 +1129,13 @@ export default function AdminPage() {
     // Set current image preview for custom images
     setImagePreview(isPreset ? null : product.image);
 
+    const isMobile = isMobileProduct(product);
+
     setProductForm({
       name: product.name,
       nameEn: product.nameEn,
       price: product.price,
-      discountPrice: product.discountPrice || 0,
+      discountPrice: isMobile ? 0 : (product.discountPrice || 0),
       category: product.category,
       imageType: isPreset ? "preset" : "upload",
       imagePreset: isPreset ? product.image : "iphone",
@@ -1088,6 +1147,7 @@ export default function AdminPage() {
       rating: product.rating !== undefined && product.rating !== null ? product.rating : 5,
       reviewsCount: product.reviewsCount !== undefined && product.reviewsCount !== null ? product.reviewsCount : 24,
       ports: product.ports || [],
+      storages: product.storages || (isMobile ? ["128GB", "256GB", "512GB"] : []),
     });
     setProductColors(product.colors || []);
     setIsProductModalOpen(true);
@@ -1207,11 +1267,14 @@ export default function AdminPage() {
       });
     }
 
+    const isMobile = productForm.category === "موبايلات";
+
     const productData = {
       name: productForm.name,
       nameEn: productForm.nameEn,
       price: productForm.price,
-      discountPrice: productForm.discountPrice > 0 ? productForm.discountPrice : 0,
+      // Mobiles are strictly sold at standard price with NO discounts
+      discountPrice: isMobile ? 0 : (productForm.discountPrice > 0 ? productForm.discountPrice : 0),
       category: productForm.category,
       image: imageValue,
       description: productForm.description,
@@ -1219,6 +1282,7 @@ export default function AdminPage() {
       isPopular: productForm.isPopular,
       isOutOfStock: productForm.isOutOfStock,
       colors: finalColors,
+      storages: isMobile ? (productForm.storages || []) : (productForm.storages || []),
       rating: productForm.rating,
       reviewsCount: productForm.reviewsCount,
       ports: productForm.ports,
@@ -1423,7 +1487,18 @@ export default function AdminPage() {
               }`}
           >
             <ShoppingBag className="w-4.5 h-4.5" />
-            <span>إدارة المنتجات ({totalProducts})</span>
+            <span>إدارة المنتجات العامة ({totalProducts})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("devices")}
+            className={`w-full flex items-center gap-3 p-3.5 rounded-xl text-sm font-bold transition-all text-right cursor-pointer ${activeTab === "devices"
+              ? "bg-[#1a1a1a] text-white shadow-md"
+              : "hover:bg-slate-50 text-slate-600"
+              }`}
+          >
+            <Smartphone className="w-4.5 h-4.5 text-sky-400" />
+            <span>إدارة وإضافة الأجهزة ({products.filter(p => isMobileProduct(p)).length})</span>
           </button>
 
           <button
@@ -1751,6 +1826,170 @@ export default function AdminPage() {
                 </div>
               )}
 
+            </div>
+          )}
+
+          {/* TAB: SMART DEVICES MANAGEMENT */}
+          {activeTab === "devices" && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Smartphone className="w-6 h-6 text-sky-500" />
+                    <h2 className="text-xl font-extrabold text-[#1a1a1a]">إدارة وإضافة الهواتف الذكية والأجهزة</h2>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1">
+                    قسم مخصص لإضافة الهواتف الذكية مع خيارات الذاكرة (128GB, 256GB, 512GB, 1TB) وتخصيص الألوان بسهولة. (ملاحظة: الهواتف لا تشملها الخصومات)
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleOpenAddDevice}
+                  className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  + إضافة هاتف ذكي جديد
+                </button>
+              </div>
+
+              {/* Devices quick stats */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-sky-50/60 border border-sky-100 p-4 rounded-2xl">
+                  <span className="text-[10px] font-bold text-sky-600 block">إجمالي أجهزة الموبايل المعروضة</span>
+                  <span className="text-2xl font-black text-sky-900">{products.filter(p => isMobileProduct(p)).length} هاتف</span>
+                </div>
+                <div className="bg-emerald-50/60 border border-emerald-100 p-4 rounded-2xl">
+                  <span className="text-[10px] font-bold text-emerald-600 block">سعات التخزين المدعومة</span>
+                  <span className="text-xs font-bold text-emerald-900 mt-1 block">128GB • 256GB • 512GB • 1TB</span>
+                </div>
+                <div className="bg-amber-50/60 border border-amber-100 p-4 rounded-2xl">
+                  <span className="text-[10px] font-bold text-amber-600 block">سياسة الخصم المعتمدة</span>
+                  <span className="text-xs font-bold text-amber-900 mt-1 block">أجهزة الموبايل غير مشمولة بالخصومات</span>
+                </div>
+              </div>
+
+              {/* Search bar inside devices CMS */}
+              <div className="relative w-full max-w-sm">
+                <input
+                  type="text"
+                  placeholder="ابحث عن هاتف بالاسم..."
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-4 pr-10 focus:outline-none focus:border-accent"
+                />
+                <Search className="w-4 h-4 text-slate-400 absolute left-auto right-3 top-1/2 -translate-y-1/2" />
+              </div>
+
+              {/* Devices Table */}
+              {products.filter(p => isMobileProduct(p) && matchProduct(p, productSearch)).length === 0 ? (
+                <div className="p-12 border border-dashed border-slate-200 rounded-xl text-center text-slate-400 text-xs space-y-3">
+                  <Smartphone className="w-10 h-10 mx-auto text-slate-300" />
+                  <p>لا توجد هواتف ذكية مضافة حالياً تطابق البحث.</p>
+                  <button
+                    onClick={handleOpenAddDevice}
+                    className="bg-[#1a1a1a] hover:bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    إضافة أول هاتف ذكي
+                  </button>
+                </div>
+              ) : (
+                <div className="overflow-x-auto border border-card-border rounded-xl">
+                  <table className="w-full text-xs text-right">
+                    <thead className="bg-slate-50 text-slate-500 font-bold border-b border-card-border">
+                      <tr>
+                        <th className="p-3 w-16">المعاينة</th>
+                        <th className="p-3">اسم الجهاز</th>
+                        <th className="p-3">سعات التخزين</th>
+                        <th className="p-3">الألوان المتاحة</th>
+                        <th className="p-3">السعر الأصلي</th>
+                        <th className="p-3 text-left">التحكم</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {products
+                        .filter(p => isMobileProduct(p) && matchProduct(p, productSearch))
+                        .map((prod) => (
+                          <tr key={prod.id} className="hover:bg-slate-50/50">
+                            <td className="p-3">
+                              <div className="w-10 h-10 bg-slate-100 rounded border border-slate-200 flex items-center justify-center text-[7px] text-slate-400 select-none uppercase overflow-hidden font-bold">
+                                {(prod.image && (prod.image.startsWith("http://") || prod.image.startsWith("https://") || prod.image.startsWith("/") || prod.image.includes("."))) ? (
+                                  <img src={prod.image} alt="" className="w-full h-full object-cover rounded" />
+                                ) : (
+                                  <ProductMockup image={prod.image} name={prod.name} sizeClass="w-6 aspect-[9/18]" />
+                                )}
+                              </div>
+                            </td>
+
+                            <td className="p-3">
+                              <div className="font-bold text-slate-850">{prod.name}</div>
+                              <div className="text-[10px] text-slate-400 font-mono">{prod.nameEn}</div>
+                            </td>
+
+                            <td className="p-3">
+                              {prod.storages && prod.storages.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {prod.storages.map(st => (
+                                    <span key={st} className="bg-sky-50 border border-sky-100 text-sky-700 px-1.5 py-0.5 rounded text-[10px] font-black">
+                                      {st}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-[10px] text-slate-400">غير محدد</span>
+                              )}
+                            </td>
+
+                            <td className="p-3">
+                              {prod.colors && prod.colors.length > 0 ? (
+                                <div className="flex flex-wrap items-center gap-1">
+                                  {prod.colors.map((c, i) => (
+                                    <span
+                                      key={i}
+                                      className="inline-block w-3.5 h-3.5 rounded-full border border-black/10 shadow-2xs"
+                                      style={{ backgroundColor: c.hex }}
+                                      title={c.name}
+                                    />
+                                  ))}
+                                  <span className="text-[10px] text-slate-500 mr-1 font-bold">
+                                    ({prod.colors.length} ألوان)
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-[10px] text-slate-400">لون افتراضي</span>
+                              )}
+                            </td>
+
+                            <td className="p-3 font-semibold text-slate-700 font-mono">
+                              {prod.price.toLocaleString()} د.ع
+                            </td>
+
+                            <td className="p-3 text-left space-x-1 space-x-reverse">
+                              <button
+                                onClick={() => handleOpenEdit(prod)}
+                                className="p-1.5 text-slate-500 hover:text-accent hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                                title="تعديل الجهاز"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (confirm(`هل أنت متأكد من حذف الجهاز: ${prod.name}؟`)) {
+                                    deleteProduct(prod.id);
+                                  }
+                                }}
+                                className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                title="حذف الجهاز"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
 
@@ -2499,8 +2738,36 @@ export default function AdminPage() {
                       </select>
                     </div>
 
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-slate-700">سعر الصفقة الجديد (د.ع) *</label>
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <label className="text-xs font-semibold text-slate-700">سعر الصفقة المخفض الجديد (د.ع) *</label>
+                        {selectedFlashProduct && (
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            السعر الأصلي: {selectedFlashProduct.price.toLocaleString()} د.ع
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Quick percentage buttons for flash sale */}
+                      {selectedFlashProduct && selectedFlashProduct.price > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5 p-2 bg-slate-50 border border-slate-200 rounded-xl">
+                          <span className="text-[10px] font-bold text-slate-500 ml-1">حساب سريع بالنسبة:</span>
+                          {[10, 15, 20, 25, 30, 40, 50, 60, 70].map((pct) => (
+                            <button
+                              key={pct}
+                              type="button"
+                              onClick={() => {
+                                const newPrice = Math.round(selectedFlashProduct.price * (1 - pct / 100));
+                                setFlashSaleForm({ ...flashSaleForm, discountPrice: newPrice });
+                              }}
+                              className="px-2 py-0.5 rounded-md bg-white border border-slate-200 hover:border-accent text-slate-700 text-[10px] font-bold transition-all shadow-2xs cursor-pointer hover:bg-slate-100"
+                            >
+                              -{pct}%
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
                       <input
                         type="number"
                         value={flashSaleForm.discountPrice || ""}
@@ -2508,6 +2775,13 @@ export default function AdminPage() {
                         placeholder="مثال: 24000"
                         className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 font-mono text-xs focus:border-accent focus:outline-none"
                       />
+
+                      {selectedFlashProduct && flashSaleForm.discountPrice > 0 && selectedFlashProduct.price > flashSaleForm.discountPrice && (
+                        <div className="flex justify-between items-center text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 p-2 rounded-lg">
+                          <span>نسبة الخصم المحسوبة: {Math.round((1 - flashSaleForm.discountPrice / selectedFlashProduct.price) * 100)}%</span>
+                          <span>توفير للزبون: {(selectedFlashProduct.price - flashSaleForm.discountPrice).toLocaleString()} د.ع</span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="space-y-1">
@@ -3762,17 +4036,87 @@ export default function AdminPage() {
 
               {/* Specifications */}
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700">المواصفات الفنية (كل ميزة في سطر منفصل)</label>
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-semibold text-slate-700">المواصفات الفنية (كل ميزة في سطر منفصل)</label>
+                  {productForm.category === "موبايلات" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProductForm({
+                          ...productForm,
+                          specs: "شاشة Super Retina OLED عالية الدقة والسطوع\nمعالج رائد فائق السرعة والأداء\nنظام كاميرات احترافي متطور مع تصوير ليلي فائق\nبطارية تدوم طوال اليوم مع شحن سريع\nمقاومة للماء والغبار وضمان استبدال معتمد",
+                        });
+                      }}
+                      className="text-[10px] text-sky-600 hover:underline font-bold"
+                    >
+                      + إدراج قالب مواصفات هاتف
+                    </button>
+                  )}
+                </div>
                 <textarea
                   value={productForm.specs}
                   onChange={(e) => setProductForm({ ...productForm, specs: e.target.value })}
-                  placeholder="مثال:&#10;قوة شحن 120 واط&#10;منفذ شحن USB-C&#10;حماية ضد التماس الكهربائي"
+                  placeholder="مثال:&#10;شاشة OLED فائقة الوضوح&#10;شحن سريع 45 واط&#10;كاميرا احترافية بدقة 50 ميجابكسل"
                   rows={3}
                   className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:border-accent resize-none font-mono"
                 />
               </div>
 
-              {/* Price */}
+              {/* Storage Capacities Selector (Always active for mobiles, optional for other items) */}
+              <div className="space-y-2 border border-slate-200 rounded-xl p-3.5 bg-slate-50">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <Smartphone className="w-3.5 h-3.5 text-sky-500" />
+                      خيارات الذاكرة والتخزين (128GB, 256GB, 512GB, 1TB)
+                    </label>
+                    <span className="text-[10px] text-slate-400 block mt-0.5">حدد السعات المتاحة ليتمكن العميل من اختيارها عند الشراء</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const all = PRESET_STORAGES;
+                      const allSelected = all.every((s) => productForm.storages?.includes(s));
+                      setProductForm({
+                        ...productForm,
+                        storages: allSelected ? [] : all,
+                      });
+                    }}
+                    className="text-[10px] text-accent hover:underline font-bold"
+                  >
+                    {PRESET_STORAGES.every((s) => productForm.storages?.includes(s)) ? "إلغاء الكل" : "تحديد كافة السعات"}
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                  {PRESET_STORAGES.map((storage) => {
+                    const isSelected = productForm.storages?.includes(storage) || false;
+                    return (
+                      <button
+                        type="button"
+                        key={storage}
+                        onClick={() => {
+                          const current = productForm.storages || [];
+                          const next = isSelected ? current.filter((s) => s !== storage) : [...current, storage];
+                          setProductForm({ ...productForm, storages: next });
+                        }}
+                        className={`py-2 px-3 rounded-xl border text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
+                          isSelected
+                            ? "bg-[#1a1a1a] text-white border-[#1a1a1a] shadow-sm scale-[1.02]"
+                            : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300"
+                        }`}
+                      >
+                        <span>{storage}</span>
+                        <span className="text-[9px] font-normal opacity-80">
+                          {storage === "1TB" ? "1 تيرابايت" : `${storage.replace("GB", "")} جيجابايت`}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Price Section */}
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-700">سعر المنتج الأصلي (بالدينار العراقي IQD) *</label>
                 <input
@@ -3785,18 +4129,114 @@ export default function AdminPage() {
                 />
               </div>
 
-              {/* Discount Price */}
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700">سعر العرض/الخصم (بالدينار العراقي IQD - اختياري)</label>
-                <input
-                  type="number"
-                  value={productForm.discountPrice || ""}
-                  onChange={(e) => setProductForm({ ...productForm, discountPrice: parseInt(e.target.value) || 0 })}
-                  placeholder="اتركه فارغاً أو 0 إذا لم يكن هناك خصم..."
-                  className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:border-accent font-mono"
-                />
-                <p className="text-[10px] text-slate-400">إذا تم إدخال سعر خصم أقل من السعر الأصلي، سيظهر المنتج كـ "عرض مميز" تلقائياً.</p>
-              </div>
+              {/* Discount Price or Mobile Discount Exemption Notice */}
+              {productForm.category === "موبايلات" ? (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-2.5">
+                  <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold block">أجهزة الموبايل غير مشمولة بالخصومات</span>
+                    <span className="text-[10px] text-amber-700 block mt-0.5">
+                      تُباع كافة أجهزة الهواتف بالسعر الأصلي ولا تسري عليها أكواد أو عروض التخفيض.
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2.5 border border-slate-200 rounded-xl p-3.5 bg-slate-50">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <TicketPercent className="w-3.5 h-3.5 text-accent" />
+                      تحديد الخصم للمنتج (بالنسبة المئوية أو بالسعر المباشر)
+                    </label>
+                    {productForm.discountPrice > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setProductForm({ ...productForm, discountPrice: 0 })}
+                        className="text-[10px] text-rose-500 hover:underline font-bold cursor-pointer"
+                      >
+                        إلغاء الخصم
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Quick percentage buttons */}
+                  {productForm.price > 0 && (
+                    <div className="space-y-1.5 bg-white p-2.5 rounded-xl border border-slate-200">
+                      <span className="text-[10px] font-bold text-slate-500 block">اختيار نسبة خصم سريعة بضغطة زر:</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[5, 10, 15, 20, 25, 30, 40, 50].map((pct) => {
+                          const calculatedPrice = Math.round(productForm.price * (1 - pct / 100));
+                          const isSelected = productForm.discountPrice === calculatedPrice;
+                          return (
+                            <button
+                              key={pct}
+                              type="button"
+                              onClick={() => setProductForm({ ...productForm, discountPrice: calculatedPrice })}
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
+                                isSelected
+                                  ? "bg-[#1a1a1a] text-white border-[#1a1a1a] shadow-xs"
+                                  : "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200"
+                              }`}
+                            >
+                              خصم {pct}%
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Direct input and live feedback */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-slate-700">سعر العرض بعد الخصم (د.ع)</label>
+                      <input
+                        type="number"
+                        value={productForm.discountPrice || ""}
+                        onChange={(e) => setProductForm({ ...productForm, discountPrice: parseInt(e.target.value) || 0 })}
+                        placeholder="اتركه فارغاً إذا لم يكن هناك خصم..."
+                        className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:border-accent font-mono"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-slate-700">أو اكتب نسبة الخصم المئوية (%)</label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min={1}
+                          max={99}
+                          value={
+                            productForm.price > 0 && productForm.discountPrice > 0 && productForm.discountPrice < productForm.price
+                              ? Math.round((1 - productForm.discountPrice / productForm.price) * 100)
+                              : ""
+                          }
+                          onChange={(e) => {
+                            const pct = parseInt(e.target.value) || 0;
+                            if (pct > 0 && pct < 100 && productForm.price > 0) {
+                              setProductForm({
+                                ...productForm,
+                                discountPrice: Math.round(productForm.price * (1 - pct / 100)),
+                              });
+                            } else if (pct === 0) {
+                              setProductForm({ ...productForm, discountPrice: 0 });
+                            }
+                          }}
+                          placeholder="مثال: 15"
+                          className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:border-accent font-mono pr-7"
+                        />
+                        <Percent className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {productForm.price > 0 && productForm.discountPrice > 0 && productForm.discountPrice < productForm.price && (
+                    <div className="flex justify-between items-center text-[10px] font-bold text-emerald-800 bg-emerald-50/90 border border-emerald-200 p-2.5 rounded-xl font-mono">
+                      <span>✓ نسبة الخصم: {Math.round((1 - productForm.discountPrice / productForm.price) * 100)}%</span>
+                      <span>توفير للزبون: {(productForm.price - productForm.discountPrice).toLocaleString()} د.ع</span>
+                      <span className="text-slate-600">يدفع الزبون: {productForm.discountPrice.toLocaleString()} د.ع</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Rating and Reviews Count */}
               <div className="grid grid-cols-2 gap-3">
@@ -3826,60 +4266,112 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* Ports Selection Section */}
-              <div className="space-y-2.5 border border-slate-200 rounded-xl p-3 bg-slate-50">
-                <label className="text-xs font-bold text-slate-700 block">المنافذ المتوفرة للمنتج (Charging Ports)</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { key: "مايكرو (Micro USB)", label: "مايكرو" },
-                    { key: "تايب سي (Type-C)", label: "تايب سي" },
-                    { key: "لايتنينغ (Lightning)", label: "لايتنينغ" }
-                  ].map((portItem) => {
-                    const isChecked = productForm.ports?.includes(portItem.key) || false;
-                    return (
-                      <label
-                        key={portItem.key}
-                        className={`flex items-center justify-center gap-1.5 p-2 rounded-lg border text-[11px] font-bold cursor-pointer select-none transition-all duration-200 ${isChecked
-                          ? "bg-[#1a1a1a] border-[#1a1a1a] text-white shadow-xs"
-                          : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                          }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={(e) => {
-                            const currentPorts = productForm.ports || [];
-                            const updatedPorts = e.target.checked
-                              ? [...currentPorts, portItem.key]
-                              : currentPorts.filter((p) => p !== portItem.key);
-                            setProductForm({ ...productForm, ports: updatedPorts });
-                          }}
-                          className="hidden"
-                        />
-                        <span>{portItem.label}</span>
-                      </label>
-                    );
-                  })}
+              {/* Ports Selection Section (for accessories) */}
+              {productForm.category !== "موبايلات" && (
+                <div className="space-y-2.5 border border-slate-200 rounded-xl p-3 bg-slate-50">
+                  <label className="text-xs font-bold text-slate-700 block">المنافذ المتوفرة للمنتج (Charging Ports)</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { key: "مايكرو (Micro USB)", label: "مايكرو" },
+                      { key: "تايب سي (Type-C)", label: "تايب سي" },
+                      { key: "لايتنينغ (Lightning)", label: "لايتنينغ" }
+                    ].map((portItem) => {
+                      const isChecked = productForm.ports?.includes(portItem.key) || false;
+                      return (
+                        <label
+                          key={portItem.key}
+                          className={`flex items-center justify-center gap-1.5 p-2 rounded-lg border text-[11px] font-bold cursor-pointer select-none transition-all duration-200 ${isChecked
+                            ? "bg-[#1a1a1a] border-[#1a1a1a] text-white shadow-xs"
+                            : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                            }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              const currentPorts = productForm.ports || [];
+                              const updatedPorts = e.target.checked
+                                ? [...currentPorts, portItem.key]
+                                : currentPorts.filter((p) => p !== portItem.key);
+                              setProductForm({ ...productForm, ports: updatedPorts });
+                            }}
+                            className="hidden"
+                          />
+                          <span>{portItem.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[9px] text-slate-400">حدد المنافذ إذا كان المنتج يحتوي على أكثر من خيار للعميل (مثل الشواحن أو الكيبلات أو السماعات).</p>
                 </div>
-                <p className="text-[9px] text-slate-400">حدد المنافذ إذا كان المنتج يحتوي على أكثر من خيار للعميل (مثل الشواحن أو الكيبلات أو السماعات).</p>
-              </div>
+              )}
 
-              {/* Colors Selection Section */}
+              {/* Colors Selection Section - with Easy 1-Click Palette */}
               <div className="space-y-3 border border-slate-200 rounded-xl p-3 bg-slate-50">
                 <div className="flex justify-between items-center">
                   <label className="text-xs font-bold text-slate-700">خيارات الألوان المتاحة ({productColors.length})</label>
+                  {productColors.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setProductColors([])}
+                      className="text-[10px] text-rose-500 hover:underline font-bold cursor-pointer"
+                    >
+                      مسح كافة الألوان
+                    </button>
+                  )}
+                </div>
+
+                {/* 1-Click Quick Preset Palette */}
+                <div className="p-2.5 bg-white border border-slate-200 rounded-xl space-y-2">
+                  <span className="text-[10px] font-bold text-slate-600 block">ألوان جاهزة شائعة (إضافة سريعة بضغطة زر واحدة):</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {PRESET_PHONE_COLORS.map((preset) => {
+                      const alreadyAdded = productColors.some((c) => c.name === preset.name);
+                      return (
+                        <button
+                          key={preset.name}
+                          type="button"
+                          onClick={() => {
+                            if (!alreadyAdded) {
+                              setProductColors([
+                                ...productColors,
+                                { name: preset.name, hex: preset.hex, image: null, file: null },
+                              ]);
+                            }
+                          }}
+                          disabled={alreadyAdded}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all ${
+                            alreadyAdded
+                              ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60"
+                              : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-400 cursor-pointer shadow-2xs"
+                          }`}
+                        >
+                          <span
+                            className="w-2.5 h-2.5 rounded-full border border-black/15 shadow-2xs"
+                            style={{ backgroundColor: preset.hex }}
+                          />
+                          <span>{preset.name}</span>
+                          <span className="text-[9px] font-bold">{alreadyAdded ? "✓" : "+"}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Manual Custom Color Button */}
+                <div className="flex justify-between items-center">
                   <button
                     type="button"
                     onClick={() => setProductColors([...productColors, { name: "", hex: "#1a1a1a", image: null, file: null }])}
-                    className="text-[10px] bg-[#1a1a1a] hover:bg-slate-800 text-white px-2.5 py-1 rounded-lg font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                    className="text-[10px] bg-slate-800 hover:bg-black text-white px-3 py-1.5 rounded-lg font-bold transition-colors flex items-center gap-1 cursor-pointer"
                   >
                     <Plus className="w-3 h-3" />
-                    إضافة لون جديد
+                    إضافة لون يدوي مخصص
                   </button>
                 </div>
 
                 {productColors.length === 0 ? (
-                  <p className="text-[10px] text-slate-400 text-center py-2">لا توجد ألوان مضافة لهذا المنتج. سيتم استخدام الصورة الأساسية فقط.</p>
+                  <p className="text-[10px] text-slate-400 text-center py-2">لا توجد ألوان مضافة لهذا المنتج بعد. اضغط على أي لون أعلاه لإضافته.</p>
                 ) : (
                   <div className="space-y-2.5 max-h-48 overflow-y-auto pr-1">
                     {productColors.map((color, index) => (
@@ -4530,31 +5022,187 @@ export default function AdminPage() {
                 />
               </div>
 
-              {/* Discount Type and Value */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-700">نوع الخصم *</label>
-                  <select
-                    value={codeForm.discountType}
-                    onChange={(e) => setCodeForm({ ...codeForm, discountType: e.target.value as "fixed" | "percent" })}
-                    className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none cursor-pointer"
+              {/* Discount Type Selector Cards */}
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-slate-700">نوع وطريقة احتساب الخصم *</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCodeForm({ ...codeForm, discountType: "percent", discountValue: codeForm.discountType === "percent" ? codeForm.discountValue : 10 })}
+                    className={`p-3 rounded-xl border text-right transition-all cursor-pointer flex flex-col gap-1 ${
+                      codeForm.discountType === "percent"
+                        ? "bg-emerald-50/80 border-emerald-500 text-emerald-950 shadow-xs ring-1 ring-emerald-500"
+                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
                   >
-                    <option value="fixed">خصم ثابت (د.ع)</option>
-                    <option value="percent">نسبة مئوية (%)</option>
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-700">قيمة الخصم *</label>
-                  <input
-                    type="number"
-                    value={codeForm.discountValue || ""}
-                    onChange={(e) => setCodeForm({ ...codeForm, discountValue: parseInt(e.target.value) || 0 })}
-                    placeholder="5000 أو 10"
-                    className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none font-mono"
-                    required
-                  />
+                    <div className="flex items-center gap-1.5 font-black text-xs text-emerald-700">
+                      <Percent className="w-4 h-4" />
+                      <span>نسبة مئوية (%)</span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 leading-tight">
+                      يتم خصم نسبة من مجموع الفاتورة (مثال: 10% أو 25%)
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setCodeForm({ ...codeForm, discountType: "fixed", discountValue: codeForm.discountType === "fixed" ? codeForm.discountValue : 5000 })}
+                    className={`p-3 rounded-xl border text-right transition-all cursor-pointer flex flex-col gap-1 ${
+                      codeForm.discountType === "fixed"
+                        ? "bg-sky-50/80 border-sky-500 text-sky-950 shadow-xs ring-1 ring-sky-500"
+                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-black text-xs text-sky-700">
+                      <TicketPercent className="w-4 h-4" />
+                      <span>مبلغ مالي ثابت (د.ع)</span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 leading-tight">
+                      يتم خصم مبلغ محدد بالدينار (مثال: 5,000 د.ع)
+                    </span>
+                  </button>
                 </div>
               </div>
+
+              {/* Discount Value with Quick Buttons and Live Calculation */}
+              {codeForm.discountType === "percent" ? (
+                <div className="space-y-2.5 border border-emerald-200 bg-emerald-50/40 p-3.5 rounded-xl">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                      <Percent className="w-3.5 h-3.5 text-emerald-600" />
+                      نسبة الخصم المئوية (من 1% إلى 100%) *
+                    </label>
+                    <span className="text-[10px] font-bold text-emerald-700">
+                      {codeForm.discountValue ? `خصم ${codeForm.discountValue}%` : "حدد النسبة"}
+                    </span>
+                  </div>
+
+                  {/* Preset Percent Chips */}
+                  <div className="space-y-1 bg-white p-2.5 rounded-xl border border-emerald-100">
+                    <span className="text-[10px] font-bold text-slate-500 block">اختر نسبة جاهزة بضغطة زر:</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[5, 10, 15, 20, 25, 30, 40, 50, 70].map((pct) => (
+                        <button
+                          key={pct}
+                          type="button"
+                          onClick={() => setCodeForm({ ...codeForm, discountValue: pct })}
+                          className={`px-2.5 py-1 rounded-lg text-[10px] font-black border transition-all cursor-pointer ${
+                            codeForm.discountValue === pct
+                              ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs scale-105"
+                              : "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200"
+                          }`}
+                        >
+                          {pct}%
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Input field */}
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={codeForm.discountValue || ""}
+                      onChange={(e) => setCodeForm({ ...codeForm, discountValue: Math.min(100, Math.max(0, parseInt(e.target.value) || 0)) })}
+                      placeholder="اكتب النسبة هنا مثلاً: 15"
+                      className="w-full text-xs font-mono border border-emerald-300 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:border-emerald-600 pr-8 font-bold"
+                      required
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 font-black text-emerald-700 text-xs select-none">
+                      %
+                    </span>
+                  </div>
+
+                  {/* Live Simulation Card */}
+                  {codeForm.discountValue > 0 && (
+                    <div className="space-y-1.5 pt-1">
+                      <span className="text-[10px] font-bold text-emerald-800 block flex items-center gap-1">
+                        <Calculator className="w-3.5 h-3.5" />
+                        معاينة الحساب التلقائي للفواتير ({codeForm.discountValue}%):
+                      </span>
+                      <div className="grid grid-cols-3 gap-1.5 font-mono text-[10px]">
+                        <div className="bg-white p-2 rounded-lg border border-emerald-100 text-center">
+                          <span className="text-[9px] text-slate-400 block">طلب 25,000 د.ع</span>
+                          <span className="text-emerald-700 font-black block mt-0.5">
+                            خصم {Math.round(25000 * codeForm.discountValue / 100).toLocaleString()} د.ع
+                          </span>
+                          <span className="text-[8px] text-slate-500 block">يدفع: {Math.max(0, 25000 - Math.round(25000 * codeForm.discountValue / 100)).toLocaleString()} د.ع</span>
+                        </div>
+                        <div className="bg-white p-2 rounded-lg border border-emerald-100 text-center">
+                          <span className="text-[9px] text-slate-400 block">طلب 50,000 د.ع</span>
+                          <span className="text-emerald-700 font-black block mt-0.5">
+                            خصم {Math.round(50000 * codeForm.discountValue / 100).toLocaleString()} د.ع
+                          </span>
+                          <span className="text-[8px] text-slate-500 block">يدفع: {Math.max(0, 50000 - Math.round(50000 * codeForm.discountValue / 100)).toLocaleString()} د.ع</span>
+                        </div>
+                        <div className="bg-white p-2 rounded-lg border border-emerald-100 text-center">
+                          <span className="text-[9px] text-slate-400 block">طلب 100,000 د.ع</span>
+                          <span className="text-emerald-700 font-black block mt-0.5">
+                            خصم {Math.round(100000 * codeForm.discountValue / 100).toLocaleString()} د.ع
+                          </span>
+                          <span className="text-[8px] text-slate-500 block">يدفع: {Math.max(0, 100000 - Math.round(100000 * codeForm.discountValue / 100)).toLocaleString()} د.ع</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2.5 border border-sky-200 bg-sky-50/40 p-3.5 rounded-xl">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-bold text-sky-900 flex items-center gap-1.5">
+                      <TicketPercent className="w-3.5 h-3.5 text-sky-600" />
+                      مبلغ الخصم المالي الثابت (بالدينار العراقي) *
+                    </label>
+                    <span className="text-[10px] font-bold text-sky-700">
+                      {codeForm.discountValue ? `${codeForm.discountValue.toLocaleString()} د.ع` : "حدد المبلغ"}
+                    </span>
+                  </div>
+
+                  {/* Preset Amount Chips */}
+                  <div className="space-y-1 bg-white p-2.5 rounded-xl border border-sky-100">
+                    <span className="text-[10px] font-bold text-slate-500 block">اختر مبالغ شائعة بضغطة زر:</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[2500, 5000, 10000, 15000, 20000, 25000, 50000].map((amt) => (
+                        <button
+                          key={amt}
+                          type="button"
+                          onClick={() => setCodeForm({ ...codeForm, discountValue: amt })}
+                          className={`px-2.5 py-1 rounded-lg text-[10px] font-black border transition-all cursor-pointer ${
+                            codeForm.discountValue === amt
+                              ? "bg-sky-600 text-white border-sky-600 shadow-2xs scale-105"
+                              : "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200"
+                          }`}
+                        >
+                          {amt.toLocaleString()} د.ع
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Input field */}
+                  <div className="relative">
+                    <input
+                      type="number"
+                      value={codeForm.discountValue || ""}
+                      onChange={(e) => setCodeForm({ ...codeForm, discountValue: parseInt(e.target.value) || 0 })}
+                      placeholder="مثال: 5000"
+                      className="w-full text-xs font-mono border border-sky-300 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:border-sky-600 pl-12 font-bold"
+                      required
+                    />
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 font-black text-sky-700 text-xs select-none">
+                      د.ع
+                    </span>
+                  </div>
+
+                  {codeForm.discountValue > 0 && (
+                    <div className="bg-white p-2 rounded-lg border border-sky-100 text-[10px] text-sky-900 font-medium flex items-center gap-1.5">
+                      <span>✓ سيتم خصم مبلغ ثابت قدره <strong className="font-bold font-mono">{codeForm.discountValue.toLocaleString()} د.ع</strong> من الفاتورة المؤهلة.</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Applies To */}
               <div className="space-y-1">

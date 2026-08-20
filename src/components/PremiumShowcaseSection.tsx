@@ -13,7 +13,7 @@ import {
   Sparkles,
   Zap,
 } from "lucide-react";
-import { Product, useApp } from "@/context/AppContext";
+import { Product, useApp, isMobileProduct } from "@/context/AppContext";
 import ProductMockup from "@/components/ProductMockup";
 
 interface PremiumShowcaseSectionProps {
@@ -48,6 +48,20 @@ const themeStyles = {
     meter: "from-cyan-950 via-cyan-700 to-sky-300",
     tint: "bg-cyan-600",
   },
+  emerald: {
+    shell: "from-white via-emerald-50 to-slate-100",
+    accent: "bg-emerald-950 text-white",
+    subtle: "text-emerald-700/70",
+    meter: "from-emerald-950 via-emerald-700 to-teal-300",
+    tint: "bg-emerald-600",
+  },
+  amber: {
+    shell: "from-white via-amber-50 to-slate-100",
+    accent: "bg-amber-950 text-white",
+    subtle: "text-amber-700/70",
+    meter: "from-amber-950 via-amber-700 to-yellow-300",
+    tint: "bg-amber-600",
+  },
   blush: {
     shell: "from-white via-rose-50 to-slate-100",
     accent: "bg-rose-950 text-white",
@@ -58,8 +72,8 @@ const themeStyles = {
 };
 
 const isPresetProductVisual = (image: string) => presetImages.includes(image) || image.startsWith("charger-");
-const hasRealDiscount = (product: Product) => Boolean(product.discountPrice && product.discountPrice > 0 && product.discountPrice < product.price);
-const getCurrentPrice = (product: Product) => product.discountPrice || product.price;
+const hasRealDiscount = (product: Product) => !isMobileProduct(product) && Boolean(product.discountPrice && product.discountPrice > 0 && product.discountPrice < product.price);
+const getCurrentPrice = (product: Product) => isMobileProduct(product) ? product.price : (product.discountPrice || product.price);
 const getDiscountPercent = (product: Product) => (
   hasRealDiscount(product)
     ? Math.round((1 - (getCurrentPrice(product) / product.price)) * 100)

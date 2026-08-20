@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { X, User, Phone, MapPin, AlertCircle, CheckCircle2, ShoppingBag, TicketPercent } from "lucide-react";
-import { CartItem, AppliedCoupon } from "@/context/AppContext";
+import { CartItem, AppliedCoupon, isMobileProduct } from "@/context/AppContext";
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -36,7 +36,7 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onSubmit, sh
       setFormData({ name: "", phone: "", address: "" });
       
       const subTotal = cartItems.reduce(
-        (sum, item) => sum + (item.product.discountPrice || item.product.price) * item.quantity,
+        (sum, item) => sum + (isMobileProduct(item.product) ? item.product.price : (item.product.discountPrice || item.product.price)) * item.quantity,
         0
       );
       setSavedTotalPrice(Math.max(0, subTotal - couponDiscount) + numericShipping);
@@ -125,13 +125,16 @@ export default function CheckoutModal({ isOpen, onClose, cartItems, onSubmit, sh
                 </div>
                 <div className="max-h-24 overflow-y-auto space-y-1 pr-1">
                   {cartItems.map(item => (
-                    <div key={`${item.product.id}-${item.selectedColor?.name || "default"}-${item.selectedPort || "default"}`} className="flex justify-between text-slate-500">
+                    <div key={`${item.product.id}-${item.selectedColor?.name || "default"}-${item.selectedPort || "default"}-${item.selectedStorage || "default"}`} className="flex justify-between text-slate-500">
                       <span className="truncate max-w-[240px]">
                         • {item.product.name}
+                        {item.selectedStorage ? ` [${item.selectedStorage}]` : ""}
                         {item.selectedColor ? ` (${item.selectedColor.name})` : ""}
                         {item.selectedPort ? ` (منفذ: ${item.selectedPort})` : ""} (x{item.quantity})
                       </span>
-                      <span className="font-mono text-slate-600">{((item.product.discountPrice || item.product.price) * item.quantity).toLocaleString()} د.ع</span>
+                      <span className="font-mono text-slate-600">
+                        {((isMobileProduct(item.product) ? item.product.price : (item.product.discountPrice || item.product.price)) * item.quantity).toLocaleString()} د.ع
+                      </span>
                     </div>
                   ))}
                 </div>

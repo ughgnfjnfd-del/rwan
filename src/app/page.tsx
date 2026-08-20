@@ -31,7 +31,7 @@ import CheckoutModal from "@/components/CheckoutModal";
 import WishlistDrawer from "@/components/WishlistDrawer";
 import PromoCarousel from "@/components/PromoCarousel";
 import Link from "next/link";
-import { useApp, Product } from "@/context/AppContext";
+import { useApp, Product, isMobileProduct } from "@/context/AppContext";
 import { matchProduct } from "@/lib/search";
 
 import ProductMockup from "@/components/ProductMockup";
@@ -65,7 +65,7 @@ const getProductHighlights = (product: Product) => {
 };
 
 const getDiscountPercent = (product: Product) => (
-  product.discountPrice && product.discountPrice > 0
+  !isMobileProduct(product) && product.discountPrice && product.discountPrice > 0
     ? Math.round((1 - (product.discountPrice / product.price)) * 100)
     : 0
 );
@@ -127,14 +127,19 @@ export default function Home() {
     // Check appliesTo (only store or both)
     if (coupon.appliesTo === "repair") return 0; // doesn't apply to cart items
 
-    const subtotal = cartItems.reduce((acc, curr) => acc + (curr.product.discountPrice || curr.product.price) * curr.quantity, 0);
+    // Exclude mobile phones from coupon discounts
+    const eligibleSubtotal = cartItems.reduce(
+      (acc, curr) => (isMobileProduct(curr.product) ? acc : acc + (curr.product.discountPrice || curr.product.price) * curr.quantity),
+      0
+    );
 
-    if (coupon.minOrderAmount > 0 && subtotal < coupon.minOrderAmount) return 0;
+    if (eligibleSubtotal <= 0) return 0;
+    if (coupon.minOrderAmount > 0 && eligibleSubtotal < coupon.minOrderAmount) return 0;
 
     if (coupon.discountType === "percent") {
-      return Math.min(subtotal, Math.round(subtotal * (coupon.discountValue / 100)));
+      return Math.min(eligibleSubtotal, Math.round(eligibleSubtotal * (coupon.discountValue / 100)));
     }
-    return Math.min(subtotal, coupon.discountValue);
+    return Math.min(eligibleSubtotal, coupon.discountValue);
   }, [appliedCoupon, couponCodes, cartItems]);
 
   // States
@@ -201,20 +206,33 @@ export default function Home() {
   const handleAddToCart = (
     product: Product,
     selectedColor?: { name: string; hex: string; image?: string | null } | null,
-    selectedPort?: string | null
+    selectedPort?: string | null,
+    selectedStorage?: string | null
   ) => {
     const color = selectedColor !== undefined ? selectedColor : (product.colors && product.colors.length > 0 ? product.colors[0] : null);
     const port = selectedPort !== undefined ? selectedPort : (product.ports && product.ports.length > 0 ? product.ports[0] : null);
-    addToCart(product, color, port);
+    const storage = selectedStorage !== undefined ? selectedStorage : (product.storages && product.storages.length > 0 ? product.storages[0] : null);
+    addToCart(product, color, port, storage);
     setIsCartOpen(true);
   };
 
-  const handleUpdateQuantity = (productId: string, quantity: number, selectedColorName?: string | null, selectedPort?: string | null) => {
-    updateCartQuantity(productId, quantity, selectedColorName, selectedPort);
+  const handleUpdateQuantity = (
+    productId: string,
+    quantity: number,
+    selectedColorName?: string | null,
+    selectedPort?: string | null,
+    selectedStorage?: string | null
+  ) => {
+    updateCartQuantity(productId, quantity, selectedColorName, selectedPort, selectedStorage);
   };
 
-  const handleRemoveItem = (productId: string, selectedColorName?: string | null, selectedPort?: string | null) => {
-    removeFromCart(productId, selectedColorName, selectedPort);
+  const handleRemoveItem = (
+    productId: string,
+    selectedColorName?: string | null,
+    selectedPort?: string | null,
+    selectedStorage?: string | null
+  ) => {
+    removeFromCart(productId, selectedColorName, selectedPort, selectedStorage);
   };
 
   const handleCheckout = () => {
@@ -227,13 +245,21 @@ export default function Home() {
   };
 
   const handleCheckoutSubmit = async (customer: { name: string; phone: string; address: string }): Promise<boolean> => {
-    const total = cartItems.reduce((acc, curr) => acc + (curr.product.discountPrice || curr.product.price) * curr.quantity, 0);
+    const total = cartItems.reduce(
+      (acc, curr) => acc + (isMobileProduct(curr.product) ? curr.product.price : (curr.product.discountPrice || curr.product.price)) * curr.quantity,
+      0
+    );
+
+    const eligibleSubtotal = cartItems.reduce(
+      (acc, curr) => (isMobileProduct(curr.product) ? acc : acc + (curr.product.discountPrice || curr.product.price) * curr.quantity),
+      0
+    );
 
     let currentDiscount = couponDiscount;
     const finalCouponCode = appliedCoupon ? appliedCoupon.code : undefined;
 
     if (appliedCoupon) {
-      const liveValidation = await validateCouponLive(appliedCoupon.code, "store", total);
+      const liveValidation = await validateCouponLive(appliedCoupon.code, "store", eligibleSubtotal);
       if (!liveValidation.isValid) {
         alert(`عذراً، لم يعد رمز الخصم صالحاً للاستخدام: ${liveValidation.message}`);
         clearAppliedCoupon();
@@ -493,7 +519,7 @@ export default function Home() {
                               </div>
                               <div className="flex flex-col items-end gap-1.5 flex-shrink-0 pl-1">
                                 <div className="flex flex-col text-left font-mono">
-                                  {product.discountPrice ? (
+                                  {!isMobileProduct(product) && product.discountPrice ? (
                                     <>
                                       <span className="text-[9px] text-slate-400 line-through leading-none">
                                         {product.price.toLocaleString()} د.ع
@@ -725,7 +751,7 @@ export default function Home() {
                           </div>
                           <div className="flex flex-col items-end gap-1.5 flex-shrink-0 pl-1">
                             <div className="flex flex-col text-left font-mono">
-                              {product.discountPrice ? (
+                              {!isMobileProduct(product) && product.discountPrice ? (
                                 <>
                                   <span className="text-[9px] text-slate-400 line-through leading-none">
                                     {product.price.toLocaleString()} د.ع
@@ -1149,7 +1175,7 @@ export default function Home() {
                                 <div className="border-t border-slate-100 pt-3">
                                   <div className="mb-3 flex min-h-9 items-end justify-between gap-2">
                                     <div className="flex flex-col text-right">
-                                      {product.discountPrice ? (
+                                      {!isMobileProduct(product) && product.discountPrice ? (
                                         <>
                                           <span className="mb-0.5 font-mono text-[9px] leading-none text-slate-400 line-through">
                                             {product.price.toLocaleString()} د.ع
@@ -1538,8 +1564,11 @@ export default function Home() {
         appliedCoupon={appliedCoupon}
         couponDiscount={couponDiscount}
         onApplyCoupon={(code) => {
-          const subtotal = cartItems.reduce((acc, curr) => acc + (curr.product.discountPrice || curr.product.price) * curr.quantity, 0);
-          return applyCoupon(code, "store", subtotal);
+          const eligibleSubtotal = cartItems.reduce(
+            (acc, curr) => (isMobileProduct(curr.product) ? acc : acc + (curr.product.discountPrice || curr.product.price) * curr.quantity),
+            0
+          );
+          return applyCoupon(code, "store", eligibleSubtotal);
         }}
         onClearCoupon={clearAppliedCoupon}
       />

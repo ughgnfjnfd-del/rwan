@@ -2,15 +2,26 @@
 
 import React, { useEffect, useState } from "react";
 import { X, Trash2, Plus, Minus, ShoppingBag, TicketPercent, CheckCircle2, AlertCircle } from "lucide-react";
-import { CartItem, AppliedCoupon, CouponValidationResult } from "@/context/AppContext";
+import { CartItem, AppliedCoupon, CouponValidationResult, isMobileProduct } from "@/context/AppContext";
 import ProductMockup from "@/components/ProductMockup";
 
 interface CartDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   items: CartItem[];
-  onUpdateQuantity: (productId: string, quantity: number, selectedColorName?: string | null, selectedPort?: string | null) => void;
-  onRemoveItem: (productId: string, selectedColorName?: string | null, selectedPort?: string | null) => void;
+  onUpdateQuantity: (
+    productId: string,
+    quantity: number,
+    selectedColorName?: string | null,
+    selectedPort?: string | null,
+    selectedStorage?: string | null,
+  ) => void;
+  onRemoveItem: (
+    productId: string,
+    selectedColorName?: string | null,
+    selectedPort?: string | null,
+    selectedStorage?: string | null,
+  ) => void;
   onCheckout: () => void;
   shippingFee?: string;
   appliedCoupon?: AppliedCoupon | null;
@@ -48,12 +59,13 @@ export default function CartDrawer({
   }, [isOpen]);
 
   const totalPrice = items.reduce(
-    (sum, item) => sum + (item.product.discountPrice || item.product.price) * item.quantity,
+    (sum, item) => sum + (isMobileProduct(item.product) ? item.product.price : (item.product.discountPrice || item.product.price)) * item.quantity,
     0
   );
 
   const numericShipping = parseInt(shippingFee.replace(/[^0-9]/g, "")) || 0;
   const finalTotal = Math.max(0, totalPrice - couponDiscount) + numericShipping;
+  const hasMobile = items.some((it) => isMobileProduct(it.product));
 
   const handleApplyCoupon = () => {
     if (!onApplyCoupon) return;
@@ -118,7 +130,7 @@ export default function CartDrawer({
           ) : (
             items.map((item) => (
               <div
-                key={`${item.product.id}-${item.selectedColor?.name || "default"}-${item.selectedPort || "default"}`}
+                key={`${item.product.id}-${item.selectedColor?.name || "default"}-${item.selectedPort || "default"}-${item.selectedStorage || "default"}`}
                 className="flex gap-4 p-3 border border-card-border rounded-xl hover:shadow-sm transition-shadow duration-200"
               >
                 {/* Product Image */}
@@ -136,10 +148,15 @@ export default function CartDrawer({
                     <h4 className="font-bold text-sm text-[#1a1a1a] truncate">
                       {item.product.name}
                     </h4>
-                    <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1">
                       <span className="text-[10px] text-slate-400 uppercase">
                         {item.product.category}
                       </span>
+                      {item.selectedStorage && (
+                        <div className="flex items-center gap-1 bg-sky-50 border border-sky-100 text-sky-700 px-1.5 py-0.5 rounded-md text-[9px] font-black">
+                          {item.selectedStorage}
+                        </div>
+                      )}
                       {item.selectedColor && (
                         <div className="flex items-center gap-1 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded-full">
                           <span
@@ -164,7 +181,7 @@ export default function CartDrawer({
                     <div className="flex items-center border border-slate-200 rounded-lg bg-slate-50/50">
                       <button
                         onClick={() =>
-                          onUpdateQuantity(item.product.id, item.quantity - 1, item.selectedColor?.name, item.selectedPort)
+                          onUpdateQuantity(item.product.id, item.quantity - 1, item.selectedColor?.name, item.selectedPort, item.selectedStorage)
                         }
                         className="p-1 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-r-lg transition-colors cursor-pointer"
                       >
@@ -175,7 +192,7 @@ export default function CartDrawer({
                       </span>
                       <button
                         onClick={() =>
-                          onUpdateQuantity(item.product.id, item.quantity + 1, item.selectedColor?.name, item.selectedPort)
+                          onUpdateQuantity(item.product.id, item.quantity + 1, item.selectedColor?.name, item.selectedPort, item.selectedStorage)
                         }
                         className="p-1 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-l-lg transition-colors cursor-pointer"
                       >
@@ -185,10 +202,10 @@ export default function CartDrawer({
 
                     <div className="flex items-center gap-3">
                       <span className="font-bold text-sm text-accent">
-                        {((item.product.discountPrice || item.product.price) * item.quantity).toLocaleString()} د.ع
+                        {((isMobileProduct(item.product) ? item.product.price : (item.product.discountPrice || item.product.price)) * item.quantity).toLocaleString()} د.ع
                       </span>
                       <button
-                        onClick={() => onRemoveItem(item.product.id, item.selectedColor?.name, item.selectedPort)}
+                        onClick={() => onRemoveItem(item.product.id, item.selectedColor?.name, item.selectedPort, item.selectedStorage)}
                         className="text-slate-400 hover:text-rose-500 p-1 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -268,6 +285,12 @@ export default function CartDrawer({
                     {couponMessage.type === "success" ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertCircle className="h-3.5 w-3.5" />}
                     <span>{couponMessage.text}</span>
                   </div>
+                )}
+
+                {hasMobile && (
+                  <p className="text-[10px] text-amber-700 font-medium bg-amber-50/80 border border-amber-200/60 p-2 rounded-lg">
+                    * ملاحظة: أجهزة الموبايل غير مشمولة بخصومات الكوبونات.
+                  </p>
                 )}
               </div>
               {couponDiscount > 0 && (

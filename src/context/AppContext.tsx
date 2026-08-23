@@ -42,24 +42,45 @@ export interface Product {
 }
 
 // Database Helpers & Mappers
-const mapDBProduct = (dbProd: any): Product => ({
-  id: dbProd.id,
-  name: dbProd.name,
-  nameEn: dbProd.nameen || dbProd.nameEn || "",
-  price: dbProd.price,
-  discountPrice: dbProd.discount_price || undefined,
-  image: dbProd.image,
-  category: dbProd.category,
-  description: dbProd.description || "",
-  specs: dbProd.specs || "",
-  isPopular: dbProd.is_popular || dbProd.isPopular || false,
-  colors: dbProd.colors || null,
-  storages: dbProd.storages || null,
-  rating: dbProd.rating !== undefined && dbProd.rating !== null ? Number(dbProd.rating) : 5,
-  reviewsCount: dbProd.reviews_count !== undefined && dbProd.reviews_count !== null ? Number(dbProd.reviews_count) : 24,
-  ports: dbProd.ports || null,
-  isOutOfStock: dbProd.is_out_of_stock || dbProd.isOutOfStock || false,
-});
+const mapDBProduct = (dbProd: any): Product => {
+  let storagesList: string[] | null = null;
+  const rawStorage = dbProd.storage !== undefined && dbProd.storage !== null ? dbProd.storage : dbProd.storages;
+  if (rawStorage) {
+    if (Array.isArray(rawStorage)) {
+      storagesList = rawStorage;
+    } else if (typeof rawStorage === 'string') {
+      try {
+        const parsed = JSON.parse(rawStorage);
+        if (Array.isArray(parsed)) {
+          storagesList = parsed;
+        } else {
+          storagesList = rawStorage.split(',').map((s: string) => s.trim()).filter(Boolean);
+        }
+      } catch {
+        storagesList = rawStorage.split(',').map((s: string) => s.trim()).filter(Boolean);
+      }
+    }
+  }
+
+  return {
+    id: dbProd.id,
+    name: dbProd.name,
+    nameEn: dbProd.nameen || dbProd.nameEn || "",
+    price: dbProd.price,
+    discountPrice: dbProd.discount_price || undefined,
+    image: dbProd.image,
+    category: dbProd.category,
+    description: dbProd.description || "",
+    specs: dbProd.specs || "",
+    isPopular: dbProd.is_popular || dbProd.isPopular || false,
+    colors: dbProd.colors || null,
+    storages: storagesList,
+    rating: dbProd.rating !== undefined && dbProd.rating !== null ? Number(dbProd.rating) : 5,
+    reviewsCount: dbProd.reviews_count !== undefined && dbProd.reviews_count !== null ? Number(dbProd.reviews_count) : 24,
+    ports: dbProd.ports || null,
+    isOutOfStock: dbProd.is_out_of_stock || dbProd.isOutOfStock || false,
+  };
+};
 
 const mapLocalProductToDB = (prod: Partial<Product>) => {
   const dbProd: any = {};
@@ -76,7 +97,9 @@ const mapLocalProductToDB = (prod: Partial<Product>) => {
   if (prod.specs !== undefined) dbProd.specs = prod.specs;
   if (prod.isPopular !== undefined) dbProd.is_popular = prod.isPopular;
   if (prod.colors !== undefined) dbProd.colors = prod.colors;
-  if (prod.storages !== undefined) dbProd.storages = prod.storages;
+  if (prod.storages !== undefined) {
+    dbProd.storage = Array.isArray(prod.storages) ? prod.storages.join(", ") : prod.storages;
+  }
   if (prod.rating !== undefined) dbProd.rating = prod.rating;
   if (prod.reviewsCount !== undefined) dbProd.reviews_count = prod.reviewsCount;
   if (prod.ports !== undefined) dbProd.ports = prod.ports;
@@ -600,15 +623,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       id: `prod-${Date.now()}`,
     };
 
+    const previousProducts = products;
     // Optimistic UI Update
     const updated = [product, ...products];
     setProducts(updated);
 
     // Supabase Update
-    const { error } = await supabase.from("products").insert([mapLocalProductToDB(product)]);
+    const dbPayload = mapLocalProductToDB(product);
+    const { error } = await supabase.from("products").insert([dbPayload]);
     if (error) {
       console.error("Error adding product to Supabase", error);
-      // Revert in real app, keeping simple here
+      alert(`حدث خطأ أثناء إضافة المنتج إلى قاعدة البيانات: ${error.message || error.details || "يرجى التحقق من الاتصال والصلاحيات."}`);
+      setProducts(previousProducts);
+      throw error;
     }
   };
 

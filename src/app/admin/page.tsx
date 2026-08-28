@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { useApp, Product, Appointment, SlideItem, MarqueeSettings, FlashSale, PromoPopUp, ProductBundle, PremiumShowcase, DEFAULT_PREMIUM_SHOWCASE, GalleryShowcase, DEFAULT_GALLERY_SHOWCASE, isMobileProduct } from "@/context/AppContext";
+import { useApp, Product, Appointment, Order, OrderStatus, RepairStatus, SlideItem, MarqueeSettings, FlashSale, PromoPopUp, ProductBundle, PremiumShowcase, DEFAULT_PREMIUM_SHOWCASE, GalleryShowcase, DEFAULT_GALLERY_SHOWCASE, isMobileProduct } from "@/context/AppContext";
 import { supabase, deleteImageFromSupabase } from "@/lib/supabase";
 import ProductMockup from "@/components/ProductMockup";
+import PrintInvoiceModal, { PrintableDataType } from "@/components/PrintInvoiceModal";
 import { matchProduct } from "@/lib/search";
 import {
   Lock,
@@ -16,6 +17,7 @@ import {
   Trash2,
   Edit2,
   CheckCircle,
+  CheckCircle2,
   Clock,
   Play,
   XCircle,
@@ -41,7 +43,16 @@ import {
   Monitor,
   Smartphone,
   Percent,
-  Calculator
+  Calculator,
+  Printer,
+  Truck,
+  Package,
+  PackageCheck,
+  Receipt,
+  MessageCircle,
+  ExternalLink,
+  QrCode,
+  Share2
 } from "lucide-react";
 
 // Preset storage capacities for mobile phones
@@ -118,11 +129,17 @@ export default function AdminPage() {
   const {
     products,
     appointments,
+    orders,
     addProduct,
     updateProduct,
     deleteProduct,
     updateAppointmentStatus,
+    updateAppointmentDetails,
     deleteAppointment,
+    addAppointment,
+    addOrder,
+    updateOrderStatus,
+    deleteOrder,
     siteSettings,
     updateSiteSettings,
     heroSlides,
@@ -400,8 +417,267 @@ export default function AdminPage() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Tab State: "overview", "products", "devices", "repairs", "settings", "flash", "slides", "premium", "bundles", "coupons" | "gallery"
-  const [activeTab, setActiveTab] = useState<"overview" | "products" | "devices" | "repairs" | "settings" | "flash" | "slides" | "premium" | "bundles" | "coupons" | "gallery">("overview");
+  // Tab State: "overview", "products", "devices", "orders", "repairs", "settings", "flash", "slides", "premium", "bundles", "coupons" | "gallery"
+  const [activeTab, setActiveTab] = useState<"overview" | "products" | "devices" | "orders" | "repairs" | "settings" | "flash" | "slides" | "premium" | "bundles" | "coupons" | "gallery">("overview");
+
+  // Orders & Invoice Printing States
+  const [orderFilter, setOrderFilter] = useState<"all" | OrderStatus>("all");
+  const [orderSearch, setOrderSearch] = useState("");
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [printableData, setPrintableData] = useState<PrintableDataType | null>(null);
+
+  // Quick Manual Invoice States
+  const [isManualInvoiceModalOpen, setIsManualInvoiceModalOpen] = useState(false);
+  const [manualInvoiceForm, setManualInvoiceForm] = useState({
+    customerName: "",
+    customerPhone: "",
+    customerAddress: "",
+    shippingFee: 0,
+    discountAmount: 0,
+    notes: "يرجى فحص الطلب والتأكد منه عند الاستلام بحضور المندوب.",
+    items: [{ name: "", quantity: 1, price: 0, details: "" }],
+  });
+
+  const handlePrintOrder = (order: Order) => {
+    setPrintableData({ type: "order", data: order });
+    setIsPrintModalOpen(true);
+  };
+
+  const handlePrintRepair = (appt: Appointment) => {
+    setPrintableData({ type: "repair", data: appt });
+    setIsPrintModalOpen(true);
+  };
+
+  // Repair Tracking & Diagnostics Modal State
+  const [editingRepairAppt, setEditingRepairAppt] = useState<Appointment | null>(null);
+  const [isRepairDetailModalOpen, setIsRepairDetailModalOpen] = useState(false);
+
+  const handleOpenRepairModal = (appt: Appointment) => {
+    setEditingRepairAppt({ ...appt });
+    setIsRepairDetailModalOpen(true);
+  };
+
+  const handleSaveRepairDetails = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingRepairAppt) return;
+    await updateAppointmentDetails(editingRepairAppt.id, editingRepairAppt);
+    setIsRepairDetailModalOpen(false);
+    alert("تم تحديث بيانات وبطاقة التتبع الفني بنجاح.");
+  };
+
+  const handleSendRepairWhatsApp = (appt: Appointment) => {
+    const currentOrigin = typeof window !== "undefined" ? window.location.origin : "https://alrwan-center.com";
+    const trackCode = appt.trackingCode || appt.id;
+    const trackUrl = `${currentOrigin}/track?code=${encodeURIComponent(trackCode)}`;
+
+    const statusLabels: Record<string, string> = {
+      pending: "تم استلام الجهاز وبانتظار الفحص",
+      diagnosing: "قيد التشخيص والفحص الفني المجهري",
+      "in-progress": "قيد الصيانة واستبدال القطع",
+      testing: "قيد الفحص النهائي واختبار الجودة",
+      ready: "جهازكم جاهز للاستلام الآن في المركز",
+      completed: "تم التسليم بنجاح وتفعيل الضمان",
+      cancelled: "تم إلغاء طلب الصيانة",
+    };
+
+    const statusText = statusLabels[appt.status] || appt.status;
+    const costText = appt.cost && appt.cost > 0 ? `\nالتكلفة المعتمدة: ${appt.cost.toLocaleString()} د.ع` : "";
+    const notesText = appt.techNotes ? `\nتقرير الفني: ${appt.techNotes}` : "";
+    const readyText = appt.estimatedReady ? `\nموعد الاستلام المتوقع: ${appt.estimatedReady}` : "";
+
+    const message = `مرحباً ${appt.name}\nنحيطكم علماً بتحديث حالة صيانة جهازكم (${appt.device}) لدى مركز الروان للصيانة:\n\nالمرحلة الحالية: *${statusText}*${costText}${notesText}${readyText}\n\nلمتابعة مراحل الصيانة مباشرة عبر موقعنا:\n${trackUrl}\n\nشكراً لتعاملكم مع مركز الروان.`;
+
+    const cleanPhone = appt.phone.replace(/[^0-9+]/g, "").replace(/^0/, "964");
+    window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`, "_blank");
+  };
+
+  const handleCopyTrackLink = (appt: Appointment) => {
+    const currentOrigin = typeof window !== "undefined" ? window.location.origin : "https://alrwan-center.com";
+    const trackCode = appt.trackingCode || appt.id;
+    const trackUrl = `${currentOrigin}/track?code=${encodeURIComponent(trackCode)}`;
+    navigator.clipboard.writeText(trackUrl);
+    alert(`تم نسخ رابط التتبع بنجاح:\n${trackUrl}`);
+  };
+
+  // In-Store POS & Manual Invoice State
+  const [productSearchQuery, setProductSearchQuery] = useState("");
+  const [showProductPicker, setShowProductPicker] = useState(false);
+
+  const handleOpenManualInvoice = () => {
+    setManualInvoiceForm({
+      customerName: "",
+      customerPhone: "",
+      customerAddress: "استلام مباشر من المحل",
+      shippingFee: 0,
+      discountAmount: 0,
+      notes: "شكراً لتعاملكم مع مركز الروان - ضمان وفحص معتمد.",
+      items: [{ name: "", quantity: 1, price: 0, details: "" }],
+    });
+    setProductSearchQuery("");
+    setShowProductPicker(false);
+    setIsManualInvoiceModalOpen(true);
+  };
+
+  const handleQuickFillWalkinCustomer = () => {
+    setManualInvoiceForm((prev) => ({
+      ...prev,
+      customerName: "زبون مباشر",
+      customerPhone: "07700000000",
+      customerAddress: "شراء مباشر من المركز",
+    }));
+  };
+
+  const handleSelectProductForManualInvoice = (prod: Product) => {
+    const defaultPrice = (prod.discountPrice && prod.discountPrice > 0) ? prod.discountPrice : prod.price;
+    const defaultDetails = prod.category === "موبايلات" ? "أصلي مع الضمان" : (prod.category || "");
+    
+    setManualInvoiceForm((prev) => {
+      const existingItems = prev.items.filter((it) => it.name.trim() !== "");
+      return {
+        ...prev,
+        items: [
+          ...existingItems,
+          {
+            name: prod.name,
+            quantity: 1,
+            price: defaultPrice,
+            details: defaultDetails,
+          },
+        ],
+      };
+    });
+    setShowProductPicker(false);
+    setProductSearchQuery("");
+  };
+
+  const handleAddManualItem = () => {
+    setManualInvoiceForm((prev) => ({
+      ...prev,
+      items: [...prev.items, { name: "", quantity: 1, price: 0, details: "" }],
+    }));
+  };
+
+  const handleRemoveManualItem = (idx: number) => {
+    if (manualInvoiceForm.items.length <= 1) return;
+    setManualInvoiceForm((prev) => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== idx),
+    }));
+  };
+
+  const handleManualItemChange = (idx: number, field: string, value: any) => {
+    const updatedItems = [...manualInvoiceForm.items];
+    updatedItems[idx] = { ...updatedItems[idx], [field]: value };
+    setManualInvoiceForm((prev) => ({ ...prev, items: updatedItems }));
+  };
+
+  const handleSaveManualInvoice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualInvoiceForm.customerName.trim() || !manualInvoiceForm.customerPhone.trim()) {
+      alert("يرجى إدخال اسم العميل ورقم الهاتف على الأقل.");
+      return;
+    }
+
+    const validItems = manualInvoiceForm.items.filter(i => i.name.trim());
+    if (validItems.length === 0) {
+      alert("يرجى إضافة مادة أو منتج واحد على الأقل في الفاتورة وتحديد السعر.");
+      return;
+    }
+
+    const subtotal = validItems.reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 1), 0);
+    const totalAmount = Math.max(0, subtotal - (Number(manualInvoiceForm.discountAmount) || 0)) + (Number(manualInvoiceForm.shippingFee) || 0);
+
+    const created = await addOrder({
+      customerName: manualInvoiceForm.customerName.trim(),
+      customerPhone: manualInvoiceForm.customerPhone.trim(),
+      customerAddress: manualInvoiceForm.customerAddress.trim() || "استلام مباشر من المحل",
+      items: validItems.map((i) => ({
+        productId: `pos-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+        productName: i.name.trim(),
+        price: Number(i.price) || 0,
+        quantity: Number(i.quantity) || 1,
+        selectedStorage: i.details || null,
+      })),
+      subtotal,
+      shippingFee: Number(manualInvoiceForm.shippingFee) || 0,
+      discountAmount: Number(manualInvoiceForm.discountAmount) || 0,
+      totalAmount,
+      status: "delivered",
+      notes: manualInvoiceForm.notes,
+    });
+
+    setIsManualInvoiceModalOpen(false);
+    setPrintableData({ type: "order", data: created });
+    setIsPrintModalOpen(true);
+  };
+
+  // In-Store Repair Intake & Invoice Modal State
+  const [isManualRepairModalOpen, setIsManualRepairModalOpen] = useState(false);
+  const [manualRepairForm, setManualRepairForm] = useState({
+    name: "",
+    phone: "",
+    device: "",
+    issueType: "صيانة عامة وفحص",
+    details: "تم استلام الجهاز بحالة طبيعية بدون ملحقات.",
+    techNotes: "بانتظار الفحص والتشخيص الفني في المركز.",
+    cost: 0,
+    estimatedReady: "اليوم خلال ساعتين",
+    status: "pending" as Appointment["status"],
+  });
+
+  const handleOpenManualRepair = () => {
+    setManualRepairForm({
+      name: "",
+      phone: "",
+      device: "",
+      issueType: "صيانة عامة وفحص",
+      details: "تم استلام الجهاز بحالة طبيعية بدون ملحقات.",
+      techNotes: "بانتظار الفحص والتشخيص الفني في المركز.",
+      cost: 0,
+      estimatedReady: "اليوم خلال ساعتين",
+      status: "pending",
+    });
+    setIsManualRepairModalOpen(true);
+  };
+
+  const handleQuickFillRepairCustomer = () => {
+    setManualRepairForm((prev) => ({
+      ...prev,
+      name: "زبون صيانة مباشر",
+      phone: "07700000000",
+    }));
+  };
+
+  const handleSaveManualRepair = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualRepairForm.name.trim() || !manualRepairForm.phone.trim()) {
+      alert("يرجى إدخال اسم الزبون ورقم الهاتف.");
+      return;
+    }
+    if (!manualRepairForm.device.trim()) {
+      alert("يرجى إدخال نوع وموديل الجهاز المراد صيانته.");
+      return;
+    }
+
+    const todayStr = new Date().toISOString().split("T")[0];
+    const createdAppt = await addAppointment({
+      name: manualRepairForm.name.trim(),
+      phone: manualRepairForm.phone.trim(),
+      device: manualRepairForm.device.trim(),
+      issueType: manualRepairForm.issueType || "صيانة عامة وفحص",
+      details: manualRepairForm.details.trim(),
+      techNotes: manualRepairForm.techNotes.trim(),
+      cost: Number(manualRepairForm.cost) || 0,
+      estimatedReady: manualRepairForm.estimatedReady.trim(),
+      status: manualRepairForm.status,
+      date: todayStr,
+      timeSlot: "استلام مباشر من المركز",
+    });
+
+    setIsManualRepairModalOpen(false);
+    setPrintableData({ type: "repair", data: createdAppt });
+    setIsPrintModalOpen(true);
+  };
 
   // Coupon/Campaign Management States
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
@@ -552,6 +828,7 @@ export default function AdminPage() {
   const [settingsForm, setSettingsForm] = useState({
     email: "",
     phone: "",
+    address: "العراق، الناصرية، الصالحية، شارع التقاعد، قرب دائرة التقاعد",
     socials: [] as Array<{ platform: string; url: string; name: string }>,
     shippingFee: "",
     promoBanner: {
@@ -982,6 +1259,7 @@ export default function AdminPage() {
       setSettingsForm({
         email: siteSettings.email || "",
         phone: siteSettings.phone || "",
+        address: siteSettings.address || "العراق، الناصرية، الصالحية، شارع التقاعد، قرب دائرة التقاعد",
         socials: siteSettings.socials || [],
         shippingFee: siteSettings.shippingFee || "مجاني",
         promoBanner: siteSettings.promoBanner || {
@@ -1307,8 +1585,38 @@ export default function AdminPage() {
   const activeRepairs = appointments.filter((a) => a.status === "in-progress").length;
   const completedRepairs = appointments.filter((a) => a.status === "completed").length;
 
-  // Simulated revenue: 45,000 IQD per completed repair + sum of all products
-  const estimatedRevenue = completedRepairs * 45000 + products.reduce((acc, curr) => acc + curr.price * 0.1, 0);
+  const totalOrdersCount = orders.length;
+  const pendingOrdersCount = orders.filter((o) => o.status === "pending").length;
+  const preparingOrdersCount = orders.filter((o) => o.status === "preparing").length;
+  const shippingOrdersCount = orders.filter((o) => o.status === "shipping").length;
+  const deliveredOrdersCount = orders.filter((o) => o.status === "delivered").length;
+  const cancelledOrdersCount = orders.filter((o) => o.status === "cancelled").length;
+  const totalDeliveredRevenue = orders
+    .filter((o) => o.status === "delivered")
+    .reduce((acc, curr) => acc + (curr.totalAmount || 0), 0);
+
+  // Filtered Orders List
+  const filteredOrders = orders.filter((order) => {
+    const matchesFilter = orderFilter === "all" ? true : order.status === orderFilter;
+    if (!matchesFilter) return false;
+    if (!orderSearch.trim()) return true;
+    const query = orderSearch.trim().toLowerCase();
+    const orderNum = (order.orderNumber || "").toLowerCase();
+    const custName = (order.customerName || "").toLowerCase();
+    const custPhone = (order.customerPhone || "").toLowerCase();
+    const custAddr = (order.customerAddress || "").toLowerCase();
+    const hasItemMatch = order.items && order.items.some((i) => (i.productName || "").toLowerCase().includes(query));
+    return (
+      orderNum.includes(query) ||
+      custName.includes(query) ||
+      custPhone.includes(query) ||
+      custAddr.includes(query) ||
+      hasItemMatch
+    );
+  });
+
+  // Simulated revenue: 45,000 IQD per completed repair + sum of all products + delivered orders
+  const estimatedRevenue = completedRepairs * 45000 + totalDeliveredRevenue + products.reduce((acc, curr) => acc + curr.price * 0.1, 0);
 
   // Filtered Products List
   const filteredProducts = products.filter((prod) =>
@@ -1502,6 +1810,22 @@ export default function AdminPage() {
           </button>
 
           <button
+            onClick={() => setActiveTab("orders")}
+            className={`w-full flex items-center gap-3 p-3.5 rounded-xl text-sm font-bold transition-all text-right cursor-pointer ${activeTab === "orders"
+              ? "bg-[#1a1a1a] text-white shadow-md"
+              : "hover:bg-slate-50 text-slate-600"
+              }`}
+          >
+            <Truck className="w-4.5 h-4.5 text-emerald-500" />
+            <span>طلبات الشراء والتوصيل ({orders.length})</span>
+            {pendingOrdersCount > 0 && (
+              <span className="mr-auto bg-emerald-500 text-white font-extrabold text-[9px] w-4.5 h-4.5 rounded-full flex items-center justify-center">
+                {pendingOrdersCount}
+              </span>
+            )}
+          </button>
+
+          <button
             onClick={() => setActiveTab("repairs")}
             className={`w-full flex items-center gap-3 p-3.5 rounded-xl text-sm font-bold transition-all text-right cursor-pointer ${activeTab === "repairs"
               ? "bg-[#1a1a1a] text-white shadow-md"
@@ -1609,63 +1933,175 @@ export default function AdminPage() {
         <section className="lg:col-span-9 bg-white border border-card-border rounded-2xl p-6 sm:p-8 min-h-[500px]">
 
           {/* TAB 1: OVERVIEW */}
+          {/* TAB 1: OVERVIEW */}
           {activeTab === "overview" && (
             <div className="space-y-8">
               <div className="border-b border-slate-100 pb-4">
-                <h2 className="text-xl font-extrabold text-[#1a1a1a]">نظرة عامة على المتجر</h2>
-                <p className="text-xs text-slate-400">إحصائيات فورية حول المخزن وعمليات الصيانة والطلب</p>
+                <h2 className="text-xl font-extrabold text-[#1a1a1a]">نظرة عامة على المتجر والمركز</h2>
+                <p className="text-xs text-slate-400">إحصائيات فورية حول المخزن وعمليات الصيانة والطلبات والمبيعات</p>
               </div>
 
               {/* Bento Box Stats */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
 
                 {/* Stat 1: Total products */}
                 <div className="bg-slate-50/50 border border-slate-100 p-5 rounded-2xl space-y-2">
                   <div className="p-2 bg-blue-50 text-blue-500 rounded-lg w-fit">
                     <ShoppingBag className="w-5 h-5" />
                   </div>
-                  <div className="text-slate-400 text-[10px] font-bold">إجمالي المنتجات بالمحل</div>
+                  <div className="text-slate-400 text-[10px] font-bold">إجمالي المنتجات والأجهزة</div>
                   <div className="text-2xl font-extrabold text-slate-800">{totalProducts}</div>
                 </div>
 
-                {/* Stat 2: Pending Repairs */}
+                {/* Stat 2: Orders Count */}
                 <div className="bg-slate-50/50 border border-slate-100 p-5 rounded-2xl space-y-2">
-                  <div className="p-2 bg-amber-50 text-amber-500 rounded-lg w-fit">
-                    <Clock className="w-5 h-5" />
+                  <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg w-fit flex items-center justify-between w-full">
+                    <Truck className="w-5 h-5" />
+                    {pendingOrdersCount > 0 && (
+                      <span className="bg-emerald-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full">
+                        {pendingOrdersCount} جديد
+                      </span>
+                    )}
                   </div>
-                  <div className="text-slate-400 text-[10px] font-bold">حجوزات صيانة قيد الانتظار</div>
-                  <div className="text-2xl font-extrabold text-slate-800">{pendingRepairs}</div>
+                  <div className="text-slate-400 text-[10px] font-bold">إجمالي طلبات الشراء</div>
+                  <div className="text-2xl font-extrabold text-slate-800">{totalOrdersCount}</div>
                 </div>
 
-                {/* Stat 3: Active Repairs */}
+                {/* Stat 3: Pending & Active Repairs */}
                 <div className="bg-slate-50/50 border border-slate-100 p-5 rounded-2xl space-y-2">
-                  <div className="p-2 bg-purple-50 text-purple-500 rounded-lg w-fit">
-                    <Play className="w-5 h-5" />
+                  <div className="p-2 bg-amber-50 text-amber-500 rounded-lg w-fit flex items-center justify-between w-full">
+                    <Wrench className="w-5 h-5" />
+                    {pendingRepairs > 0 && (
+                      <span className="bg-amber-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full">
+                        {pendingRepairs} انتظار
+                      </span>
+                    )}
                   </div>
-                  <div className="text-slate-400 text-[10px] font-bold">أجهزة قيد الصيانة حالياً</div>
-                  <div className="text-2xl font-extrabold text-slate-800">{activeRepairs}</div>
+                  <div className="text-slate-400 text-[10px] font-bold">حجوزات الصيانة</div>
+                  <div className="text-2xl font-extrabold text-slate-800">{appointments.length}</div>
                 </div>
 
                 {/* Stat 4: Estimated sales */}
                 <div className="bg-slate-50/50 border border-slate-100 p-5 rounded-2xl space-y-2">
-                  <div className="p-2 bg-emerald-50 text-emerald-500 rounded-lg w-fit">
+                  <div className="p-2 bg-purple-50 text-purple-600 rounded-lg w-fit">
                     <TrendingUp className="w-5 h-5" />
                   </div>
-                  <div className="text-slate-400 text-[10px] font-bold">العوائد التقديرية</div>
-                  <div className="text-sm sm:text-base font-extrabold text-slate-800 truncate">
+                  <div className="text-slate-400 text-[10px] font-bold">العوائد والمبيعات</div>
+                  <div className="text-sm sm:text-base font-extrabold text-slate-800 truncate font-mono">
                     {estimatedRevenue.toLocaleString()} د.ع
                   </div>
                 </div>
 
               </div>
 
-              {/* Quick Table for Repairs */}
+              {/* Quick Table 1: Latest Orders */}
               <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="font-extrabold text-sm text-[#1a1a1a]">آخر حجوزات الصيانة الواردة</h3>
-                  <button onClick={() => setActiveTab("repairs")} className="text-xs text-accent font-bold hover:underline">
-                    عرض الكل ←
-                  </button>
+                <div className="flex justify-between items-center flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <Truck className="w-4 h-4 text-emerald-600" />
+                    <h3 className="font-extrabold text-sm text-[#1a1a1a]">آخر طلبات الشراء والتوصيل</h3>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={handleOpenManualInvoice}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>فاتورة زبون محل</span>
+                    </button>
+                    <button onClick={() => setActiveTab("orders")} className="text-xs text-accent font-bold hover:underline cursor-pointer">
+                      عرض كافة الطلبات ({orders.length}) ←
+                    </button>
+                  </div>
+                </div>
+
+                {orders.length === 0 ? (
+                  <div className="p-8 border border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-400">
+                    لا توجد طلبات شراء مسجلة حالياً.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto border border-card-border rounded-xl">
+                    <table className="w-full text-xs text-right">
+                      <thead className="bg-slate-50 text-slate-500 font-bold border-b border-card-border">
+                        <tr>
+                          <th className="p-3">رقم الطلب</th>
+                          <th className="p-3">العميل والهاتف</th>
+                          <th className="p-3">المواد المطلوبة</th>
+                          <th className="p-3">المبلغ الإجمالي</th>
+                          <th className="p-3">الحالة</th>
+                          <th className="p-3 text-left">طباعة</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {orders.slice(0, 4).map((order) => (
+                          <tr key={order.id} className="hover:bg-slate-50/50">
+                            <td className="p-3 font-mono font-bold text-slate-900">{order.orderNumber}</td>
+                            <td className="p-3">
+                              <div className="font-bold text-slate-800">{order.customerName}</div>
+                              <div className="text-[10px] text-slate-400 font-mono" dir="ltr">{order.customerPhone}</div>
+                            </td>
+                            <td className="p-3 max-w-[200px] truncate text-slate-600">
+                              {order.items?.map((i) => `${i.productName} (x${i.quantity})`).join(", ")}
+                            </td>
+                            <td className="p-3 font-bold font-mono text-slate-850" dir="ltr">
+                              {order.totalAmount.toLocaleString()} د.ع
+                            </td>
+                            <td className="p-3">
+                              <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                                order.status === "pending"
+                                  ? "bg-amber-50 text-amber-600 border border-amber-100"
+                                  : order.status === "preparing"
+                                  ? "bg-blue-50 text-blue-600 border border-blue-100"
+                                  : order.status === "shipping"
+                                  ? "bg-purple-50 text-purple-600 border border-purple-100"
+                                  : order.status === "delivered"
+                                  ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                                  : "bg-rose-50 text-rose-600 border border-rose-100"
+                              }`}>
+                                {order.status === "pending" && "جديد"}
+                                {order.status === "preparing" && "تجهيز"}
+                                {order.status === "shipping" && "توصيل"}
+                                {order.status === "delivered" && "مكتمل"}
+                                {order.status === "cancelled" && "ملغي"}
+                              </span>
+                            </td>
+                            <td className="p-3 text-left">
+                              <button
+                                onClick={() => handlePrintOrder(order)}
+                                className="p-1.5 bg-sky-50 hover:bg-sky-100 text-sky-600 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 font-bold text-[10px]"
+                                title="طباعة الفاتورة والبوليصة"
+                              >
+                                <Printer className="w-3.5 h-3.5" />
+                                <span>طباعة</span>
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Quick Table 2: Repairs */}
+              <div className="space-y-4">
+                <div className="flex justify-between items-center flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <Wrench className="w-4 h-4 text-sky-600" />
+                    <h3 className="font-extrabold text-sm text-[#1a1a1a]">آخر حجوزات وعمليات الصيانة</h3>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={handleOpenManualRepair}
+                      className="bg-sky-600 hover:bg-sky-700 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>وصل صيانة جديد</span>
+                    </button>
+                    <button onClick={() => setActiveTab("repairs")} className="text-xs text-accent font-bold hover:underline cursor-pointer">
+                      عرض الكل ({appointments.length}) ←
+                    </button>
+                  </div>
                 </div>
 
                 {appointments.length === 0 ? (
@@ -1681,7 +2117,8 @@ export default function AdminPage() {
                           <th className="p-3">الجهاز</th>
                           <th className="p-3">المشكلة</th>
                           <th className="p-3">التاريخ</th>
-                          <th className="p-3 text-left">الحالة</th>
+                          <th className="p-3">الحالة</th>
+                          <th className="p-3 text-left">وصل صيانة</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -1691,7 +2128,7 @@ export default function AdminPage() {
                             <td className="p-3 text-slate-600 font-mono">{appt.device}</td>
                             <td className="p-3 text-slate-600">{appt.issueType}</td>
                             <td className="p-3 text-slate-500 font-mono">{appt.date}</td>
-                            <td className="p-3 text-left">
+                            <td className="p-3">
                               <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${appt.status === "pending"
                                 ? "bg-amber-50 text-amber-600 border border-amber-100"
                                 : appt.status === "in-progress"
@@ -1705,6 +2142,16 @@ export default function AdminPage() {
                                 {appt.status === "completed" && "مكتمل"}
                                 {appt.status === "cancelled" && "ملغى"}
                               </span>
+                            </td>
+                            <td className="p-3 text-left">
+                              <button
+                                onClick={() => handlePrintRepair(appt)}
+                                className="p-1.5 bg-sky-50 hover:bg-sky-100 text-sky-600 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 font-bold text-[10px]"
+                                title="طباعة إيصال استلام الصيانة"
+                              >
+                                <Printer className="w-3.5 h-3.5" />
+                                <span>وصل</span>
+                              </button>
                             </td>
                           </tr>
                         ))}
@@ -1993,17 +2440,276 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* TAB 3: REPAIR APPOINTMENTS */}
-          {activeTab === "repairs" && (
+          {/* TAB 3: ORDERS MANAGEMENT & PRINTING */}
+          {activeTab === "orders" && (
             <div className="space-y-6">
+              
+              {/* Header & Actions */}
               <div className="border-b border-slate-100 pb-4 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                 <div>
-                  <h2 className="text-xl font-extrabold text-[#1a1a1a]">إدارة حجوزات صيانة الأجهزة</h2>
-                  <p className="text-xs text-slate-400">متابعة الأجهزة المعطلة وتغيير حالة الصيانة وحذف الحجوزات</p>
+                  <h2 className="text-xl font-extrabold text-[#1a1a1a]">إدارة ومتابعة طلبات الشراء والتوصيل</h2>
+                  <p className="text-xs text-slate-400">
+                    متابعة وتحديث حالات طلبات الزبائن، والطباعة الفورية للفواتير الحرارية 80mm وبوالص الشحن الرسمية A4
+                  </p>
                 </div>
 
-                {/* Filter Selector */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleOpenManualInvoice}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-sm flex items-center gap-2 transition-all cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>إنشاء فاتورة مبيعات مباشرة (زبون محل)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Search & Filter Bar */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                
+                {/* Status Chips */}
                 <div className="flex gap-1.5 overflow-x-auto pb-1">
+                  {(["all", "pending", "preparing", "shipping", "delivered", "cancelled"] as const).map((filter) => {
+                    const count =
+                      filter === "all"
+                        ? orders.length
+                        : orders.filter((o) => o.status === filter).length;
+                    return (
+                      <button
+                        key={filter}
+                        onClick={() => setOrderFilter(filter)}
+                        className={`text-[10px] font-bold px-3 py-1.5 rounded-lg border transition-all cursor-pointer truncate flex items-center gap-1.5 ${
+                          orderFilter === filter
+                            ? "bg-[#1a1a1a] border-[#1a1a1a] text-white shadow-sm"
+                            : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                        }`}
+                      >
+                        <span>
+                          {filter === "all" && "الكل"}
+                          {filter === "pending" && "جديد قيد الانتظار"}
+                          {filter === "preparing" && "قيد التجهيز"}
+                          {filter === "shipping" && "جاري التوصيل"}
+                          {filter === "delivered" && "تم التسليم"}
+                          {filter === "cancelled" && "ملغي"}
+                        </span>
+                        <span
+                          className={`text-[9px] px-1.5 py-0.2 rounded-full font-mono font-black ${
+                            orderFilter === filter
+                              ? "bg-white/20 text-white"
+                              : "bg-slate-100 text-slate-600"
+                          }`}
+                        >
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Search Input */}
+                <div className="relative min-w-[240px]">
+                  <Search className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={orderSearch}
+                    onChange={(e) => setOrderSearch(e.target.value)}
+                    placeholder="بحث برقم الطلب، العميل، الهاتف، أو المنتج..."
+                    className="w-full text-xs pr-9 pl-4 py-2 bg-slate-50/50 border border-slate-200 rounded-xl focus:outline-none focus:border-accent focus:bg-white transition-all font-sans"
+                  />
+                  {orderSearch && (
+                    <button
+                      onClick={() => setOrderSearch("")}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      <XCircle className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+              </div>
+
+              {/* Orders Table */}
+              {filteredOrders.length === 0 ? (
+                <div className="p-12 border border-dashed border-slate-200 rounded-2xl text-center space-y-3">
+                  <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mx-auto text-slate-400">
+                    <Truck className="w-6 h-6" />
+                  </div>
+                  <div className="text-sm font-bold text-slate-700">لا توجد طلبات شراء مطابقة للبحث أو التصفية</div>
+                  <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                    يمكنك إنشاء فاتورة يدوية سريعة لزبائن المحل أو انتظار الطلبات الواردة من المتجر الإلكتروني.
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto border border-card-border rounded-xl shadow-xs">
+                  <table className="w-full text-xs text-right">
+                    <thead className="bg-slate-50 text-slate-500 font-bold border-b border-card-border">
+                      <tr>
+                        <th className="p-3 w-28">رقم الطلب</th>
+                        <th className="p-3">بيانات الزبون</th>
+                        <th className="p-3">المواد والمنتجات</th>
+                        <th className="p-3 w-32">المبلغ الصافي</th>
+                        <th className="p-3 w-36">حالة الطلب</th>
+                        <th className="p-3 w-32 text-left">الإجراءات</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredOrders.map((order) => (
+                        <tr key={order.id} className="hover:bg-slate-50/50">
+                          
+                          {/* Order Number & Date */}
+                          <td className="p-3 align-top space-y-1">
+                            <span className="inline-block bg-slate-900 text-white font-mono font-bold text-[10px] px-2 py-0.5 rounded">
+                              {order.orderNumber}
+                            </span>
+                            <div className="text-[10px] text-slate-400 font-mono">
+                              {new Date(order.createdAt).toLocaleDateString("ar-IQ", {
+                                month: "numeric",
+                                day: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </div>
+                            {order.couponCode && (
+                              <span className="inline-flex items-center gap-1 text-[9px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded font-mono font-bold">
+                                <TicketPercent className="w-3 h-3" />
+                                {order.couponCode}
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Customer Info */}
+                          <td className="p-3 align-top space-y-0.5">
+                            <strong className="text-slate-900 block text-xs">{order.customerName}</strong>
+                            <div className="text-slate-500 font-mono text-[11px]" dir="ltr">
+                              {order.customerPhone}
+                            </div>
+                            <div className="text-[10px] text-slate-400 max-w-[200px] truncate" title={order.customerAddress}>
+                              📍 {order.customerAddress}
+                            </div>
+                          </td>
+
+                          {/* Items List */}
+                          <td className="p-3 align-top">
+                            <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
+                              {order.items?.map((item, idx) => (
+                                <div key={idx} className="text-slate-700 flex items-center justify-between gap-2 border-b border-dashed border-slate-100 pb-0.5">
+                                  <span className="font-semibold text-[11px] truncate max-w-[180px]">
+                                    • {item.productName}
+                                    {item.selectedStorage ? ` [${item.selectedStorage}]` : ""}
+                                    {item.selectedColor ? ` (${item.selectedColor.name})` : ""}
+                                    {item.selectedPort ? ` (منفذ: ${item.selectedPort})` : ""}
+                                  </span>
+                                  <span className="font-mono text-slate-400 font-bold text-[10px] flex-shrink-0">
+                                    x{item.quantity}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+
+                          {/* Price & Summary */}
+                          <td className="p-3 align-top space-y-0.5 font-mono">
+                            <strong className="text-slate-950 font-bold text-sm block" dir="ltr">
+                              {order.totalAmount.toLocaleString()} د.ع
+                            </strong>
+                            <div className="text-[10px] text-slate-400">
+                              توصيل: {order.shippingFee > 0 ? `${order.shippingFee.toLocaleString()} د.ع` : "مجاني"}
+                            </div>
+                            {order.discountAmount > 0 && (
+                              <div className="text-[10px] text-emerald-600">
+                                خصم: -{order.discountAmount.toLocaleString()} د.ع
+                              </div>
+                            )}
+                          </td>
+
+                          {/* Status Selector */}
+                          <td className="p-3 align-top">
+                            <select
+                              value={order.status}
+                              onChange={(e) => updateOrderStatus(order.id, e.target.value as OrderStatus)}
+                              className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border focus:outline-none cursor-pointer w-full ${
+                                order.status === "pending"
+                                  ? "bg-amber-50 text-amber-700 border-amber-200"
+                                  : order.status === "preparing"
+                                  ? "bg-blue-50 text-blue-700 border-blue-200"
+                                  : order.status === "shipping"
+                                  ? "bg-purple-50 text-purple-700 border-purple-200"
+                                  : order.status === "delivered"
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                  : "bg-rose-50 text-rose-700 border-rose-200"
+                              }`}
+                            >
+                              <option value="pending">قيد الانتظار</option>
+                              <option value="preparing">قيد التجهيز</option>
+                              <option value="shipping">جاري التوصيل</option>
+                              <option value="delivered">تم التسليم</option>
+                              <option value="cancelled">ملغي</option>
+                            </select>
+                          </td>
+
+                          {/* Actions */}
+                          <td className="p-3 align-top text-left">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {/* Print Invoice Button */}
+                              <button
+                                onClick={() => handlePrintOrder(order)}
+                                className="bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 font-bold px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-all cursor-pointer text-[11px]"
+                                title="طباعة الفاتورة وبوليصة الشحن"
+                              >
+                                <Printer className="w-3.5 h-3.5" />
+                                <span>طباعة</span>
+                              </button>
+
+                              {/* Delete button */}
+                              <button
+                                onClick={() => {
+                                  if (confirm(`هل أنت متأكد من حذف الطلب رقم ${order.orderNumber}؟`)) {
+                                    deleteOrder(order.id);
+                                  }
+                                }}
+                                className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                title="حذف الطلب"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+            </div>
+          )}
+
+          {/* TAB 4: REPAIR APPOINTMENTS & INTAKE */}
+          {activeTab === "repairs" && (
+            <div className="space-y-6">
+              
+              {/* Repairs Header & Actions */}
+              <div className="border-b border-slate-100 pb-4 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                <div>
+                  <h2 className="text-xl font-extrabold text-[#1a1a1a]">إدارة ومتابعة صيانة الأجهزة</h2>
+                  <p className="text-xs text-slate-400">متابعة مراحل الصيانة وتحديث التقارير الفنية وطباعة إيصالات الاستلام مع باركود و QR التتبع</p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleOpenManualRepair}
+                    className="bg-sky-600 hover:bg-sky-700 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl shadow-sm flex items-center gap-2 transition-all cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>إنشاء وصل صيانة مباشر (زبون محل)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Filter Selector Bar */}
+              <div className="flex items-center justify-between gap-3 overflow-x-auto pb-1">
+                <div className="flex gap-1.5">
                   {(["all", "pending", "in-progress", "completed", "cancelled"] as const).map((filter) => (
                     <button
                       key={filter}
@@ -2033,93 +2739,133 @@ export default function AdminPage() {
                   <table className="w-full text-xs text-right">
                     <thead className="bg-slate-50 text-slate-500 font-bold border-b border-card-border">
                       <tr>
-                        <th className="p-3">الرمز</th>
-                        <th className="p-3">العميل وهاتفه</th>
-                        <th className="p-3">الجهاز والمشكلة</th>
-                        <th className="p-3">الموعد والتوقيت</th>
-                        <th className="p-3">حالة الصيانة</th>
-                        <th className="p-3 text-left">الإجراءات</th>
+                        <th className="p-3">كود التتبع / الإيصال</th>
+                        <th className="p-3">العميل ورقم الهاتف</th>
+                        <th className="p-3">الجهاز والعطل</th>
+                        <th className="p-3">الكلفة والتقرير</th>
+                        <th className="p-3">مرحلة الصيانة الحالية</th>
+                        <th className="p-3 text-left">إجراءات التتبع والإيصال</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {filteredRepairs.map((appt) => (
-                        <tr key={appt.id} className="hover:bg-slate-50/50">
+                        <tr key={appt.id} className="hover:bg-slate-50/50 transition-colors">
 
-                          <td className="p-3 font-bold text-slate-400 font-mono">{appt.id}</td>
-
-                          <td className="p-3 space-y-0.5">
-                            <div className="font-semibold text-slate-800">{appt.name}</div>
-                            <div className="text-[10px] text-slate-400 font-mono">{appt.phone}</div>
+                          {/* Tracking Code */}
+                          <td className="p-3">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-sky-600 font-mono bg-sky-50 px-2 py-0.5 rounded border border-sky-100">
+                                {appt.trackingCode || appt.id}
+                              </span>
+                              <button
+                                onClick={() => handleCopyTrackLink(appt)}
+                                className="p-1 text-slate-400 hover:text-sky-600 transition-colors"
+                                title="نسخ رابط التتبع للزبون"
+                              >
+                                <Copy className="w-3 h-3" />
+                              </button>
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-mono mt-0.5">{appt.date}</div>
                           </td>
 
+                          {/* Customer */}
+                          <td className="p-3 space-y-0.5">
+                            <div className="font-bold text-slate-800">{appt.name}</div>
+                            <div className="text-[10px] text-slate-500 font-mono" dir="ltr">{appt.phone}</div>
+                          </td>
+
+                          {/* Device & Issue */}
                           <td className="p-3 space-y-0.5 max-w-[200px]">
-                            <div className="font-semibold text-slate-700 truncate font-mono">{appt.device}</div>
-                            <div className="text-[10px] text-slate-400 truncate" title={appt.details}>
+                            <div className="font-bold text-slate-800 truncate">{appt.device}</div>
+                            <div className="text-[10px] text-amber-600 font-semibold truncate" title={appt.details}>
                               {appt.issueType} {appt.details && `| ${appt.details}`}
                             </div>
                           </td>
 
-                          <td className="p-3 space-y-0.5">
-                            <div className="text-slate-600 font-mono font-bold">{appt.date}</div>
-                            <div className="text-[10px] text-slate-400">{appt.timeSlot}</div>
+                          {/* Cost & Notes */}
+                          <td className="p-3 space-y-0.5 max-w-[170px]">
+                            <div className="font-mono font-bold text-slate-800" dir="ltr">
+                              {appt.cost && appt.cost > 0 ? `${appt.cost.toLocaleString()} د.ع` : "يحدد بعد الفحص"}
+                            </div>
+                            <div className="text-[10px] text-slate-500 truncate" title={appt.techNotes}>
+                              {appt.techNotes || "لا توجد ملاحظات فنية بعد"}
+                            </div>
                           </td>
 
+                          {/* Live Status Stage Pill */}
                           <td className="p-3">
-                            <span className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-bold ${appt.status === "pending"
-                              ? "bg-amber-50 text-amber-600 border border-amber-100"
-                              : appt.status === "in-progress"
-                                ? "bg-blue-50 text-blue-600 border border-blue-100"
-                                : appt.status === "completed"
-                                  ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
-                                  : "bg-rose-50 text-rose-600 border border-rose-100"
-                              }`}>
-                              {appt.status === "pending" && "قيد الانتظار"}
-                              {appt.status === "in-progress" && "قيد الصيانة"}
-                              {appt.status === "completed" && "مكتملة"}
-                              {appt.status === "cancelled" && "ملغاة"}
-                            </span>
+                            <select
+                              value={appt.status}
+                              onChange={(e) => updateAppointmentStatus(appt.id, e.target.value as Appointment["status"])}
+                              className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border focus:outline-none cursor-pointer ${
+                                appt.status === "pending"
+                                  ? "bg-amber-50 text-amber-700 border-amber-200"
+                                  : appt.status === "diagnosing"
+                                  ? "bg-purple-50 text-purple-700 border-purple-200"
+                                  : appt.status === "in-progress"
+                                  ? "bg-sky-50 text-sky-700 border-sky-200"
+                                  : appt.status === "testing"
+                                  ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+                                  : appt.status === "ready"
+                                  ? "bg-emerald-100 text-emerald-800 border-emerald-300 font-black animate-pulse"
+                                  : appt.status === "completed"
+                                  ? "bg-slate-100 text-slate-700 border-slate-200"
+                                  : "bg-rose-50 text-rose-700 border-rose-200"
+                              }`}
+                            >
+                              <option value="pending">تم الاستلام (بانتظار الفحص)</option>
+                              <option value="diagnosing">قيد التشخيص والفحص</option>
+                              <option value="in-progress">قيد الصيانة والعمل</option>
+                              <option value="testing">الفحص النهائي واختبار الجودة</option>
+                              <option value="ready">جاهز للاستلام بالمحل</option>
+                              <option value="completed">تم التسليم بنجاح</option>
+                              <option value="cancelled">ملغي / تعذر الإصلاح</option>
+                            </select>
                           </td>
 
-                          {/* Quick Actions */}
+                          {/* Action Buttons */}
                           <td className="p-3 text-left space-x-1 space-x-reverse flex items-center justify-end">
 
-                            {/* Wrench: Mark In Progress */}
-                            {appt.status === "pending" && (
-                              <button
-                                onClick={() => updateAppointmentStatus(appt.id, "in-progress")}
-                                className="p-1 bg-blue-50 text-blue-500 rounded hover:bg-blue-100 transition-colors cursor-pointer"
-                                title="بدء الصيانة"
-                              >
-                                <Play className="w-3.5 h-3.5" />
-                              </button>
-                            )}
+                            {/* Open Repair Detail / Tech Editor Modal */}
+                            <button
+                              onClick={() => handleOpenRepairModal(appt)}
+                              className="p-1.5 bg-sky-50 text-sky-700 hover:bg-sky-100 rounded-lg transition-colors cursor-pointer"
+                              title="تعديل تقرير الفني والكلفة وموعد الاستلام"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
 
-                            {/* Check: Mark Completed */}
-                            {(appt.status === "pending" || appt.status === "in-progress") && (
-                              <button
-                                onClick={() => updateAppointmentStatus(appt.id, "completed")}
-                                className="p-1 bg-emerald-50 text-emerald-500 rounded hover:bg-emerald-100 transition-colors cursor-pointer"
-                                title="إكمال الصيانة"
-                              >
-                                <CheckCircle className="w-3.5 h-3.5" />
-                              </button>
-                            )}
+                            {/* Send WhatsApp Status to Customer */}
+                            <button
+                              onClick={() => handleSendRepairWhatsApp(appt)}
+                              className="p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg transition-colors cursor-pointer"
+                              title="إرسال إشعار تحديث الحالة عبر واتساب للزبون"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5" />
+                            </button>
 
-                            {/* Cancel: Mark Cancelled */}
-                            {(appt.status === "pending" || appt.status === "in-progress") && (
-                              <button
-                                onClick={() => updateAppointmentStatus(appt.id, "cancelled")}
-                                className="p-1 bg-rose-50 text-rose-500 rounded hover:bg-rose-100 transition-colors cursor-pointer"
-                                title="إلغاء الموعد"
-                              >
-                                <XCircle className="w-3.5 h-3.5" />
-                              </button>
-                            )}
+                            {/* Copy Tracking Link */}
+                            <button
+                              onClick={() => handleCopyTrackLink(appt)}
+                              className="p-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                              title="نسخ رابط التتبع المباشر"
+                            >
+                              <Share2 className="w-3.5 h-3.5" />
+                            </button>
+
+                            {/* Print Repair Receipt with Live QR */}
+                            <button
+                              onClick={() => handlePrintRepair(appt)}
+                              className="p-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                              title="طباعة إيصال استلام وضمان صيانة مع كود التتبع"
+                            >
+                              <Printer className="w-3.5 h-3.5" />
+                            </button>
 
                             {/* Trash: Delete Appointment */}
                             <button
                               onClick={() => deleteAppointment(appt.id)}
-                              className="p-1 text-slate-400 hover:text-rose-500 rounded transition-colors cursor-pointer"
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                               title="حذف الحجز نهائياً"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -2233,6 +2979,19 @@ export default function AdminPage() {
                         dir="ltr"
                         required
                       />
+                    </div>
+
+                    {/* Address Input */}
+                    <div className="space-y-1 md:col-span-2">
+                      <label className="text-xs font-semibold text-slate-700">عنوان وموقع المركز (الذي يظهر في الفواتير وبوالص الشحن) *</label>
+                      <input
+                        type="text"
+                        value={settingsForm.address || ""}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, address: e.target.value })}
+                        placeholder="مثال: العراق، الناصرية، الصالحية، شارع التقاعد، قرب دائرة التقاعد"
+                        className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:border-accent text-right"
+                      />
+                      <p className="text-[10px] text-slate-400">سيتم اعتماده كعنوان رسمي للمرسل في بوالص الشحن وفواتير الـ A5 والحرارية.</p>
                     </div>
 
                     {/* Shipping Fee Input */}
@@ -5287,6 +6046,704 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+
+      {/* IN-STORE REPAIR INTAKE & INVOICE MODAL */}
+      {isManualRepairModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs" dir="rtl">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 text-right space-y-4 max-h-[92vh] flex flex-col">
+            
+            {/* Modal Header */}
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3 flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-sky-500/10 border border-sky-500/20 rounded-2xl text-sky-600">
+                  <Wrench className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-900">إنشاء وصل واستلام صيانة (زبون المحل)</h3>
+                  <p className="text-[11px] text-slate-400">إصدار وطباعة إيصال استلام وفحص معتمد مع باركود ورمز QR التتبع المباشر للزبون</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsManualRepairModalOpen(false)}
+                className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveManualRepair} className="space-y-4 overflow-y-auto flex-1 pl-1 pr-1 py-1">
+              
+              {/* Quick Actions & Presets */}
+              <div className="bg-slate-50 p-2.5 rounded-2xl border border-slate-200/80 flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-bold text-slate-600">إجراءات سريعة:</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleQuickFillRepairCustomer}
+                    className="text-xs bg-white border border-slate-200 hover:border-slate-300 text-slate-700 font-bold px-3 py-1.5 rounded-xl transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
+                  >
+                    <User className="w-3.5 h-3.5 text-sky-600" />
+                    <span>تعبئة زبون مباشر</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Customer Info Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700">اسم صاحب الجهاز *</label>
+                  <input
+                    type="text"
+                    value={manualRepairForm.name}
+                    onChange={(e) => setManualRepairForm({ ...manualRepairForm, name: e.target.value })}
+                    placeholder="مثال: علي محمد"
+                    className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50 focus:outline-none focus:border-sky-500 font-bold"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700">رقم هاتف الزبون للتواصل والتتبع *</label>
+                  <input
+                    type="text"
+                    value={manualRepairForm.phone}
+                    onChange={(e) => setManualRepairForm({ ...manualRepairForm, phone: e.target.value })}
+                    placeholder="مثال: 0773 000 0000"
+                    className="w-full text-xs font-mono text-left border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50 focus:outline-none focus:border-sky-500 font-bold"
+                    dir="ltr"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Device & Issue Section */}
+              <div className="space-y-3 border-t border-slate-100 pt-3">
+                
+                {/* Device Model & Quick Chips */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-bold text-slate-800">نوع وموديل الجهاز *</label>
+                    <span className="text-[10px] text-slate-400">انقر للاختيار السريع:</span>
+                  </div>
+                  <input
+                    type="text"
+                    value={manualRepairForm.device}
+                    onChange={(e) => setManualRepairForm({ ...manualRepairForm, device: e.target.value })}
+                    placeholder="مثال: iPhone 15 Pro Max أو Galaxy S24 Ultra"
+                    className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50 focus:outline-none focus:border-sky-500 font-bold"
+                    required
+                  />
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {["iPhone 15 Pro Max", "iPhone 14 Pro", "iPhone 13", "iPhone 12", "Galaxy S24 Ultra", "Galaxy S23", "Redmi Note 13", "iPad Pro", "Apple Watch"].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setManualRepairForm({ ...manualRepairForm, device: preset })}
+                        className="text-[10px] bg-slate-100 hover:bg-sky-50 hover:text-sky-700 border border-slate-200 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Issue Type & Stage */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-700">نوع العطل / الخدمة المطلوبة</label>
+                    <select
+                      value={manualRepairForm.issueType}
+                      onChange={(e) => setManualRepairForm({ ...manualRepairForm, issueType: e.target.value })}
+                      className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50 focus:outline-none focus:border-sky-500 font-bold"
+                    >
+                      <option value="تبديل شاشة أصلية">تبديل شاشة أصلية مع الضمان</option>
+                      <option value="استبدال بطارية أصلية">استبدال بطارية أصلية مع الفحص</option>
+                      <option value="صيانة آيسي الشحن والبورد">صيانة آيسي الشحن والبورد</option>
+                      <option value="معالجة وتنظيف سوائل وماء">معالجة وتنظيف سوائل وماء</option>
+                      <option value="تبديل زجاج الظهر / الكاميرا">تبديل زجاج الظهر / الكاميرا</option>
+                      <option value="سوفتوير وفك قفل وبرمجة">سوفتوير وفك قفل وبرمجة</option>
+                      <option value="صيانة عامة وفحص شامل">صيانة عامة وفحص شامل</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-700">مرحلة الاستلام الأولية</label>
+                    <select
+                      value={manualRepairForm.status}
+                      onChange={(e) => setManualRepairForm({ ...manualRepairForm, status: e.target.value as Appointment["status"] })}
+                      className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50 focus:outline-none focus:border-sky-500 font-bold"
+                    >
+                      <option value="pending">1. تم الاستلام (بانتظار الفحص)</option>
+                      <option value="diagnosing">2. قيد التشخيص والفحص الفني</option>
+                      <option value="in-progress">3. قيد الصيانة واستبدال القطع</option>
+                      <option value="testing">4. الفحص النهائي واختبار الجودة</option>
+                      <option value="ready">5. جاهز للاستلام بالمحل</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Accessories & Intake Condition */}
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700">الملحقات المسلمة وحالة الجهاز عند الاستلام</label>
+                  <input
+                    type="text"
+                    value={manualRepairForm.details}
+                    onChange={(e) => setManualRepairForm({ ...manualRepairForm, details: e.target.value })}
+                    placeholder="مثال: تم استلام الجهاز بدون شاحن، البصمة تعمل، لا يوجد كسر خلفي"
+                    className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50 focus:outline-none focus:border-sky-500"
+                  />
+                </div>
+
+              </div>
+
+              {/* Financials & Ready Time */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-slate-100 pt-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700">التكلفة المتفق عليها / المعتمدة (د.ع)</label>
+                  <input
+                    type="number"
+                    value={manualRepairForm.cost || ""}
+                    onChange={(e) => setManualRepairForm({ ...manualRepairForm, cost: parseInt(e.target.value) || 0 })}
+                    placeholder="0 (تحدد بعد الفحص)"
+                    className="w-full text-xs font-mono text-left border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50 focus:outline-none focus:border-sky-500 font-bold"
+                    dir="ltr"
+                  />
+                  <span className="text-[10px] text-slate-400 block">اتركه 0 إذا كانت الكلفة تحدد لاحقاً بعد الفحص.</span>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700">موعد الاستلام المتوقع للزبون</label>
+                  <input
+                    type="text"
+                    value={manualRepairForm.estimatedReady}
+                    onChange={(e) => setManualRepairForm({ ...manualRepairForm, estimatedReady: e.target.value })}
+                    placeholder="مثال: اليوم الساعة 6:00 مساءً"
+                    className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50 focus:outline-none focus:border-sky-500 font-bold"
+                  />
+                  <span className="text-[10px] text-slate-400 block">يظهر للزبون في صفحة التتبع عبر الـ QR.</span>
+                </div>
+              </div>
+
+              {/* Tech Notes */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700">تقرير وملاحظات الفني الأولية</label>
+                <textarea
+                  rows={2}
+                  value={manualRepairForm.techNotes}
+                  onChange={(e) => setManualRepairForm({ ...manualRepairForm, techNotes: e.target.value })}
+                  placeholder="ملاحظات مهندس الصيانة حول الجهاز..."
+                  className="w-full text-xs border border-slate-200 rounded-xl p-3 bg-slate-50 focus:outline-none focus:border-sky-500"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-3 border-t border-slate-100 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsManualRepairModalOpen(false)}
+                  className="flex-1 border border-slate-200 text-slate-600 font-bold py-2.5 rounded-xl text-xs cursor-pointer text-center"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-sky-600 hover:bg-sky-700 text-white font-bold py-2.5 rounded-xl text-xs shadow-md cursor-pointer text-center flex items-center justify-center gap-2"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>حفظ وإصدار إيصال الصيانة للطباعة</span>
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* IN-STORE POS & MANUAL INVOICE MODAL */}
+      {isManualInvoiceModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs" dir="rtl">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 text-right space-y-4 max-h-[92vh] flex flex-col">
+            
+            {/* Modal Header */}
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3 flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-emerald-600">
+                  <Receipt className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-900">إنشاء فاتورة مبيعات مباشرة (زبون المحل)</h3>
+                  <p className="text-[11px] text-slate-400">إصدار وطباعة فاتورة معتمدة مع الباركود ورمز التتبع للمبيعات المباشرة داخل المحل</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsManualInvoiceModalOpen(false)}
+                className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveManualInvoice} className="space-y-4 overflow-y-auto flex-1 pl-1 pr-1 py-1">
+              
+              {/* Quick Actions Bar */}
+              <div className="bg-slate-50 p-2.5 rounded-2xl border border-slate-200/80 flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-bold text-slate-600">إجراءات سريعة:</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleQuickFillWalkinCustomer}
+                    className="text-xs bg-white border border-slate-200 hover:border-slate-300 text-slate-700 font-bold px-3 py-1.5 rounded-xl transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
+                  >
+                    <User className="w-3.5 h-3.5 text-sky-600" />
+                    <span>تعبئة سريعة (زبون مباشر)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowProductPicker(!showProductPicker)}
+                    className="text-xs bg-sky-50 border border-sky-200 hover:bg-sky-100 text-sky-800 font-bold px-3 py-1.5 rounded-xl transition-all shadow-2xs cursor-pointer flex items-center gap-1.5"
+                  >
+                    <ShoppingBag className="w-3.5 h-3.5 text-sky-600" />
+                    <span>اختيار من منتجات المتجر</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* In-Store Product Picker Dropdown Search */}
+              {showProductPicker && (
+                <div className="bg-slate-900 text-white p-3.5 rounded-2xl space-y-2.5 shadow-xl animate-in fade-in zoom-in-95 duration-200">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-300">ابحث واختر منتج لإضافته للفاتورة مباشرة:</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowProductPicker(false)}
+                      className="text-slate-400 hover:text-white text-xs"
+                    >
+                      إغلاق
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={productSearchQuery}
+                      onChange={(e) => setProductSearchQuery(e.target.value)}
+                      placeholder="ابحث بالاسم، الموديل، أو الفئة..."
+                      className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl py-2 pr-9 pl-3 text-xs focus:outline-none focus:border-sky-500"
+                    />
+                    <Search className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
+                  </div>
+                  <div className="max-h-48 overflow-y-auto divide-y divide-slate-800 rounded-xl bg-slate-950 border border-slate-800">
+                    {products
+                      .filter((p) =>
+                        !productSearchQuery.trim() ||
+                        p.name.toLowerCase().includes(productSearchQuery.toLowerCase()) ||
+                        p.category.toLowerCase().includes(productSearchQuery.toLowerCase())
+                      )
+                      .slice(0, 8)
+                      .map((prod) => (
+                        <div
+                          key={prod.id}
+                          onClick={() => handleSelectProductForManualInvoice(prod)}
+                          className="p-2.5 hover:bg-slate-800/80 flex items-center justify-between text-xs cursor-pointer transition-colors"
+                        >
+                          <div>
+                            <strong className="text-white block font-bold">{prod.name}</strong>
+                            <span className="text-[10px] text-slate-400">{prod.category}</span>
+                          </div>
+                          <div className="text-left font-mono font-bold text-sky-400" dir="ltr">
+                            {(prod.discountPrice || prod.price).toLocaleString()} د.ع
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Customer Info Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700">اسم الزبون *</label>
+                  <input
+                    type="text"
+                    value={manualInvoiceForm.customerName}
+                    onChange={(e) => setManualInvoiceForm({ ...manualInvoiceForm, customerName: e.target.value })}
+                    placeholder="مثال: زبون مباشر أو علي محمد"
+                    className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:border-sky-500 font-bold"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700">رقم الهاتف *</label>
+                  <input
+                    type="text"
+                    value={manualInvoiceForm.customerPhone}
+                    onChange={(e) => setManualInvoiceForm({ ...manualInvoiceForm, customerPhone: e.target.value })}
+                    placeholder="مثال: 07700000000"
+                    className="w-full text-xs font-mono text-left border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:border-sky-500 font-bold"
+                    dir="ltr"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700">نوع الشراء / العنوان</label>
+                  <input
+                    type="text"
+                    value={manualInvoiceForm.customerAddress}
+                    onChange={(e) => setManualInvoiceForm({ ...manualInvoiceForm, customerAddress: e.target.value })}
+                    placeholder="مثال: استلام مباشر من المحل"
+                    className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none focus:border-sky-500"
+                  />
+                </div>
+              </div>
+
+              {/* Items Section */}
+              <div className="space-y-3 border-t border-slate-100 pt-3">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-bold text-slate-800">قائمة المواد والمنتجات المباعة</label>
+                  <button
+                    type="button"
+                    onClick={handleAddManualItem}
+                    className="text-xs text-sky-700 font-bold hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>إضافة مادة أخرى</span>
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {manualInvoiceForm.items.map((item, idx) => (
+                    <div key={idx} className="bg-slate-50 p-3 rounded-2xl border border-slate-200 grid grid-cols-12 gap-2 items-center text-xs">
+                      <div className="col-span-5 space-y-0.5">
+                        <span className="text-[10px] text-slate-400 font-bold">اسم المادة / المنتج</span>
+                        <input
+                          type="text"
+                          value={item.name}
+                          onChange={(e) => handleManualItemChange(idx, "name", e.target.value)}
+                          placeholder="مثال: شاحن Anker 20W أصلي"
+                          className="w-full text-xs border border-slate-200 bg-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-sky-500 font-bold"
+                          required
+                        />
+                      </div>
+                      <div className="col-span-3 space-y-0.5">
+                        <span className="text-[10px] text-slate-400 font-bold">المواصفات / اللون</span>
+                        <input
+                          type="text"
+                          value={item.details}
+                          onChange={(e) => handleManualItemChange(idx, "details", e.target.value)}
+                          placeholder="مثال: أسود / 256GB"
+                          className="w-full text-xs border border-slate-200 bg-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-sky-500"
+                        />
+                      </div>
+                      <div className="col-span-1 space-y-0.5">
+                        <span className="text-[10px] text-slate-400 font-bold">العدد</span>
+                        <input
+                          type="number"
+                          min="1"
+                          value={item.quantity}
+                          onChange={(e) => handleManualItemChange(idx, "quantity", parseInt(e.target.value) || 1)}
+                          className="w-full text-xs font-mono text-center border border-slate-200 bg-white rounded-lg px-1.5 py-1.5 focus:outline-none focus:border-sky-500 font-bold"
+                          required
+                        />
+                      </div>
+                      <div className="col-span-2 space-y-0.5">
+                        <span className="text-[10px] text-slate-400 font-bold">السعر (د.ع)</span>
+                        <input
+                          type="number"
+                          value={item.price || ""}
+                          onChange={(e) => handleManualItemChange(idx, "price", parseInt(e.target.value) || 0)}
+                          placeholder="25000"
+                          className="w-full text-xs font-mono text-left border border-slate-200 bg-white rounded-lg px-2 py-1.5 focus:outline-none focus:border-sky-500 font-bold"
+                          dir="ltr"
+                          required
+                        />
+                      </div>
+                      <div className="col-span-1 text-left pt-3.5">
+                        {manualInvoiceForm.items.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveManualItem(idx)}
+                            className="p-1.5 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Financial & Notes Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-slate-100 pt-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700">أجور التوصيل (د.ع)</label>
+                  <input
+                    type="number"
+                    value={manualInvoiceForm.shippingFee || ""}
+                    onChange={(e) => setManualInvoiceForm({ ...manualInvoiceForm, shippingFee: parseInt(e.target.value) || 0 })}
+                    placeholder="0"
+                    className="w-full text-xs font-mono text-left border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none font-bold"
+                    dir="ltr"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-700">قيمة الخصم المباشر (د.ع)</label>
+                  <input
+                    type="number"
+                    value={manualInvoiceForm.discountAmount || ""}
+                    onChange={(e) => setManualInvoiceForm({ ...manualInvoiceForm, discountAmount: parseInt(e.target.value) || 0 })}
+                    placeholder="0"
+                    className="w-full text-xs font-mono text-left border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none font-bold"
+                    dir="ltr"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700">ملاحظات الفاتورة</label>
+                <input
+                  type="text"
+                  value={manualInvoiceForm.notes}
+                  onChange={(e) => setManualInvoiceForm({ ...manualInvoiceForm, notes: e.target.value })}
+                  placeholder="ملاحظات أو شروط ضمان خاصة..."
+                  className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 focus:outline-none"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-3 border-t border-slate-100 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsManualInvoiceModalOpen(false)}
+                  className="flex-1 border border-slate-200 text-slate-600 font-bold py-2.5 rounded-xl text-xs cursor-pointer text-center"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-xs shadow-md cursor-pointer text-center flex items-center justify-center gap-2"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>حفظ وطباعة الفاتورة 🖨️</span>
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Repair Tracking & Diagnostics Modal */}
+      {isRepairDetailModalOpen && editingRepairAppt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs" dir="rtl">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 text-right space-y-5 max-h-[90vh] overflow-y-auto">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-sky-500/10 border border-sky-500/20 rounded-2xl text-sky-600">
+                  <Wrench className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-900">
+                    إدارة تقرير وتتبع صيانة الجهاز
+                  </h3>
+                  <div className="flex items-center gap-2 text-xs text-slate-500 font-mono mt-0.5">
+                    <span>كود التتبع: <strong className="text-sky-600 font-bold">{editingRepairAppt.trackingCode || editingRepairAppt.id}</strong></span>
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsRepairDetailModalOpen(false)}
+                className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Quick Customer & Device Summary */}
+            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 grid grid-cols-2 gap-3 text-xs">
+              <div>
+                <span className="text-slate-400 font-bold block">العميل:</span>
+                <strong className="text-slate-800 font-bold">{editingRepairAppt.name}</strong>
+                <div className="font-mono text-slate-600" dir="ltr">{editingRepairAppt.phone}</div>
+              </div>
+              <div>
+                <span className="text-slate-400 font-bold block">الجهاز:</span>
+                <strong className="text-slate-800 font-bold">{editingRepairAppt.device}</strong>
+                <div className="text-amber-600 font-bold truncate">{editingRepairAppt.issueType}</div>
+              </div>
+            </div>
+
+            {/* Edit Form */}
+            <form onSubmit={handleSaveRepairDetails} className="space-y-4">
+              
+              {/* Status Stage Selector */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-sky-600" />
+                  <span>مرحلة الصيانة المباشرة (تظهر للزبون عند التتبع):</span>
+                </label>
+                <select
+                  value={editingRepairAppt.status}
+                  onChange={(e) =>
+                    setEditingRepairAppt({
+                      ...editingRepairAppt,
+                      status: e.target.value as Appointment["status"],
+                    })
+                  }
+                  className="w-full text-xs font-bold border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50 focus:outline-none focus:border-sky-500"
+                >
+                  <option value="pending">1. تم الاستلام (بانتظار الفحص والتشخيص)</option>
+                  <option value="diagnosing">2. قيد الفحص والتشخيص الفني المجهري</option>
+                  <option value="in-progress">3. قيد الصيانة واستبدال القطع</option>
+                  <option value="testing">4. الفحص النهائي واختبار الجودة والشحن</option>
+                  <option value="ready">5. جاهز للاستلام بالمحل</option>
+                  <option value="completed">6. تم التسليم للزبون وتفعيل الضمان</option>
+                  <option value="cancelled">7. ملغي / تعذر الإصلاح</option>
+                </select>
+              </div>
+
+              {/* Technician Live Report / Notes */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <Wrench className="w-4 h-4 text-sky-600" />
+                  <span>تقرير مهندس الصيانة (يظهر في صفحة التتبع للزبون):</span>
+                </label>
+                <textarea
+                  rows={3}
+                  value={editingRepairAppt.techNotes || ""}
+                  onChange={(e) =>
+                    setEditingRepairAppt({
+                      ...editingRepairAppt,
+                      techNotes: e.target.value,
+                    })
+                  }
+                  placeholder="مثال: تم فحص البورد وتحديد الخلل في آيسي الشحن، جاري استبدال القطعة الأصلية وإجراء الاختبار النهائي..."
+                  className="w-full text-xs border border-slate-200 rounded-xl p-3 bg-slate-50 focus:outline-none focus:border-sky-500 leading-relaxed font-sans"
+                />
+              </div>
+
+              {/* Cost & Estimated Ready Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">التكلفة المعتمدة (د.ع):</label>
+                  <input
+                    type="number"
+                    value={editingRepairAppt.cost || ""}
+                    onChange={(e) =>
+                      setEditingRepairAppt({
+                        ...editingRepairAppt,
+                        cost: parseInt(e.target.value) || 0,
+                      })
+                    }
+                    placeholder="مثال: 25000"
+                    className="w-full text-xs font-mono font-bold border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50 focus:outline-none focus:border-sky-500"
+                    dir="ltr"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">موعد الاستلام المتوقع:</label>
+                  <input
+                    type="text"
+                    value={editingRepairAppt.estimatedReady || ""}
+                    onChange={(e) =>
+                      setEditingRepairAppt({
+                        ...editingRepairAppt,
+                        estimatedReady: e.target.value,
+                      })
+                    }
+                    placeholder="مثال: اليوم الساعة 6:00 مساءً"
+                    className="w-full text-xs font-bold border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50 focus:outline-none focus:border-sky-500"
+                  />
+                </div>
+              </div>
+
+              {/* Fault Details / Custom Description */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">تفاصيل العطل والملحقات المسلمة مع الجهاز:</label>
+                <input
+                  type="text"
+                  value={editingRepairAppt.details || ""}
+                  onChange={(e) =>
+                    setEditingRepairAppt({
+                      ...editingRepairAppt,
+                      details: e.target.value,
+                    })
+                  }
+                  placeholder="مثال: تم استلام الجهاز بدون شاحن، الكاميرا الخلفية تعمل بشكل طبيعي"
+                  className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50 focus:outline-none focus:border-sky-500"
+                />
+              </div>
+
+              {/* Quick Communication & Actions Bar */}
+              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleSendRepairWhatsApp(editingRepairAppt)}
+                    className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    <span>إرسال واتساب للزبون</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleCopyTrackLink(editingRepairAppt)}
+                    className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>نسخ رابط التتبع</span>
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    handlePrintRepair(editingRepairAppt);
+                  }}
+                  className="px-3 py-2 bg-sky-100 hover:bg-sky-200 text-sky-800 rounded-xl font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>طباعة الإيصال والـ QR</span>
+                </button>
+              </div>
+
+              {/* Modal Save & Close Buttons */}
+              <div className="flex gap-3 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsRepairDetailModalOpen(false)}
+                  className="flex-1 border border-slate-200 text-slate-600 font-bold py-2.5 rounded-xl text-xs cursor-pointer text-center"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-sky-600 hover:bg-sky-700 text-white font-bold py-2.5 rounded-xl text-xs shadow-md cursor-pointer text-center flex items-center justify-center gap-2"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  <span>حفظ التحديثات ونشر التتبع</span>
+                </button>
+              </div>
+
+            </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* Printable Invoice & Waybill Modal */}
+      <PrintInvoiceModal
+        isOpen={isPrintModalOpen}
+        onClose={() => setIsPrintModalOpen(false)}
+        printableData={printableData}
+        siteSettings={siteSettings}
+      />
 
     </div>
   );

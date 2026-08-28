@@ -116,6 +116,7 @@ export default function Home() {
     clearAppliedCoupon,
     couponCodes,
     recordCouponUse,
+    addOrder,
   } = useApp();
 
   // Calculate dynamic coupon discount based on cart items and applied coupon conditions
@@ -268,7 +269,35 @@ export default function Home() {
       currentDiscount = liveValidation.discountAmount;
     }
 
-    const finalTotal = Math.max(0, total - currentDiscount) + (parseInt(siteSettings.shippingFee.replace(/[^0-9]/g, "")) || 0);
+    const numericShipping = parseInt(siteSettings.shippingFee.replace(/[^0-9]/g, "")) || 0;
+    const finalTotal = Math.max(0, total - currentDiscount) + numericShipping;
+
+    // Create and save the order in state & database
+    let createdOrder: any = null;
+    try {
+      createdOrder = await addOrder({
+        customerName: customer.name,
+        customerPhone: customer.phone,
+        customerAddress: customer.address,
+        items: cartItems.map((item) => ({
+          productId: item.product.id,
+          productName: item.product.name,
+          price: isMobileProduct(item.product) ? item.product.price : (item.product.discountPrice || item.product.price),
+          quantity: item.quantity,
+          selectedColor: item.selectedColor ? { name: item.selectedColor.name, hex: item.selectedColor.hex, image: item.selectedColor.image } : null,
+          selectedPort: item.selectedPort || null,
+          selectedStorage: item.selectedStorage || null,
+        })),
+        subtotal: total,
+        shippingFee: numericShipping,
+        couponCode: finalCouponCode || null,
+        discountAmount: currentDiscount,
+        totalAmount: finalTotal,
+        status: "pending",
+      });
+    } catch (orderErr) {
+      console.warn("Could not save order record:", orderErr);
+    }
 
     try {
       const res = await fetch("/api/telegram", {
@@ -285,6 +314,7 @@ export default function Home() {
             couponCode: finalCouponCode,
             couponDiscount: currentDiscount,
             finalTotal: finalTotal,
+            orderNumber: createdOrder?.orderNumber,
           },
         }),
       });
@@ -406,7 +436,7 @@ export default function Home() {
           </div>
 
           {/* Center: Desktop Menu */}
-          <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
+          <nav className="hidden md:flex items-center gap-6 text-sm font-semibold text-slate-600">
             <a href="#" className="text-accent transition-colors hover:text-[#1a1a1a]">الرئيسية</a>
             <a
               href="#products"
@@ -429,6 +459,12 @@ export default function Home() {
               ملحقات
             </a>
             <Link href="/repair" className="hover:text-accent transition-colors">صيانة</Link>
+            <Link
+              href="/track"
+              className="text-xs font-bold text-sky-700 hover:text-sky-800 bg-sky-50 hover:bg-sky-100 px-3 py-1.5 rounded-full border border-sky-200 transition-all"
+            >
+              تتبع الصيانة
+            </Link>
             <a href="#contact" className="hover:text-accent transition-colors">اتصل بنا</a>
           </nav>
 
@@ -645,11 +681,22 @@ export default function Home() {
               </button>
             </div>
 
-            <nav className="flex flex-col gap-4 text-base font-bold text-slate-700">
+            <nav className="flex flex-col gap-3.5 text-base font-bold text-slate-700">
               <a href="#" onClick={() => setIsMobileMenuOpen(false)} className="text-accent">الرئيسية</a>
               <a href="#categories" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-accent">الأقسام</a>
               <a href="#products" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-accent">المنتجات</a>
               <Link href="/repair" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-accent">مركز الصيانة</Link>
+              <Link
+                href="/track"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="flex items-center justify-between text-sky-700 bg-sky-50 p-3 rounded-2xl border border-sky-200 font-bold text-sm"
+              >
+                <div className="flex items-center gap-2">
+                  <Wrench className="w-4 h-4 text-sky-600" />
+                  <span>تتبع حالة الصيانة والطلب</span>
+                </div>
+                <span className="text-[11px] bg-sky-100 text-sky-800 font-bold px-2 py-0.5 rounded-md">مباشر</span>
+              </Link>
               <a href="#contact" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-accent">اتصل بنا</a>
 
               <div className="h-px bg-slate-100 my-2 w-full" />

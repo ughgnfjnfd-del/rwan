@@ -107,18 +107,49 @@ const mapLocalProductToDB = (prod: Partial<Product>) => {
   return dbProd;
 };
 
-const mapDBAppointment = (dbAppt: any): Appointment => ({
-  id: dbAppt.id,
-  name: dbAppt.name,
-  phone: dbAppt.phone,
-  device: dbAppt.device,
-  issueType: dbAppt.issuetype || dbAppt.issueType || "",
-  details: dbAppt.details || "",
-  date: dbAppt.date,
-  timeSlot: dbAppt.timeslot || dbAppt.timeSlot || "",
-  status: dbAppt.status,
-  createdAt: dbAppt.createdat || dbAppt.createdAt || new Date().toISOString()
-});
+const mapDBAppointment = (dbAppt: any): Appointment => {
+  let techNotes = dbAppt.technotes || dbAppt.techNotes || "";
+  let cost = dbAppt.cost !== undefined ? Number(dbAppt.cost) : undefined;
+  let estimatedReady = dbAppt.estimatedready || dbAppt.estimatedReady || "";
+  let trackingCode = dbAppt.trackingcode || dbAppt.trackingCode || "";
+  let detailsText = dbAppt.details || "";
+
+  if (typeof detailsText === "string" && detailsText.startsWith("__TRACK_META__:")) {
+    try {
+      const parsed = JSON.parse(detailsText.replace("__TRACK_META__:", ""));
+      detailsText = parsed.details || "";
+      if (!techNotes) techNotes = parsed.techNotes || "";
+      if (cost === undefined && parsed.cost !== undefined) cost = parsed.cost;
+      if (!estimatedReady) estimatedReady = parsed.estimatedReady || "";
+      if (!trackingCode) trackingCode = parsed.trackingCode || "";
+    } catch (e) {
+      // Ignore parse error and keep detailsText
+    }
+  }
+
+  const idStr = String(dbAppt.id || "");
+  if (!trackingCode) {
+    const cleanNum = idStr.replace(/\D/g, "").slice(-4) || String(Math.abs(idStr.split("").reduce((a, c) => a + c.charCodeAt(0), 1000))).slice(-4);
+    trackingCode = `RWN-R${cleanNum.padStart(4, "0")}`;
+  }
+
+  return {
+    id: dbAppt.id,
+    trackingCode,
+    name: dbAppt.name,
+    phone: dbAppt.phone,
+    device: dbAppt.device,
+    issueType: dbAppt.issuetype || dbAppt.issueType || "",
+    details: detailsText,
+    techNotes,
+    cost,
+    estimatedReady,
+    date: dbAppt.date,
+    timeSlot: dbAppt.timeslot || dbAppt.timeSlot || "",
+    status: dbAppt.status || "pending",
+    createdAt: dbAppt.createdat || dbAppt.createdAt || new Date().toISOString()
+  };
+};
 
 const mapLocalAppointmentToDB = (appt: any) => {
   const dbAppt: any = {};
@@ -127,11 +158,20 @@ const mapLocalAppointmentToDB = (appt: any) => {
   if (appt.phone !== undefined) dbAppt.phone = appt.phone;
   if (appt.device !== undefined) dbAppt.device = appt.device;
   if (appt.issueType !== undefined) dbAppt.issuetype = appt.issueType;
-  if (appt.details !== undefined) dbAppt.details = appt.details;
   if (appt.date !== undefined) dbAppt.date = appt.date;
   if (appt.timeSlot !== undefined) dbAppt.timeslot = appt.timeSlot;
   if (appt.status !== undefined) dbAppt.status = appt.status;
   if (appt.createdAt !== undefined) dbAppt.createdat = appt.createdAt;
+
+  const metaObj = {
+    details: appt.details || "",
+    techNotes: appt.techNotes || "",
+    cost: appt.cost,
+    estimatedReady: appt.estimatedReady || "",
+    trackingCode: appt.trackingCode || ""
+  };
+  dbAppt.details = `__TRACK_META__:${JSON.stringify(metaObj)}`;
+
   return dbAppt;
 };
 
@@ -143,16 +183,105 @@ export interface CartItem {
   selectedStorage?: string | null;
 }
 
+export interface OrderItem {
+  productId: string;
+  productName: string;
+  price: number;
+  quantity: number;
+  selectedColor?: { name: string; hex: string; image?: string | null } | null;
+  selectedPort?: string | null;
+  selectedStorage?: string | null;
+}
+
+export type OrderStatus = "pending" | "preparing" | "shipping" | "delivered" | "cancelled";
+
+export interface Order {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  customerPhone: string;
+  customerAddress: string;
+  items: OrderItem[];
+  subtotal: number;
+  shippingFee: number;
+  couponCode?: string | null;
+  discountAmount: number;
+  totalAmount: number;
+  status: OrderStatus;
+  notes?: string;
+  createdAt: string;
+}
+
+const mapDBOrder = (dbOrder: any): Order => {
+  let parsedItems: OrderItem[] = [];
+  if (typeof dbOrder.items === "string") {
+    try {
+      parsedItems = JSON.parse(dbOrder.items);
+    } catch {
+      parsedItems = [];
+    }
+  } else if (Array.isArray(dbOrder.items)) {
+    parsedItems = dbOrder.items;
+  }
+
+  return {
+    id: dbOrder.id,
+    orderNumber: dbOrder.order_number || dbOrder.orderNumber || `RWN-${dbOrder.id?.slice(0, 5) || "0000"}`,
+    customerName: dbOrder.customer_name || dbOrder.customerName || "",
+    customerPhone: dbOrder.customer_phone || dbOrder.customerPhone || "",
+    customerAddress: dbOrder.customer_address || dbOrder.customerAddress || "",
+    items: parsedItems,
+    subtotal: Number(dbOrder.subtotal) || 0,
+    shippingFee: Number(dbOrder.shipping_fee ?? dbOrder.shippingFee) || 0,
+    couponCode: dbOrder.coupon_code || dbOrder.couponCode || null,
+    discountAmount: Number(dbOrder.discount_amount ?? dbOrder.discountAmount) || 0,
+    totalAmount: Number(dbOrder.total_amount ?? dbOrder.totalAmount) || 0,
+    status: dbOrder.status || "pending",
+    notes: dbOrder.notes || "",
+    createdAt: dbOrder.created_at || dbOrder.createdAt || new Date().toISOString(),
+  };
+};
+
+const mapLocalOrderToDB = (order: Order) => ({
+  id: order.id,
+  order_number: order.orderNumber,
+  customer_name: order.customerName,
+  customer_phone: order.customerPhone,
+  customer_address: order.customerAddress,
+  items: JSON.stringify(order.items),
+  subtotal: order.subtotal,
+  shipping_fee: order.shippingFee,
+  coupon_code: order.couponCode || null,
+  discount_amount: order.discountAmount,
+  total_amount: order.totalAmount,
+  status: order.status,
+  notes: order.notes || "",
+  created_at: order.createdAt,
+});
+
+export type RepairStatus =
+  | "pending"
+  | "diagnosing"
+  | "in-progress"
+  | "testing"
+  | "ready"
+  | "completed"
+  | "cancelled";
+
 export interface Appointment {
   id: string;
+  trackingCode?: string;
   name: string;
   phone: string;
   device: string;
   issueType: string;
   details?: string;
+  techNotes?: string;
+  cost?: number;
+  estimatedReady?: string;
   date: string;
   timeSlot: string;
-  status: "pending" | "in-progress" | "completed" | "cancelled";
+  status: RepairStatus;
   createdAt: string;
 }
 
@@ -226,6 +355,7 @@ export interface PartnerSiteSettings {
 export interface SiteSettings {
   email: string;
   phone: string;
+  address?: string;
   socials: Array<{ platform: string; url: string; name: string }>;
   shippingFee: string;
   promoBanner: PromoBanner;
@@ -342,8 +472,11 @@ interface AppContextType {
   addProduct: (product: Omit<Product, "id">) => void;
   updateProduct: (id: string, product: Partial<Product>) => void;
   deleteProduct: (id: string) => void;
-  addAppointment: (appointment: Omit<Appointment, "id" | "status" | "createdAt">) => void;
+  addAppointment: (appointment: Omit<Appointment, "id" | "status" | "createdAt"> & { status?: Appointment["status"]; trackingCode?: string }) => Promise<Appointment>;
   updateAppointmentStatus: (id: string, status: Appointment["status"]) => void;
+  updateAppointmentDetails: (id: string, updates: Partial<Appointment>) => Promise<void>;
+  getRepairByTrackingCode: (query: string) => Appointment | undefined;
+  getRepairsByPhone: (phone: string) => Appointment[];
   deleteAppointment: (id: string) => void;
   addToCart: (
     product: Product,
@@ -383,6 +516,10 @@ interface AppContextType {
   addBundleToCart: (productIds: string[]) => void;
   galleryShowcase: GalleryShowcase;
   updateGalleryShowcase: (settings: GalleryShowcase) => Promise<void>;
+  orders: Order[];
+  addOrder: (order: Omit<Order, "id" | "orderNumber" | "createdAt"> & { orderNumber?: string }) => Promise<Order>;
+  updateOrderStatus: (id: string, status: OrderStatus) => Promise<void>;
+  deleteOrder: (id: string) => Promise<void>;
   isInitialized: boolean;
 }
 
@@ -391,10 +528,12 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [siteSettings, setSiteSettings] = useState<SiteSettings>({
     email: "support@mobileworld.com",
     phone: "0771 165 0096",
+    address: "العراق، الناصرية، الصالحية، شارع التقاعد، قرب دائرة التقاعد",
     socials: [
       { platform: "facebook", url: "#", name: "فيسبوك" },
       { platform: "instagram", url: "#", name: "إنستغرام" },
@@ -506,6 +645,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           setSiteSettings((prev) => ({
             email: contactObj?.email || prev.email,
             phone: contactObj?.phone || prev.phone,
+            address: contactObj?.address || prev.address,
             socials: Array.isArray(socialsObj) ? socialsObj : prev.socials,
             shippingFee: shippingObj?.fee !== undefined ? shippingObj.fee : prev.shippingFee,
             promoBanner: {
@@ -582,6 +722,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
         if (apptsError) throw apptsError;
         if (apptsData) setAppointments(apptsData.map(mapDBAppointment));
+
+        // Fetch Orders
+        try {
+          const { data: ordersData, error: ordersError } = await supabase
+            .from("orders")
+            .select("*")
+            .order("created_at", { ascending: false });
+
+          if (!ordersError && ordersData && ordersData.length > 0) {
+            const mappedOrders = ordersData.map(mapDBOrder);
+            setOrders(mappedOrders);
+            if (typeof window !== "undefined") {
+              localStorage.setItem("mw_orders", JSON.stringify(mappedOrders));
+            }
+          } else {
+            const storedOrders = localStorage.getItem("mw_orders");
+            if (storedOrders) {
+              setOrders(JSON.parse(storedOrders));
+            }
+          }
+        } catch {
+          const storedOrders = localStorage.getItem("mw_orders");
+          if (storedOrders) {
+            setOrders(JSON.parse(storedOrders));
+          }
+        }
 
         // Load Cart from LocalStorage
         const storedCart = localStorage.getItem("mw_cart");
@@ -696,11 +862,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Appointment Actions
-  const addAppointment = async (newAppt: Omit<Appointment, "id" | "status" | "createdAt">) => {
+  const addAppointment = async (newAppt: Omit<Appointment, "id" | "status" | "createdAt"> & { status?: Appointment["status"]; trackingCode?: string }): Promise<Appointment> => {
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    const trackingCode = newAppt.trackingCode || `RWN-R${randomSuffix}`;
     const appt: Appointment = {
       ...newAppt,
-      id: `booking-${Math.floor(1000 + Math.random() * 9000)}`,
-      status: "pending",
+      id: `rep-${Date.now().toString().slice(-4)}${randomSuffix}`,
+      trackingCode,
+      status: newAppt.status || "pending",
       createdAt: new Date().toISOString(),
     };
 
@@ -713,6 +882,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (error) {
       console.error("Error adding appointment to Supabase", error);
     }
+    return appt;
   };
 
   const updateAppointmentStatus = async (id: string, status: Appointment["status"]) => {
@@ -722,15 +892,59 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
     setAppointments(updated);
 
-    // Supabase Update
-    const { error } = await supabase
-      .from("appointments")
-      .update({ status })
-      .eq("id", id);
+    const target = updated.find((a) => a.id === id);
+    if (target) {
+      const dbPayload = mapLocalAppointmentToDB(target);
+      const { error } = await supabase
+        .from("appointments")
+        .update(dbPayload)
+        .eq("id", id);
 
-    if (error) {
-      console.error("Error updating appointment in Supabase", error);
+      if (error) {
+        console.error("Error updating appointment in Supabase", error);
+      }
     }
+  };
+
+  const updateAppointmentDetails = async (id: string, updates: Partial<Appointment>) => {
+    const updated = appointments.map((appt) =>
+      appt.id === id ? { ...appt, ...updates } : appt
+    );
+    setAppointments(updated);
+
+    const target = updated.find((a) => a.id === id);
+    if (target) {
+      const dbPayload = mapLocalAppointmentToDB(target);
+      const { error } = await supabase
+        .from("appointments")
+        .update(dbPayload)
+        .eq("id", id);
+
+      if (error) {
+        console.error("Error updating appointment details in Supabase", error);
+      }
+    }
+  };
+
+  const getRepairByTrackingCode = (query: string): Appointment | undefined => {
+    if (!query) return undefined;
+    const cleanQuery = query.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (!cleanQuery) return undefined;
+    return appointments.find((appt) => {
+      const idMatch = (appt.id || "").toLowerCase().replace(/[^a-z0-9]/g, "").includes(cleanQuery);
+      const trackMatch = (appt.trackingCode || "").toLowerCase().replace(/[^a-z0-9]/g, "").includes(cleanQuery);
+      return idMatch || trackMatch;
+    });
+  };
+
+  const getRepairsByPhone = (phone: string): Appointment[] => {
+    if (!phone) return [];
+    const cleanPhone = phone.replace(/\D/g, "");
+    if (cleanPhone.length < 4) return [];
+    return appointments.filter((appt) => {
+      const apptPhone = (appt.phone || "").replace(/\D/g, "");
+      return apptPhone.includes(cleanPhone) || cleanPhone.includes(apptPhone);
+    });
   };
 
   const deleteAppointment = async (id: string) => {
@@ -742,6 +956,61 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const { error } = await supabase.from("appointments").delete().eq("id", id);
     if (error) {
       console.error("Error deleting appointment from Supabase", error);
+    }
+  };
+
+  // Order Actions
+  const addOrder = async (
+    newOrder: Omit<Order, "id" | "orderNumber" | "createdAt"> & { orderNumber?: string }
+  ): Promise<Order> => {
+    const orderNumber = newOrder.orderNumber || `RWN-${Math.floor(10000 + Math.random() * 90000)}`;
+    const order: Order = {
+      ...newOrder,
+      id: `order-${Date.now()}`,
+      orderNumber,
+      createdAt: new Date().toISOString(),
+    };
+
+    const updated = [order, ...orders];
+    setOrders(updated);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("mw_orders", JSON.stringify(updated));
+    }
+
+    try {
+      await supabase.from("orders").insert([mapLocalOrderToDB(order)]);
+    } catch (e) {
+      console.warn("Could not insert order into Supabase orders table (fallback active):", e);
+    }
+
+    return order;
+  };
+
+  const updateOrderStatus = async (id: string, status: OrderStatus) => {
+    const updated = orders.map((o) => (o.id === id ? { ...o, status } : o));
+    setOrders(updated);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("mw_orders", JSON.stringify(updated));
+    }
+
+    try {
+      await supabase.from("orders").update({ status }).eq("id", id);
+    } catch (e) {
+      console.warn("Could not update order status in Supabase:", e);
+    }
+  };
+
+  const deleteOrder = async (id: string) => {
+    const updated = orders.filter((o) => o.id !== id);
+    setOrders(updated);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("mw_orders", JSON.stringify(updated));
+    }
+
+    try {
+      await supabase.from("orders").delete().eq("id", id);
+    } catch (e) {
+      console.warn("Could not delete order from Supabase:", e);
     }
   };
 
@@ -849,10 +1118,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setSiteSettings(newSettings);
 
     // Update Supabase
-    if (updated.email !== undefined || updated.phone !== undefined) {
+    if (updated.email !== undefined || updated.phone !== undefined || updated.address !== undefined) {
       const contactVal = {
         email: updated.email !== undefined ? updated.email : siteSettings.email,
         phone: updated.phone !== undefined ? updated.phone : siteSettings.phone,
+        address: updated.address !== undefined ? updated.address : (siteSettings.address || "العراق، الناصرية، الصالحية، شارع التقاعد، قرب دائرة التقاعد"),
       };
       const { error } = await supabase
         .from("site_settings")
@@ -1454,6 +1724,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       value={{
         products,
         appointments,
+        orders,
         cartItems,
         siteSettings,
         heroSlides,
@@ -1470,7 +1741,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         deleteProduct,
         addAppointment,
         updateAppointmentStatus,
+        updateAppointmentDetails,
+        getRepairByTrackingCode,
+        getRepairsByPhone,
         deleteAppointment,
+        addOrder,
+        updateOrderStatus,
+        deleteOrder,
         addToCart,
         removeFromCart,
         updateCartQuantity,

@@ -86,10 +86,13 @@ export default function RepairExperience() {
             )}
           </Link>
 
-          <nav className="hidden items-center gap-7 text-xs font-black text-slate-500 md:flex">
+          <nav className="hidden items-center gap-6 text-xs font-black text-slate-500 md:flex">
             <Link href="/" className="inline-flex items-center gap-1.5 transition-colors hover:text-slate-950">
               <Home className="h-3.5 w-3.5" />
               الرئيسية
+            </Link>
+            <Link href="/track" className="text-xs font-bold text-sky-700 hover:text-sky-800 bg-sky-50 px-3 py-1.5 rounded-full border border-sky-200 transition-colors">
+              تتبع الصيانة
             </Link>
             <a href="#services" className="transition-colors hover:text-slate-950">الخدمات</a>
             <a href="#process" className="transition-colors hover:text-slate-950">طريقة العمل</a>
@@ -97,14 +100,22 @@ export default function RepairExperience() {
             <a href="#questions" className="transition-colors hover:text-slate-950">الأسئلة</a>
           </nav>
 
-          <button
-            onClick={() => setIsRepairOpen(true)}
-            className="inline-flex h-10 items-center gap-2 rounded-full bg-slate-950 px-4 text-xs font-black text-white transition-all hover:bg-slate-800 active:scale-[0.98] cursor-pointer"
-          >
-            <Wrench className="h-4 w-4" />
-            <span className="hidden sm:inline">احجز فحصاً</span>
-            <span className="sm:hidden">احجز</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/track"
+              className="inline-flex h-10 items-center rounded-full bg-sky-50 border border-sky-200 px-3.5 text-xs font-bold text-sky-700 hover:bg-sky-100 transition-colors sm:hidden"
+            >
+              تتبع الصيانة
+            </Link>
+            <button
+              onClick={() => setIsRepairOpen(true)}
+              className="inline-flex h-10 items-center gap-2 rounded-full bg-slate-950 px-4 text-xs font-black text-white transition-all hover:bg-slate-800 active:scale-[0.98] cursor-pointer"
+            >
+              <Wrench className="h-4 w-4" />
+              <span className="hidden sm:inline">احجز فحصاً</span>
+              <span className="sm:hidden">احجز</span>
+            </button>
+          </div>
         </div>
       </header>
 

@@ -19,9 +19,12 @@ export async function POST(request: Request) {
     let text = "";
 
     if (type === "order") {
-      const { customer, items, total, couponCode, couponDiscount, finalTotal } = payload;
-      text = `<b>🛍️ طلب شراء جديد من المتجر!</b>\n\n`;
-      text += `<b>👤 معلومات العميل:</b>\n`;
+      const { customer, items, total, couponCode, couponDiscount, finalTotal, orderNumber } = payload;
+      text = `<b>🛍️ طلب شراء جديد من المتجر!</b>\n`;
+      if (orderNumber) {
+        text += `🔖 <b>رقم الطلب والتتبع:</b> <code>${orderNumber}</code>\n`;
+      }
+      text += `\n<b>👤 معلومات العميل:</b>\n`;
       text += `• الاسم: ${customer.name}\n`;
       text += `• الهاتف: <code>${customer.phone}</code>\n`;
       text += `• العنوان: ${customer.address}\n\n`;

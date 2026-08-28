@@ -130,11 +130,51 @@ function getStatusBadge(status: RepairStatus) {
 
 function TrackingContent() {
   const searchParams = useSearchParams();
-  const { appointments, orders, siteSettings } = useApp();
+  const { appointments, orders, siteSettings, refreshAppointments, refreshOrders } = useApp();
 
   const [searchType, setSearchType] = useState<"repair" | "order">("repair");
   const [searchQuery, setSearchQuery] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      if (refreshAppointments) await refreshAppointments();
+      if (refreshOrders) await refreshOrders();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 500);
+    }
+  };
+
+  // Background Auto-Refresh Polling (Every 20 seconds + on Tab Visibility / Window Focus)
+  useEffect(() => {
+    const triggerSync = () => {
+      if (refreshAppointments) refreshAppointments();
+      if (refreshOrders) refreshOrders();
+    };
+
+    // Auto-poll interval
+    const interval = setInterval(triggerSync, 20000);
+
+    // Visibility and focus listeners
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        triggerSync();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("focus", triggerSync);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("focus", triggerSync);
+    };
+  }, [refreshAppointments, refreshOrders]);
 
   // Read URL params automatically on mount
   useEffect(() => {
@@ -223,8 +263,8 @@ function TrackingContent() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 py-8 px-4 sm:px-6 lg:px-8 selection:bg-sky-500/20 selection:text-sky-300">
       
-      {/* Top Header / Breadcrumbs */}
-      <div className="max-w-5xl mx-auto mb-8 flex items-center justify-between">
+      {/* Top Header / Breadcrumbs & Live Sync Bar */}
+      <div className="max-w-5xl mx-auto mb-8 flex items-center justify-between flex-wrap gap-3">
         <Link
           href="/"
           className="inline-flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-white bg-slate-900 border border-slate-800 px-3.5 py-2 rounded-xl transition-colors"
@@ -232,9 +272,20 @@ function TrackingContent() {
           <ArrowRight className="w-4 h-4" />
           <span>العودة للرئيسية</span>
         </Link>
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span className="text-xs font-bold text-slate-400">تحديث مباشر للحالات</span>
+        <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2 bg-slate-900/80 border border-slate-800 px-3 py-2 rounded-xl text-xs">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span className="text-[11px] font-bold text-slate-300">مزامنة حية وتحديث تلقائي</span>
+          </div>
+          <button
+            type="button"
+            onClick={handleManualRefresh}
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-sky-400 hover:text-white bg-sky-950/60 hover:bg-sky-900/60 border border-sky-800/60 px-3 py-2 rounded-xl transition-all cursor-pointer"
+            title="تحديث الحالة الآن"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-sky-300" : ""}`} />
+            <span>{isRefreshing ? "جاري التحديث..." : "تحديث الآن"}</span>
+          </button>
         </div>
       </div>
 
@@ -619,8 +670,8 @@ function TrackingContent() {
                         <MapPin className="w-3.5 h-3.5 text-rose-400" />
                         <span>{storeAddress}</span>
                       </div>
-                      <div className="text-[11px] text-slate-500">
-                        أوقات العمل: يومياً من 9:00 صباحاً حتى 10:00 مساءً
+                      <div className="text-[11px] text-slate-400">
+                        أوقات العمل: يومياً من 3:00 مساءً حتى 12:00 ليلاً
                       </div>
                     </div>
 

@@ -109,7 +109,7 @@ const mapLocalProductToDB = (prod: Partial<Product>) => {
 
 const mapDBAppointment = (dbAppt: any): Appointment => {
   let techNotes = dbAppt.technotes || dbAppt.techNotes || "";
-  let cost = dbAppt.cost !== undefined ? Number(dbAppt.cost) : undefined;
+  let cost = dbAppt.cost !== undefined && dbAppt.cost !== null ? Number(dbAppt.cost) : 0;
   let estimatedReady = dbAppt.estimatedready || dbAppt.estimatedReady || "";
   let trackingCode = dbAppt.trackingcode || dbAppt.trackingCode || "";
   let detailsText = dbAppt.details || "";
@@ -117,11 +117,11 @@ const mapDBAppointment = (dbAppt: any): Appointment => {
   if (typeof detailsText === "string" && detailsText.startsWith("__TRACK_META__:")) {
     try {
       const parsed = JSON.parse(detailsText.replace("__TRACK_META__:", ""));
-      detailsText = parsed.details || "";
-      if (!techNotes) techNotes = parsed.techNotes || "";
-      if (cost === undefined && parsed.cost !== undefined) cost = parsed.cost;
-      if (!estimatedReady) estimatedReady = parsed.estimatedReady || "";
-      if (!trackingCode) trackingCode = parsed.trackingCode || "";
+      detailsText = parsed.details !== undefined ? parsed.details : "";
+      if (parsed.techNotes !== undefined && parsed.techNotes !== null) techNotes = parsed.techNotes;
+      if (parsed.cost !== undefined && parsed.cost !== null) cost = Number(parsed.cost);
+      if (parsed.estimatedReady !== undefined && parsed.estimatedReady !== null) estimatedReady = parsed.estimatedReady;
+      if (parsed.trackingCode !== undefined && parsed.trackingCode !== null) trackingCode = parsed.trackingCode;
     } catch (e) {
       // Ignore parse error and keep detailsText
     }
@@ -141,9 +141,9 @@ const mapDBAppointment = (dbAppt: any): Appointment => {
     device: dbAppt.device,
     issueType: dbAppt.issuetype || dbAppt.issueType || "",
     details: detailsText,
-    techNotes,
-    cost,
-    estimatedReady,
+    techNotes: techNotes || "",
+    cost: cost || 0,
+    estimatedReady: estimatedReady || "",
     date: dbAppt.date,
     timeSlot: dbAppt.timeslot || dbAppt.timeSlot || "",
     status: dbAppt.status || "pending",
@@ -166,7 +166,7 @@ const mapLocalAppointmentToDB = (appt: any) => {
   const metaObj = {
     details: appt.details || "",
     techNotes: appt.techNotes || "",
-    cost: appt.cost,
+    cost: Number(appt.cost) || 0,
     estimatedReady: appt.estimatedReady || "",
     trackingCode: appt.trackingCode || ""
   };
@@ -520,6 +520,8 @@ interface AppContextType {
   addOrder: (order: Omit<Order, "id" | "orderNumber" | "createdAt"> & { orderNumber?: string }) => Promise<Order>;
   updateOrderStatus: (id: string, status: OrderStatus) => Promise<void>;
   deleteOrder: (id: string) => Promise<void>;
+  refreshAppointments: () => Promise<void>;
+  refreshOrders: () => Promise<void>;
   isInitialized: boolean;
 }
 
@@ -773,6 +775,65 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
 
     fetchInitialData();
+  }, []);
+
+  const refreshAppointments = async () => {
+    try {
+      const { data: apptsData, error: apptsError } = await supabase
+        .from("appointments")
+        .select("*")
+        .order("createdat", { ascending: false });
+
+      if (!apptsError && apptsData) {
+        setAppointments(apptsData.map(mapDBAppointment));
+      }
+    } catch (err) {
+      console.error("Error refreshing appointments from Supabase", err);
+    }
+  };
+
+  const refreshOrders = async () => {
+    try {
+      const { data: ordersData, error: ordersError } = await supabase
+        .from("orders")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (!ordersError && ordersData && ordersData.length > 0) {
+        const mapped = ordersData.map(mapDBOrder);
+        setOrders(mapped);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("mw_orders", JSON.stringify(mapped));
+        }
+      }
+    } catch (err) {
+      console.error("Error refreshing orders from Supabase", err);
+    }
+  };
+
+  // Realtime Live Subscription for appointments and orders
+  useEffect(() => {
+    const channel = supabase
+      .channel("realtime_site_sync")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "appointments" },
+        () => {
+          refreshAppointments();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "orders" },
+        () => {
+          refreshOrders();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   // Save Cart to LocalStorage helper
@@ -1748,6 +1809,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         addOrder,
         updateOrderStatus,
         deleteOrder,
+        refreshAppointments,
+        refreshOrders,
         addToCart,
         removeFromCart,
         updateCartQuantity,

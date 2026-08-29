@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { useApp, Product, Appointment, Order, OrderStatus, RepairStatus, SlideItem, MarqueeSettings, FlashSale, PromoPopUp, ProductBundle, PremiumShowcase, DEFAULT_PREMIUM_SHOWCASE, GalleryShowcase, DEFAULT_GALLERY_SHOWCASE, isMobileProduct } from "@/context/AppContext";
+import { useApp, Product, Appointment, Order, OrderStatus, RepairStatus, SlideItem, MarqueeSettings, FlashSale, PromoPopUp, ProductBundle, PremiumShowcase, DEFAULT_PREMIUM_SHOWCASE, GalleryShowcase, DEFAULT_GALLERY_SHOWCASE, isMobileProduct, CouponCode, CouponCampaign } from "@/context/AppContext";
 import { supabase, deleteImageFromSupabase } from "@/lib/supabase";
 import ProductMockup from "@/components/ProductMockup";
 import PrintInvoiceModal, { PrintableDataType } from "@/components/PrintInvoiceModal";
+import PromoQRCodeModal from "@/components/PromoQRCodeModal";
 import { matchProduct } from "@/lib/search";
 import {
   Lock,
@@ -709,6 +710,17 @@ export default function AdminPage() {
     expiresAt: "",
   });
 
+  // Promo QR Code & Voucher Modal States
+  const [isPromoQRModalOpen, setIsPromoQRModalOpen] = useState(false);
+  const [promoQRTargetCoupon, setPromoQRTargetCoupon] = useState<CouponCode | null>(null);
+  const [promoQRTargetCampaign, setPromoQRTargetCampaign] = useState<CouponCampaign | null>(null);
+
+  const handleOpenPromoQR = (coupon: CouponCode, campaign?: CouponCampaign | null) => {
+    setPromoQRTargetCoupon(coupon);
+    setPromoQRTargetCampaign(campaign || null);
+    setIsPromoQRModalOpen(true);
+  };
+
   const generateRandomCode = (prefix = "RWAN") => {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     let code = "";
@@ -794,6 +806,10 @@ export default function AdminPage() {
     const nextCodes = [...couponCodes, newCodeData];
     updateCoupons(couponCampaigns, nextCodes);
     setIsCodeModalOpen(false);
+
+    // Automatically open the generated QR / Barcode Modal for the created code
+    const currCam = couponCampaigns.find(c => c.id === selectedCampaignId);
+    handleOpenPromoQR(newCodeData, currCam);
   };
 
   // Product CRUD States
@@ -4514,12 +4530,24 @@ export default function AdminPage() {
 
                           {/* QR / UTM Info Quick Card */}
                           <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl text-xs space-y-2 leading-relaxed">
-                            <div className="font-bold text-slate-700">تتبع UTM لروابط الحملة:</div>
+                            <div className="flex flex-wrap justify-between items-center gap-2">
+                              <div className="font-bold text-slate-700">تتبع UTM وروابط الحملة الإعلانية:</div>
+                              {selectedCamCodes.length > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenPromoQR(selectedCamCodes[0], selectedCam)}
+                                  className="bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                                >
+                                  <QrCode className="w-3.5 h-3.5" />
+                                  <span>توليد وتحميل باركود / بطاقة الخصم</span>
+                                </button>
+                              )}
+                            </div>
                             <div className="font-mono text-slate-500 bg-white border px-3 py-1.5 rounded-lg select-all text-left truncate" dir="ltr">
                               {`${window.location.origin}/promo/` + `{الرمز}?utm_source=${selectedCam.source}&utm_medium=${selectedCam.medium}&utm_campaign=${selectedCam.campaign}`}
                             </div>
                             <div className="text-[10px] text-slate-400">
-                              عند طباعة الكروت أو نشر الإعلانات، استخدم رابط صفحة الهبوط هذا. مسح الـ QR سيفتح صفحة هدية مميزة ويملأ الكوبون تلقائياً بالسلة وبالصيانة.
+                              عند طباعة الكروت أو نشر الإعلانات، استخدم كود الـ QR أو الرابط المباشر. مسح الـ QR سيفتح صفحة هدية فاخرة ويملأ الكوبون تلقائياً للعميل.
                             </div>
                           </div>
 
@@ -4561,16 +4589,25 @@ export default function AdminPage() {
                                           {c.isActive ? "فعال" : "متوقف"}
                                         </span>
                                       </td>
-                                      <td className="p-3 text-left flex justify-end gap-2 items-center">
+                                      <td className="p-3 text-left flex justify-end gap-1.5 items-center">
+                                        <button
+                                          type="button"
+                                          onClick={() => handleOpenPromoQR(c, selectedCam)}
+                                          className="px-2 py-1 text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-lg transition-colors cursor-pointer flex items-center gap-1 font-bold text-[11px]"
+                                          title="عرض وتنزيل باركود وQR الخصم"
+                                        >
+                                          <QrCode className="w-3.5 h-3.5 text-sky-600" />
+                                          <span>باركود و QR</span>
+                                        </button>
                                         <button
                                           type="button"
                                           onClick={() => {
                                             const fullPromoLink = `${window.location.origin}/promo/${c.code}?utm_source=${selectedCam.source}&utm_medium=${selectedCam.medium}&utm_campaign=${selectedCam.campaign}`;
                                             navigator.clipboard.writeText(fullPromoLink);
-                                            alert(`تم نسخ رابط تفعيل الكوبون للرمز ${c.code} بنجاح! يمكن استخدامه لإنشاء كود الـ QR.`);
+                                            alert(`تم نسخ رابط تفعيل الكوبون للرمز ${c.code} بنجاح!`);
                                           }}
                                           className="p-1.5 text-slate-500 hover:text-sky-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                                          title="نسخ الرابط لتوليد QR"
+                                          title="نسخ الرابط المباشر"
                                         >
                                           <Copy className="w-3.5 h-3.5" />
                                         </button>
@@ -6743,6 +6780,14 @@ export default function AdminPage() {
         onClose={() => setIsPrintModalOpen(false)}
         printableData={printableData}
         siteSettings={siteSettings}
+      />
+
+      {/* Promo QR Code & Gift Card Modal */}
+      <PromoQRCodeModal
+        isOpen={isPromoQRModalOpen}
+        onClose={() => setIsPromoQRModalOpen(false)}
+        coupon={promoQRTargetCoupon}
+        campaign={promoQRTargetCampaign}
       />
 
     </div>

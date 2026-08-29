@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Printer,
   X,
@@ -13,6 +13,8 @@ import {
   ShieldCheck,
   Tag
 } from "lucide-react";
+import QRCode from "qrcode";
+import JsBarcode from "jsbarcode";
 import { Order, Appointment, SiteSettings, useApp } from "@/context/AppContext";
 
 export type PrintableDataType =
@@ -28,83 +30,83 @@ interface PrintInvoiceModalProps {
 }
 
 /**
- * High-precision vector SVG Barcode generator for clean crisp scanning (Code 128 pattern)
+ * Standard Code 128 Vector SVG Barcode generator for handheld laser & optical scanners
  */
 function BarcodeSVG({ value }: { value: string }) {
-  const hash = value.split("").reduce((acc, char, idx) => acc + char.charCodeAt(0) * (idx + 1) * 7, 19);
-  const bars: { width: number; isBlack: boolean }[] = [
-    { width: 3, isBlack: true },
-    { width: 1, isBlack: false },
-    { width: 2, isBlack: true },
-    { width: 2, isBlack: false },
-  ];
+  const svgRef = useRef<SVGSVGElement | null>(null);
 
-  for (let i = 0; i < value.length; i++) {
-    const code = value.charCodeAt(i) + i * 3;
-    const w1 = (code % 3) + 1;
-    const w2 = ((code >> 1) % 3) + 1;
-    const w3 = ((code >> 2) % 2) + 1;
-    bars.push({ width: w1, isBlack: true });
-    bars.push({ width: w2, isBlack: false });
-    bars.push({ width: w3, isBlack: true });
-    bars.push({ width: 1, isBlack: false });
-  }
-
-  bars.push(
-    { width: 2, isBlack: true },
-    { width: 1, isBlack: false },
-    { width: 3, isBlack: true }
-  );
-
-  let currentX = 0;
-  const barElements = bars.map((bar, index) => {
-    const el = bar.isBlack ? (
-      <rect
-        key={index}
-        x={currentX}
-        y="0"
-        width={bar.width}
-        height="40"
-        fill="#000000"
-      />
-    ) : null;
-    currentX += bar.width;
-    return el;
-  });
+  useEffect(() => {
+    if (svgRef.current && value) {
+      try {
+        JsBarcode(svgRef.current, value, {
+          format: "CODE128",
+          width: 1.6,
+          height: 38,
+          displayValue: true,
+          font: "monospace",
+          fontSize: 10,
+          fontOptions: "bold",
+          margin: 2,
+          background: "transparent",
+        });
+      } catch (e) {
+        console.error("Barcode generation error:", e);
+      }
+    }
+  }, [value]);
 
   return (
     <div className="flex flex-col items-center">
-      <svg
-        viewBox={`0 0 ${currentX} 40`}
-        className="w-48 h-10 sm:h-11"
-        preserveAspectRatio="none"
-      >
-        {barElements}
-      </svg>
-      <span className="font-mono text-[10px] font-bold tracking-widest text-slate-800 uppercase mt-0.5" dir="ltr">
-        *{value}*
-      </span>
+      <svg ref={svgRef} className="w-48 h-10 sm:h-11 overflow-visible" />
     </div>
   );
 }
 
 /**
- * High-precision Dynamic QR Code generator for live device tracking
+ * 100% Offline Vector SVG Dynamic QR Code generator for live device tracking
+ * Renders instantly into pure inline SVG (zero external network requests, zero print latency)
  */
 function DynamicQRCode({ url, size = 60 }: { url: string; size?: number }) {
-  const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size * 2}x${size * 2}&format=svg&data=${encodeURIComponent(url)}`;
+  const qrSvgData = useMemo(() => {
+    try {
+      const qr = QRCode.create(url || "https://alrwan-center.com", {
+        errorCorrectionLevel: "M",
+      });
+      const moduleCount = qr.modules.size;
+      const margin = 1;
+      const viewBoxSize = moduleCount + margin * 2;
+
+      let path = "";
+      for (let r = 0; r < moduleCount; r++) {
+        for (let c = 0; c < moduleCount; c++) {
+          if (qr.modules.get(r, c)) {
+            path += `M${c + margin},${r + margin}h1v1h-1z `;
+          }
+        }
+      }
+      return { path, viewBoxSize };
+    } catch (e) {
+      console.error("QR Code error:", e);
+      return null;
+    }
+  }, [url]);
+
+  if (!qrSvgData) return null;
+
   return (
     <div className="flex flex-col items-center">
       <div className="bg-white p-0.5 border border-slate-900 rounded-xs shadow-2xs flex items-center justify-center">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={qrApiUrl}
-          alt="QR Code"
+        <svg
+          viewBox={`0 0 ${qrSvgData.viewBoxSize} ${qrSvgData.viewBoxSize}`}
           width={size}
           height={size}
+          shapeRendering="crispEdges"
           className="object-contain"
           style={{ width: `${size}px`, height: `${size}px` }}
-        />
+        >
+          <rect width="100%" height="100%" fill="#ffffff" />
+          <path d={qrSvgData.path} fill="#000000" />
+        </svg>
       </div>
     </div>
   );

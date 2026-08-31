@@ -717,15 +717,42 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Fetch appointments
-        const { data: apptsData, error: apptsError } = await supabase
-          .from("appointments")
-          .select("*")
-          .order('createdat', { ascending: false });
+        let loadedAppts: Appointment[] = [];
+        try {
+          const { data: apptsData, error: apptsError } = await supabase
+            .from("appointments")
+            .select("*")
+            .order('createdat', { ascending: false });
 
-        if (apptsError) throw apptsError;
-        if (apptsData) setAppointments(apptsData.map(mapDBAppointment));
+          if (!apptsError && apptsData && apptsData.length > 0) {
+            loadedAppts = apptsData.map(mapDBAppointment);
+          }
+        } catch (e) {
+          console.warn("Could not load from appointments table:", e);
+        }
+
+        // Fallback to site_settings or localStorage if appointments table is empty/restricted
+        if (loadedAppts.length === 0) {
+          const siteApptsObj = settingsData?.find((s: any) => s.key === "site_appointments")?.value;
+          if (Array.isArray(siteApptsObj) && siteApptsObj.length > 0) {
+            loadedAppts = siteApptsObj;
+          } else if (typeof window !== "undefined") {
+            const localAppts = localStorage.getItem("mw_appointments");
+            if (localAppts) {
+              try {
+                loadedAppts = JSON.parse(localAppts);
+              } catch {}
+            }
+          }
+        }
+
+        setAppointments(loadedAppts);
+        if (typeof window !== "undefined" && loadedAppts.length > 0) {
+          localStorage.setItem("mw_appointments", JSON.stringify(loadedAppts));
+        }
 
         // Fetch Orders
+        let loadedOrders: Order[] = [];
         try {
           const { data: ordersData, error: ordersError } = await supabase
             .from("orders")
@@ -733,22 +760,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             .order("created_at", { ascending: false });
 
           if (!ordersError && ordersData && ordersData.length > 0) {
-            const mappedOrders = ordersData.map(mapDBOrder);
-            setOrders(mappedOrders);
-            if (typeof window !== "undefined") {
-              localStorage.setItem("mw_orders", JSON.stringify(mappedOrders));
-            }
-          } else {
-            const storedOrders = localStorage.getItem("mw_orders");
-            if (storedOrders) {
-              setOrders(JSON.parse(storedOrders));
-            }
+            loadedOrders = ordersData.map(mapDBOrder);
           }
         } catch {
-          const storedOrders = localStorage.getItem("mw_orders");
-          if (storedOrders) {
-            setOrders(JSON.parse(storedOrders));
+          // Ignore
+        }
+
+        if (loadedOrders.length === 0) {
+          const siteOrdersObj = settingsData?.find((s: any) => s.key === "site_orders")?.value;
+          if (Array.isArray(siteOrdersObj) && siteOrdersObj.length > 0) {
+            loadedOrders = siteOrdersObj;
+          } else if (typeof window !== "undefined") {
+            const storedOrders = localStorage.getItem("mw_orders");
+            if (storedOrders) {
+              try {
+                loadedOrders = JSON.parse(storedOrders);
+              } catch {}
+            }
           }
+        }
+
+        setOrders(loadedOrders);
+        if (typeof window !== "undefined" && loadedOrders.length > 0) {
+          localStorage.setItem("mw_orders", JSON.stringify(loadedOrders));
         }
 
         // Load Cart from LocalStorage
@@ -923,6 +957,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Appointment Actions
+  const syncAppointmentsBackup = async (apptsList: Appointment[]) => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("mw_appointments", JSON.stringify(apptsList));
+    }
+    try {
+      await supabase
+        .from("site_settings")
+        .upsert({ key: "site_appointments", value: apptsList });
+    } catch (e) {
+      console.warn("Could not sync appointments to site_settings backup:", e);
+    }
+  };
+
   const addAppointment = async (newAppt: Omit<Appointment, "id" | "status" | "createdAt"> & { status?: Appointment["status"]; trackingCode?: string }): Promise<Appointment> => {
     const randomSuffix = Math.floor(1000 + Math.random() * 9000);
     const trackingCode = newAppt.trackingCode || `RWN-R${randomSuffix}`;
@@ -937,11 +984,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // Optimistic UI Update
     const updated = [appt, ...appointments];
     setAppointments(updated);
+    syncAppointmentsBackup(updated);
 
     // Supabase Update
-    const { error } = await supabase.from("appointments").insert([mapLocalAppointmentToDB(appt)]);
-    if (error) {
-      console.error("Error adding appointment to Supabase", error);
+    try {
+      const { error } = await supabase.from("appointments").insert([mapLocalAppointmentToDB(appt)]);
+      if (error) {
+        console.warn("Error adding appointment to Supabase appointments table (using cloud backup):", error);
+      }
+    } catch (err) {
+      console.warn("Supabase insert exception:", err);
     }
     return appt;
   };
@@ -952,17 +1004,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       appt.id === id ? { ...appt, status } : appt
     );
     setAppointments(updated);
+    syncAppointmentsBackup(updated);
 
     const target = updated.find((a) => a.id === id);
     if (target) {
       const dbPayload = mapLocalAppointmentToDB(target);
-      const { error } = await supabase
-        .from("appointments")
-        .update(dbPayload)
-        .eq("id", id);
+      try {
+        const { error } = await supabase
+          .from("appointments")
+          .update(dbPayload)
+          .eq("id", id);
 
-      if (error) {
-        console.error("Error updating appointment in Supabase", error);
+        if (error) {
+          console.warn("Error updating appointment in Supabase:", error);
+        }
+      } catch (err) {
+        console.warn("Supabase update exception:", err);
       }
     }
   };
@@ -972,17 +1029,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       appt.id === id ? { ...appt, ...updates } : appt
     );
     setAppointments(updated);
+    syncAppointmentsBackup(updated);
 
     const target = updated.find((a) => a.id === id);
     if (target) {
       const dbPayload = mapLocalAppointmentToDB(target);
-      const { error } = await supabase
-        .from("appointments")
-        .update(dbPayload)
-        .eq("id", id);
+      try {
+        const { error } = await supabase
+          .from("appointments")
+          .update(dbPayload)
+          .eq("id", id);
 
-      if (error) {
-        console.error("Error updating appointment details in Supabase", error);
+        if (error) {
+          console.warn("Error updating appointment details in Supabase:", error);
+        }
+      } catch (err) {
+        console.warn("Supabase update exception:", err);
       }
     }
   };
@@ -1012,15 +1074,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // Optimistic UI Update
     const updated = appointments.filter((appt) => appt.id !== id);
     setAppointments(updated);
+    syncAppointmentsBackup(updated);
 
     // Supabase Update
-    const { error } = await supabase.from("appointments").delete().eq("id", id);
-    if (error) {
-      console.error("Error deleting appointment from Supabase", error);
+    try {
+      const { error } = await supabase.from("appointments").delete().eq("id", id);
+      if (error) {
+        console.warn("Error deleting appointment from Supabase:", error);
+      }
+    } catch (err) {
+      console.warn("Supabase delete exception:", err);
     }
   };
 
   // Order Actions
+  const syncOrdersBackup = async (ordersList: Order[]) => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("mw_orders", JSON.stringify(ordersList));
+    }
+    try {
+      await supabase
+        .from("site_settings")
+        .upsert({ key: "site_orders", value: ordersList });
+    } catch (e) {
+      console.warn("Could not sync orders to site_settings backup:", e);
+    }
+  };
+
   const addOrder = async (
     newOrder: Omit<Order, "id" | "orderNumber" | "createdAt"> & { orderNumber?: string }
   ): Promise<Order> => {
@@ -1034,9 +1114,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const updated = [order, ...orders];
     setOrders(updated);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("mw_orders", JSON.stringify(updated));
-    }
+    syncOrdersBackup(updated);
 
     try {
       await supabase.from("orders").insert([mapLocalOrderToDB(order)]);
@@ -1050,9 +1128,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const updateOrderStatus = async (id: string, status: OrderStatus) => {
     const updated = orders.map((o) => (o.id === id ? { ...o, status } : o));
     setOrders(updated);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("mw_orders", JSON.stringify(updated));
-    }
+    syncOrdersBackup(updated);
 
     try {
       await supabase.from("orders").update({ status }).eq("id", id);
@@ -1064,9 +1140,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const deleteOrder = async (id: string) => {
     const updated = orders.filter((o) => o.id !== id);
     setOrders(updated);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("mw_orders", JSON.stringify(updated));
-    }
+    syncOrdersBackup(updated);
 
     try {
       await supabase.from("orders").delete().eq("id", id);

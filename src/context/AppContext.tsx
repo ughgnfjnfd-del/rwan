@@ -813,35 +813,93 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const refreshAppointments = async () => {
     try {
-      const { data: apptsData, error: apptsError } = await supabase
-        .from("appointments")
-        .select("*")
-        .order("createdat", { ascending: false });
+      let loadedAppts: Appointment[] = [];
+      try {
+        const { data: apptsData, error: apptsError } = await supabase
+          .from("appointments")
+          .select("*")
+          .order("createdat", { ascending: false });
 
-      if (!apptsError && apptsData) {
-        setAppointments(apptsData.map(mapDBAppointment));
+        if (!apptsError && apptsData && apptsData.length > 0) {
+          loadedAppts = apptsData.map(mapDBAppointment);
+        }
+      } catch (err) {
+        console.warn("Error querying appointments table:", err);
+      }
+
+      if (loadedAppts.length === 0) {
+        const { data: settingsData } = await supabase
+          .from("site_settings")
+          .select("*")
+          .eq("key", "site_appointments")
+          .maybeSingle();
+
+        if (settingsData && Array.isArray(settingsData.value) && settingsData.value.length > 0) {
+          loadedAppts = settingsData.value;
+        } else if (typeof window !== "undefined") {
+          const localAppts = localStorage.getItem("mw_appointments");
+          if (localAppts) {
+            try {
+              loadedAppts = JSON.parse(localAppts);
+            } catch {}
+          }
+        }
+      }
+
+      if (loadedAppts.length > 0) {
+        setAppointments(loadedAppts);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("mw_appointments", JSON.stringify(loadedAppts));
+        }
       }
     } catch (err) {
-      console.error("Error refreshing appointments from Supabase", err);
+      console.error("Error refreshing appointments:", err);
     }
   };
 
   const refreshOrders = async () => {
     try {
-      const { data: ordersData, error: ordersError } = await supabase
-        .from("orders")
-        .select("*")
-        .order("created_at", { ascending: false });
+      let loadedOrders: Order[] = [];
+      try {
+        const { data: ordersData, error: ordersError } = await supabase
+          .from("orders")
+          .select("*")
+          .order("created_at", { ascending: false });
 
-      if (!ordersError && ordersData && ordersData.length > 0) {
-        const mapped = ordersData.map(mapDBOrder);
-        setOrders(mapped);
+        if (!ordersError && ordersData && ordersData.length > 0) {
+          loadedOrders = ordersData.map(mapDBOrder);
+        }
+      } catch (err) {
+        console.warn("Error querying orders table:", err);
+      }
+
+      if (loadedOrders.length === 0) {
+        const { data: settingsData } = await supabase
+          .from("site_settings")
+          .select("*")
+          .eq("key", "site_orders")
+          .maybeSingle();
+
+        if (settingsData && Array.isArray(settingsData.value) && settingsData.value.length > 0) {
+          loadedOrders = settingsData.value;
+        } else if (typeof window !== "undefined") {
+          const storedOrders = localStorage.getItem("mw_orders");
+          if (storedOrders) {
+            try {
+              loadedOrders = JSON.parse(storedOrders);
+            } catch {}
+          }
+        }
+      }
+
+      if (loadedOrders.length > 0) {
+        setOrders(loadedOrders);
         if (typeof window !== "undefined") {
-          localStorage.setItem("mw_orders", JSON.stringify(mapped));
+          localStorage.setItem("mw_orders", JSON.stringify(loadedOrders));
         }
       }
     } catch (err) {
-      console.error("Error refreshing orders from Supabase", err);
+      console.error("Error refreshing orders:", err);
     }
   };
 
@@ -860,6 +918,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         "postgres_changes",
         { event: "*", schema: "public", table: "orders" },
         () => {
+          refreshOrders();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "site_settings" },
+        () => {
+          refreshAppointments();
           refreshOrders();
         }
       )

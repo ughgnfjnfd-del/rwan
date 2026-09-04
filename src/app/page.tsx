@@ -991,7 +991,7 @@ export default function Home() {
                   <span className="bg-accent text-white font-extrabold text-[9px] px-2 py-0.5 rounded-full uppercase">فوري</span>
                 </h3>
                 <p className="text-[10px] text-slate-300 leading-normal">
-                  فحص مجاني فوري وصيانة سريعة للأجهزة مع ضمان حقيقي يصل إلى 3 أيام.
+                  فحص مجاني فوري وصيانة سريعة للأجهزة مع ضمان داخل المركز فقط.
                 </p>
               </div>
             </div>
@@ -1307,7 +1307,9 @@ export default function Home() {
         </section>
 
         {/* Flash Sale Countdown Deal */}
-        <FlashSaleBanner />
+        <div className="reveal-on-scroll">
+          <FlashSaleBanner onSelectProduct={setSelectedProduct} />
+        </div>
 
         {/* Dynamic Custom Promo Banner */}
         {siteSettings.promoBanner?.isEnabled && (

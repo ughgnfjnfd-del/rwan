@@ -54,14 +54,14 @@ const processSteps = [
   { number: "01", title: "نسمع المشكلة", text: "نسجل الأعراض ونوع الجهاز والوقت المناسب لك." },
   { number: "02", title: "نفحص بدقة", text: "تشخيص واضح يحدد سبب العطل وليس شكله فقط." },
   { number: "03", title: "نطلب موافقتك", text: "السعر والمدة والقطعة تظهر قبل بدء أي عمل." },
-  { number: "04", title: "نسلّم بضمان", text: "اختبار نهائي وتوثيق الصيانة قبل استلام الجهاز." },
+  { number: "04", title: "ضمان داخل المركز", text: "فحص وتجربة شاملة للجهاز والتأكد من كفاءته داخل المركز قبل الاستلام." },
 ];
 
 const questions = [
   { q: "هل يبدأ التصليح مباشرة بعد الحجز؟", a: "لا. يبدأ الطلب بفحص وتشخيص، وبعدها نوضح لك السعر والمدة وننتظر موافقتك قبل أي إصلاح." },
   { q: "هل بيانات الجهاز تبقى آمنة؟", a: "نطلب أقل قدر ممكن من الوصول، ولا نطلب كلمات مرور أو حسابات إلا عند ضرورة فنية وبعد موافقتك الواضحة." },
   { q: "كم يستغرق الفحص؟", a: "يختلف حسب نوع العطل، لكن الفحص الأولي للأعطال الشائعة يتم عادة خلال وقت قصير ويصلك تحديث من المركز." },
-  { q: "هل توجد كفالة على الصيانة؟", a: "نعم، تُحدد الكفالة بحسب نوع الإصلاح والقطعة المستخدمة وتُوثق لك عند التسليم." },
+  { q: "هل توجد كفالة على الصيانة؟", a: "الضمان خاص بالصيانة داخل المركز فقط؛ حيث يتم فحص الجهاز وتجربة القطعة المستبدلة والتأكد من سلامتها التامة مع الزبون داخل المركز قبل الاستلام." },
 ];
 
 export default function RepairExperience() {
@@ -333,7 +333,7 @@ export default function RepairExperience() {
                 <Fingerprint className="h-16 w-16 text-cyan-300" strokeWidth={1.2} />
               </div>
               <span className="absolute right-3 top-5 rounded-full border border-slate-200 bg-white px-4 py-2 text-[10px] font-black shadow-sm">بياناتك لك</span>
-              <span className="absolute bottom-6 left-1 rounded-full border border-slate-200 bg-white px-4 py-2 text-[10px] font-black shadow-sm">ضمان موثق</span>
+              <span className="absolute bottom-6 left-1 rounded-full border border-slate-200 bg-white px-4 py-2 text-[10px] font-black shadow-sm">ضمان داخل المركز فقط</span>
               <span className="absolute left-2 top-16 rounded-full border border-slate-200 bg-white px-4 py-2 text-[10px] font-black shadow-sm">قطع معتمدة</span>
             </div>
 
@@ -346,7 +346,7 @@ export default function RepairExperience() {
                 {[
                   "لا نطلب كلمات المرور أو الحسابات دون حاجة فنية واضحة.",
                   "لا يبدأ الإصلاح قبل اعتماد السعر والمدة من قبلك.",
-                  "اختبار نهائي للجهاز قبل التسليم وتوثيق الضمان.",
+                  "اختبار نهائي للجهاز قبل التسليم وضمان فحص وتجربة داخل المركز فقط.",
                 ].map((text) => (
                   <div key={text} className="flex items-start gap-3 border-b border-slate-200 pb-4 text-sm font-bold text-slate-700">
                     <BadgeCheck className="mt-0.5 h-5 w-5 flex-shrink-0 text-cyan-600" />

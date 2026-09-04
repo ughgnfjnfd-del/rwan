@@ -657,7 +657,7 @@ function TrackingContent() {
                       </div>
                       <div className="flex justify-between items-center text-xs border-t border-slate-800/80 pt-2 text-[10px] text-slate-400">
                         <span>الضمان:</span>
-                        <span className="text-emerald-400 font-bold">ضمان فحص وقطع أصلية</span>
+                        <span className="text-emerald-400 font-bold">ضمان داخل المركز فقط</span>
                       </div>
                     </div>
 

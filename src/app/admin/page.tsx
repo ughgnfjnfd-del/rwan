@@ -477,7 +477,7 @@ export default function AdminPage() {
       "in-progress": "قيد الصيانة واستبدال القطع",
       testing: "قيد الفحص النهائي واختبار الجودة",
       ready: "جهازكم جاهز للاستلام الآن في المركز",
-      completed: "تم التسليم بنجاح وتفعيل الضمان",
+      completed: "تم التسليم بنجاح وتفعيل الضمان (داخل المركز فقط)",
       cancelled: "تم إلغاء طلب الصيانة",
     };
 
@@ -2873,7 +2873,7 @@ export default function AdminPage() {
                             <button
                               onClick={() => handlePrintRepair(appt)}
                               className="p-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
-                              title="طباعة إيصال استلام وضمان صيانة مع كود التتبع"
+                              title="طباعة إيصال استلام وضمان صيانة (داخل المركز فقط) مع كود التتبع"
                             >
                               <Printer className="w-3.5 h-3.5" />
                             </button>
@@ -6193,7 +6193,7 @@ export default function AdminPage() {
                       onChange={(e) => setManualRepairForm({ ...manualRepairForm, issueType: e.target.value })}
                       className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50 focus:outline-none focus:border-sky-500 font-bold"
                     >
-                      <option value="تبديل شاشة أصلية">تبديل شاشة أصلية مع الضمان</option>
+                      <option value="تبديل شاشة أصلية">تبديل شاشة أصلية (ضمان داخل المركز فقط)</option>
                       <option value="استبدال بطارية أصلية">استبدال بطارية أصلية مع الفحص</option>
                       <option value="صيانة آيسي الشحن والبورد">صيانة آيسي الشحن والبورد</option>
                       <option value="معالجة وتنظيف سوائل وماء">معالجة وتنظيف سوائل وماء</option>
@@ -6638,7 +6638,7 @@ export default function AdminPage() {
                   <option value="in-progress">3. قيد الصيانة واستبدال القطع</option>
                   <option value="testing">4. الفحص النهائي واختبار الجودة والشحن</option>
                   <option value="ready">5. جاهز للاستلام بالمحل</option>
-                  <option value="completed">6. تم التسليم للزبون وتفعيل الضمان</option>
+                  <option value="completed">6. تم التسليم للزبون (ضمان داخل المركز فقط)</option>
                   <option value="cancelled">7. ملغي / تعذر الإصلاح</option>
                 </select>
               </div>

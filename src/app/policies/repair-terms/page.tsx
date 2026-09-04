@@ -80,8 +80,8 @@ export default function RepairTermsPage() {
       <div className="p-4 bg-blue-50/30 border border-blue-100 rounded-2xl flex gap-3 text-xs text-slate-700">
         <ShieldCheck className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
         <div>
-          <span className="font-bold block text-blue-800 mb-1">ضمان ما بعد التصليح</span>
-          جميع عمليات الصيانة وقطع الغيار المستبدلة (شاشات، بطاريات، منافذ شحن، إلخ) مشمولة بضمان حقيقي لمدة 3 أيام. في حال تكرار نفس المشكلة نتيجة خلل في القطعة، نقوم بإعادة صيانتها مجاناً.
+          <span className="font-bold block text-blue-800 mb-1">ضمان الصيانة (داخل المركز فقط)</span>
+          جميع عمليات الصيانة وقطع الغيار المستبدلة (شاشات، بطاريات، منافذ شحن، إلخ) مشمولة بضمان داخل المركز فقط؛ حيث يتم فحص وتجربة الجهاز والقطعة المستبدلة والتأكد من سلامتها التامة مع الزبون داخل المركز مباشرة قبل الاستلام.
         </div>
       </div>
 

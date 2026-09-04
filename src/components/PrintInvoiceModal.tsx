@@ -384,7 +384,7 @@ export default function PrintInvoiceModal({
             </div>
             <div>
               <h3 className="font-extrabold text-sm sm:text-base text-white">
-                {isRepair ? "طباعة إيصال استلام وضمان الصيانة المعتمد" : "طباعة الفواتير وبوالص الشحن الرسمية"}
+                {isRepair ? "طباعة إيصال استلام وضمان الصيانة (داخل المركز فقط)" : "طباعة الفواتير وبوالص الشحن الرسمية"}
               </h3>
               <p className="text-[11px] text-slate-400 font-mono">
                 كود التتبع: {invoiceNumber}
@@ -506,7 +506,7 @@ export default function PrintInvoiceModal({
                     <div className="text-left space-y-1 flex flex-col items-end flex-shrink-0">
                       <div className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-slate-100 border border-slate-300 rounded text-[10px] font-black text-slate-800 whitespace-nowrap">
                         <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                        <span>{isRepair ? "إيصال وضمان صيانة معتمد" : "بوليصة شحن معتمدة"}</span>
+                        <span>{isRepair ? "إيصال وضمان صيانة (داخل المركز فقط)" : "بوليصة شحن معتمدة"}</span>
                       </div>
                       <BarcodeSVG value={invoiceNumber} />
                     </div>
@@ -677,9 +677,9 @@ export default function PrintInvoiceModal({
 
                       {/* Right: Repair Terms & Guarantee */}
                       <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 space-y-1 text-[9px] text-slate-600">
-                        <strong className="text-slate-900 block text-[10px]">شروط وضمان الاستلام:</strong>
+                        <strong className="text-slate-900 block text-[10px]">شروط الاستلام والضمان:</strong>
                         <p className="leading-tight">• يرجى إبراز هذا الوصل عند استلام الجهاز من المركز.</p>
-                        <p className="leading-tight">• يلتزم المركز بتوفير قطع أصلية مع فحص شامل وضمان معتمد.</p>
+                        <p className="leading-tight">• يلتزم المركز بتوفير قطع أصلية وفحص شامل (الضمان داخل المركز فقط).</p>
                         {repairData?.estimatedReady && (
                           <p className="text-sky-700 font-bold">• الموعد المتوقع: {repairData.estimatedReady}</p>
                         )}

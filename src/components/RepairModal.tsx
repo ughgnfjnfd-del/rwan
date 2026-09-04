@@ -644,7 +644,7 @@ export default function RepairModal({ isOpen, onClose }: RepairModalProps) {
                         <Sparkles className="h-4 w-4" />
                         فحص أوضح وتجربة أسرع
                       </div>
-                      سيتم تأكيد الكلفة والمدة بعد التشخيص، ولن تبدأ الصيانة إلا بعد موافقتك.
+                      سيتم تأكيد الكلفة والمدة بعد التشخيص، ولن تبدأ الصيانة إلا بعد موافقتك (الضمان داخل المركز فقط).
                     </div>
                   </div>
                 )}
